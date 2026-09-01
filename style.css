@@ -43,6 +43,13 @@ html, body {
   min-height: 100%;
 }
 
+html {
+  /* Kill double-tap zoom so rapid button taps register instead of zooming. */
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   background:
     radial-gradient(ellipse 90% 55% at 50% 18%, #1c2435 0%, transparent 55%),
@@ -1630,6 +1637,9 @@ button {
   border-radius: var(--radius);
   position: relative;
   touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(232, 197, 71, 0.2);
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 button:disabled {

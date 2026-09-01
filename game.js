@@ -816,6 +816,7 @@
 
   let lastSaveAt = 0;
   let lastRecruitSig = "";
+  let lastRecruitStructureSig = "";
   let waveTransitionTimer = null;
 
   function defaultUpgradeLevels() {
@@ -963,6 +964,7 @@
     clearSave();
     resetMetaState();
     lastRecruitSig = "";
+    lastRecruitStructureSig = "";
     appendLog("log-muted", "New game — wave 1 assault begins.");
     startBattle();
     renderHud();
@@ -2214,9 +2216,37 @@
   }
 
   function renderUpgrades() {
-    el.upgradeList.innerHTML = "";
-    for (const def of UPGRADES) {
-      if (!upgradeMatchesCategory(def, state.upgradeCategory)) continue;
+    const visible = UPGRADES.filter((def) =>
+      upgradeMatchesCategory(def, state.upgradeCategory)
+    );
+    const existing = el.upgradeList.querySelectorAll(".shop-btn[data-id]");
+    const canPatch =
+      existing.length === visible.length &&
+      Array.from(existing).every((btn, i) => btn.dataset.id === visible[i].id);
+
+    if (!canPatch) {
+      el.upgradeList.innerHTML = "";
+      for (const def of visible) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.dataset.id = def.id;
+        btn.className = "shop-btn";
+        btn.innerHTML =
+          `<span class="shop-btn-body">` +
+          `<span class="item-name">${def.name}` +
+          `<span class="level-badge"></span></span>` +
+          `<span class="item-meta"></span></span>` +
+          `<span class="item-cost"><span class="cost-gold"></span></span>`;
+        btn.addEventListener("click", () => buyUpgrade(def.id));
+        el.upgradeList.appendChild(btn);
+      }
+    }
+
+    for (const def of visible) {
+      const btn = el.upgradeList.querySelector(
+        '.shop-btn[data-id="' + def.id + '"]'
+      );
+      if (!btn) continue;
       const cost = upgradeCost(def);
       const level = state.upgradeLevels[def.id];
       const meta = def.combat
@@ -2226,23 +2256,20 @@
           (def.id === "granary" || def.id === "plunder" || def.id === "caravan")
             ? ` (${combatBonusText(def, level)})`
             : "");
-      const btn = document.createElement("button");
-      btn.dataset.id = def.id;
-      const foodTag = def.food || FOOD_UPGRADE_IDS[def.id] ? " food-upgrade" : "";
-      btn.className =
-        "shop-btn" +
-        foodTag +
-        (state.gold >= cost ? " affordable" : "") +
-        (level > 0 ? " has-level" : "");
+      const foodTag = def.food || FOOD_UPGRADE_IDS[def.id];
+      btn.classList.toggle("food-upgrade", !!foodTag);
+      btn.classList.toggle("affordable", state.gold >= cost);
+      btn.classList.toggle("has-level", level > 0);
       btn.disabled = state.gold < cost;
-      btn.innerHTML =
-        `<span class="shop-btn-body">` +
-        `<span class="item-name">${def.name}` +
-        `<span class="level-badge" title="Level ${level}">Lv ${level}</span></span>` +
-        `<span class="item-meta">${meta}</span></span>` +
-        `<span class="item-cost"><span class="cost-gold">${format(cost)} g</span></span>`;
-      btn.addEventListener("click", () => buyUpgrade(def.id));
-      el.upgradeList.appendChild(btn);
+      const badge = btn.querySelector(".level-badge");
+      const metaEl = btn.querySelector(".item-meta");
+      const costEl = btn.querySelector(".cost-gold");
+      if (badge) {
+        badge.textContent = "Lv " + level;
+        badge.title = "Level " + level;
+      }
+      if (metaEl) metaEl.textContent = meta;
+      if (costEl) costEl.textContent = format(cost) + " g";
     }
     updateUpgradeTabBadge();
   }
@@ -2327,36 +2354,55 @@
     const canCata = canCatapult();
     const used = !!(state.battle && state.battle.catapultUsed);
 
-    el.warChestList.innerHTML = "";
+    let repairBtn = el.warChestList.querySelector('[data-war-chest="repair"]');
+    let cataBtn = el.warChestList.querySelector('[data-war-chest="catapult"]');
 
-    const repairBtn = document.createElement("button");
-    repairBtn.type = "button";
-    repairBtn.className =
-      "shop-btn war-chest-btn" + (canRepair ? " affordable" : "");
+    if (!repairBtn || !cataBtn) {
+      el.warChestList.innerHTML = "";
+      repairBtn = document.createElement("button");
+      repairBtn.type = "button";
+      repairBtn.dataset.warChest = "repair";
+      repairBtn.className = "shop-btn war-chest-btn";
+      repairBtn.innerHTML =
+        `<span><span class="item-name">Repair Keep</span>` +
+        `<br><span class="item-meta"></span></span>` +
+        `<span class="item-cost"><span class="cost-gold"></span></span>`;
+      repairBtn.addEventListener("click", repairKeep);
+      el.warChestList.appendChild(repairBtn);
+
+      cataBtn = document.createElement("button");
+      cataBtn.type = "button";
+      cataBtn.dataset.warChest = "catapult";
+      cataBtn.className = "shop-btn war-chest-btn";
+      cataBtn.innerHTML =
+        `<span><span class="item-name">Catapult Strike</span>` +
+        `<br><span class="item-meta"></span></span>` +
+        `<span class="item-cost"><span class="cost-gold"></span></span>`;
+      cataBtn.addEventListener("click", catapultStrike);
+      el.warChestList.appendChild(cataBtn);
+    }
+
+    repairBtn.classList.toggle("affordable", canRepair);
     repairBtn.disabled = !canRepair;
-    repairBtn.innerHTML =
-      `<span><span class="item-name">Repair Keep</span>` +
-      `<br><span class="item-meta">Restore up to 30 HP` +
-      (live && missing > 0 ? ` · Missing ${missing}` : "") +
-      `</span></span>` +
-      `<span class="item-cost"><span class="cost-gold">${format(repairCost)} g</span></span>`;
-    repairBtn.addEventListener("click", repairKeep);
-    el.warChestList.appendChild(repairBtn);
+    const repairMeta = repairBtn.querySelector(".item-meta");
+    const repairCostEl = repairBtn.querySelector(".cost-gold");
+    if (repairMeta) {
+      repairMeta.textContent =
+        "Restore up to 30 HP" +
+        (live && missing > 0 ? ` · Missing ${missing}` : "");
+    }
+    if (repairCostEl) repairCostEl.textContent = format(repairCost) + " g";
 
-    const cataBtn = document.createElement("button");
-    cataBtn.type = "button";
-    cataBtn.className =
-      "shop-btn war-chest-btn" + (canCata ? " affordable" : "");
+    cataBtn.classList.toggle("affordable", canCata);
     cataBtn.disabled = !canCata;
-    const cataMeta = used
-      ? "Used this wave"
-      : `Deal ${cataDmg} enemy keep damage · Once per wave`;
-    cataBtn.innerHTML =
-      `<span><span class="item-name">Catapult Strike</span>` +
-      `<br><span class="item-meta">${cataMeta}</span></span>` +
-      `<span class="item-cost"><span class="cost-gold">${format(cataCost)} g</span></span>`;
-    cataBtn.addEventListener("click", catapultStrike);
-    el.warChestList.appendChild(cataBtn);
+    const cataMeta = cataBtn.querySelector(".item-meta");
+    const cataCostEl = cataBtn.querySelector(".cost-gold");
+    if (cataMeta) {
+      cataMeta.textContent = used
+        ? "Used this wave"
+        : `Deal ${cataDmg} enemy keep damage · Once per wave`;
+    }
+    if (cataCostEl) cataCostEl.textContent = format(cataCost) + " g";
   }
 
   function foodUpkeepRate() {
@@ -2468,83 +2514,117 @@
     el.spawnHint.textContent = spawnHintText(inBattle(), playerCount);
 
     const trainDur = trainDuration().toFixed(1);
-    const parts = [];
+    const structureParts = [];
     for (const type of UNIT_TYPES) {
-      const stats = playerUnitStats(type);
-      const unlocked = isUnitUnlocked(type.id);
-      const waveOk = !unitNeedsUnlock(type) || unitUnlockWaveReached(type);
-      const autoOn = unlocked && !!state.autoSpawn[type.id];
-      const isTraining = !!(training && training.typeId === type.id);
-      const canUnlock = canUnlockUnit(type.id);
-      const canQueue =
-        unlocked &&
-        live &&
-        !training &&
-        state.gold >= type.cost &&
-        state.food >= type.foodCost &&
-        playerCount < FIELD_SOFT_CAP;
-      parts.push(
-        [
-          type.id,
-          unlocked ? 1 : 0,
-          waveOk ? 1 : 0,
-          canUnlock ? 1 : 0,
-          autoOn ? 1 : 0,
-          isTraining ? 1 : 0,
-          canQueue ? 1 : 0,
-          stats.maxHp,
-          stats.atk,
-          stats.armor,
-          trainDur,
-          state.wave,
-        ].join(":")
+      structureParts.push(
+        type.id + ":" + (isUnitUnlocked(type.id) ? "1" : "0")
       );
     }
-    const sig = parts.join("|");
+    const structureSig = structureParts.join("|");
 
     const existing = el.recruitList.querySelectorAll(".recruit-card");
     const canPatch =
       existing.length === UNIT_TYPES.length &&
-      Array.from(existing).every(
-        (card, i) => card.dataset.id === UNIT_TYPES[i].id
-      );
+      structureSig === lastRecruitStructureSig &&
+      Array.from(existing).every((card, i) => {
+        const type = UNIT_TYPES[i];
+        if (!type || card.dataset.id !== type.id) return false;
+        const unlocked = isUnitUnlocked(type.id);
+        return card.classList.contains("locked") === !unlocked;
+      });
 
-    if (canPatch && sig === lastRecruitSig) {
+    if (canPatch) {
       for (const type of UNIT_TYPES) {
         const card = el.recruitList.querySelector(
           '.recruit-card[data-id="' + type.id + '"]'
         );
         if (!card) continue;
+        const stats = playerUnitStats(type);
+        const unlocked = isUnitUnlocked(type.id);
+        const waveOk = !unitNeedsUnlock(type) || unitUnlockWaveReached(type);
+        const autoOn = unlocked && !!state.autoSpawn[type.id];
         const isTraining = !!(training && training.typeId === type.id);
+        const canUnlock = canUnlockUnit(type.id);
+        const canQueue =
+          unlocked &&
+          live &&
+          !training &&
+          state.gold >= type.cost &&
+          state.food >= type.foodCost &&
+          playerCount < FIELD_SOFT_CAP;
         const pct = isTraining
           ? Math.min(100, (training.elapsed / training.duration) * 100)
           : 0;
+
+        card.classList.toggle("auto-on", autoOn);
+        card.classList.toggle("affordable", canQueue || canUnlock);
+        card.classList.toggle("training", isTraining);
+
+        const btn = card.querySelector(".recruit-btn");
+        if (btn) {
+          btn.title = !unlocked
+            ? !waveOk
+              ? `Unlocks at wave ${type.unlockWave}`
+              : canUnlock
+                ? `Unlock ${type.name} for ${type.unlockCost} gold`
+                : `Need ${type.unlockCost} gold to unlock`
+            : canQueue
+              ? `Train ${type.name}`
+              : trainBlockReason(type.id);
+        }
+
         const fill = card.querySelector(".spawn-bar-fill");
         const bar = card.querySelector(".spawn-bar");
         if (fill) fill.style.width = pct + "%";
         if (bar) bar.classList.toggle("active", isTraining);
-        card.classList.toggle("training", isTraining);
+
         const countEl = card.querySelector(".afford-count");
-        const unlocked = isUnitUnlocked(type.id);
         if (unlocked && countEl) {
           const count = affordCount(type);
           countEl.textContent = "×" + count;
           countEl.classList.toggle("is-zero", count <= 0);
         }
+
+        const metaEl = card.querySelector(".item-meta");
+        const costEl = card.querySelector(".item-cost");
         if (!unlocked) {
-          const costEl = card.querySelector(".item-cost");
-          if (
-            costEl &&
-            (!unitNeedsUnlock(type) || unitUnlockWaveReached(type))
-          ) {
-            costEl.innerHTML = formatUnlockCost(type);
+          const lockBadge = card.querySelector(".lock-badge");
+          if (lockBadge) {
+            lockBadge.textContent = waveOk
+              ? "LOCKED"
+              : "WAVE " + type.unlockWave;
           }
+          if (metaEl) {
+            metaEl.textContent = waveOk
+              ? `Unlock once · ${format(type.unlockCost)} g`
+              : `Unlocks at wave ${type.unlockWave}`;
+          }
+          if (costEl) {
+            costEl.innerHTML = waveOk
+              ? formatUnlockCost(type)
+              : `<span class="cost-muted">Wave ${type.unlockWave}</span>`;
+          }
+        } else {
+          if (metaEl) {
+            metaEl.textContent = `${stats.maxHp} HP · ${stats.atk} ATK · ${stats.armor} ARM · ${trainDur}s`;
+          }
+          if (costEl) costEl.innerHTML = formatCost(type);
+        }
+
+        const autoBtn = card.querySelector(".auto-toggle");
+        if (autoBtn) {
+          autoBtn.classList.toggle("is-on", autoOn);
+          autoBtn.setAttribute("aria-pressed", autoOn ? "true" : "false");
+          autoBtn.title = autoOn
+            ? "Auto-train on — click to disable"
+            : "Auto-train off — click to enable";
         }
       }
       return;
     }
 
-    lastRecruitSig = sig;
+    lastRecruitStructureSig = structureSig;
+    lastRecruitSig = structureSig;
     const focused =
       document.activeElement &&
       document.activeElement.closest &&
@@ -2631,7 +2711,7 @@
 
       if (!unlocked) {
         btn.addEventListener("click", () => {
-          if (!waveOk) return;
+          if (unitNeedsUnlock(type) && !unitUnlockWaveReached(type)) return;
           if (unlockUnit(type.id)) {
             pulseRecruitCard(card, "buy-flash");
             renderHud();
@@ -2740,6 +2820,37 @@
     updateUpgradeTabBadge();
   }
 
+  function bindPress(btn, handler) {
+    let ignoreClick = false;
+    btn.addEventListener(
+      "pointerdown",
+      (ev) => {
+        if (ev.isPrimary === false) return;
+        if (ev.pointerType === "mouse" && ev.button !== 0) return;
+        if (btn.disabled) return;
+        ignoreClick = true;
+        handler(ev);
+      },
+      { passive: true }
+    );
+    btn.addEventListener("click", (ev) => {
+      if (ignoreClick) {
+        ignoreClick = false;
+        return;
+      }
+      if (btn.disabled) return;
+      handler(ev);
+    });
+    const clearIgnore = () => {
+      // Click usually follows pointerup in the same turn; clear any stale flag after.
+      setTimeout(() => {
+        ignoreClick = false;
+      }, 50);
+    };
+    btn.addEventListener("pointerup", clearIgnore);
+    btn.addEventListener("pointercancel", clearIgnore);
+  }
+
   function pulseResourceClick(btn, amount, kind) {
     btn.classList.remove("click-pulse");
     void btn.offsetWidth;
@@ -2753,13 +2864,13 @@
     setTimeout(() => floater.remove(), 650);
   }
 
-  el.clickBtn.addEventListener("click", () => {
+  bindPress(el.clickBtn, () => {
     state.gold += state.clickPower;
     pulseResourceClick(el.clickBtn, state.clickPower, "gold");
     renderHud();
   });
 
-  el.foodClickBtn.addEventListener("click", () => {
+  bindPress(el.foodClickBtn, () => {
     state.food += state.foodClickPower;
     pulseResourceClick(el.foodClickBtn, state.foodClickPower, "food");
     renderHud();
@@ -2859,7 +2970,11 @@
     if (stored !== null && Number(stored) === 0) muted = true;
 
     function applyVolume() {
-      audio.volume = muted ? 0 : preferred / 100;
+      // Keep preferred gain separate from mute. Safari/iOS ignore volume=0
+      // for silence; the muted property (+ pause) is what actually works.
+      audio.volume = preferred / 100;
+      audio.muted = muted;
+      if (muted && !audio.paused) audio.pause();
       syncMuteBtn();
     }
 
@@ -2900,7 +3015,8 @@
     }
 
     function tryPlay() {
-      if (!wantPlaying() || audio.volume <= 0) return;
+      if (!wantPlaying()) return;
+      audio.muted = false;
       const playPromise = audio.play();
       if (playPromise && typeof playPromise.catch === "function") {
         playPromise.catch(() => {
