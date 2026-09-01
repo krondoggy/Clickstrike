@@ -3,7 +3,7 @@
 
   const HUD_MS = 100;
   const BATTLE_MS = 50;
-  /** Soft DOM/perf ceiling; food upkeep is the real army limit. */
+  /** Soft DOM/perf ceiling; Granary army capacity is the real player limit. */
   const FIELD_SOFT_CAP = 40;
   const PLAYER_BASE_HP = 120;
   const MELEE_RANGE = 6;
@@ -46,8 +46,10 @@
   const OPENING_COUNTDOWN_S = 8;
   /** Multiplier applied to unit.spd when marching (lower = slower field pace). */
   const UNIT_MOVE_MULT = 0.9;
-  /** Food drained per living player unit per second while battle is live. */
-  const FOOD_UPKEEP_PER_UNIT = 0.35;
+  /** Base living player units before Granary. */
+  const BASE_ARMY_CAPACITY = 10;
+  /** Extra army slots per Granary level. */
+  const GRANARY_CAPACITY_PER_LEVEL = 3;
   const SAVE_KEY = "clickstrike-save-v1";
   const SAVE_VERSION = 3;
   const SAVE_THROTTLE_MS = 2000;
@@ -60,7 +62,7 @@
   const FOOD_UPGRADE_IDS = { baskets: true, foragers: true };
   const MOBILE_MQ = "(max-width: 900px)";
   const MOBILE_PANE_KEY = "clickstrike-mobile-pane";
-  /** Kill gold soft cap window (ms). */
+  /** Kill gold / scavenge soft cap window (ms). */
   const KILL_GOLD_WINDOW_MS = 1000;
 
   const UPGRADES = [
@@ -120,7 +122,7 @@
     {
       id: "granary",
       name: "Granary",
-      desc: "−10% food upkeep / level",
+      desc: "+3 army capacity / level",
       baseCost: 55,
       growth: 1.7,
       apply() {},
@@ -184,7 +186,7 @@
       id: "spearman",
       name: "Spearman",
       cost: 12,
-      foodCost: 18,
+      foodCost: 22,
       hp: 28,
       atk: 5,
       spd: 3,
@@ -201,7 +203,7 @@
       id: "archer",
       name: "Archer",
       cost: 40,
-      foodCost: 20,
+      foodCost: 28,
       hp: 14,
       atk: 11,
       spd: 4.5,
@@ -218,7 +220,7 @@
       id: "knight",
       name: "Knight",
       cost: 100,
-      foodCost: 52,
+      foodCost: 64,
       hp: 45,
       atk: 13,
       spd: 2.5,
@@ -235,7 +237,7 @@
       id: "rider",
       name: "Rider",
       cost: 55,
-      foodCost: 28,
+      foodCost: 36,
       hp: 22,
       atk: 9,
       spd: 5.5,
@@ -254,7 +256,7 @@
       id: "mage",
       name: "Mage",
       cost: 85,
-      foodCost: 35,
+      foodCost: 42,
       hp: 12,
       atk: 18,
       spd: 3.2,
@@ -273,7 +275,7 @@
       id: "guardian",
       name: "Guardian",
       cost: 70,
-      foodCost: 60,
+      foodCost: 72,
       hp: 70,
       atk: 6,
       spd: 1.8,
@@ -1578,6 +1580,16 @@
     setTimeout(() => d.remove(), 700);
   }
 
+  function spawnFoodFloater(x, y, amount) {
+    const d = document.createElement("div");
+    d.className = "dmg-floater food-gain";
+    d.style.setProperty("--x", x + "%");
+    d.style.setProperty("--y", (y - 4) + "%");
+    d.textContent = "+" + amount + "f";
+    el.fieldUnits.appendChild(d);
+    setTimeout(() => d.remove(), 700);
+  }
+
   function killGoldPayout(target) {
     let amount = 2 + state.wave * 0.5;
     if (target && target.boss) amount *= 1.5;
@@ -1589,6 +1601,17 @@
 
   function killGoldCap() {
     return 8 + state.wave;
+  }
+
+  function killFoodPayout(target) {
+    let amount = 1 + Math.floor(state.wave / 4);
+    if (target && target.boss) amount = Math.max(1, Math.floor(amount * 1.5));
+    else if (target && target.mini) amount = Math.max(1, Math.floor(amount * 1.25));
+    return amount;
+  }
+
+  function killFoodCap() {
+    return 4 + Math.floor(state.wave / 2);
   }
 
   function awardKillGold(target) {
@@ -1605,6 +1628,27 @@
     b.killGoldWindow.accrued += pay;
     state.gold += pay;
     spawnGoldFloater(target.x, target.y, pay);
+  }
+
+  function awardKillFood(target) {
+    const b = state.battle;
+    if (!b || !b.active) return;
+    const now = Date.now();
+    if (!b.killFoodWindow || now - b.killFoodWindow.t0 >= KILL_GOLD_WINDOW_MS) {
+      b.killFoodWindow = { t0: now, accrued: 0 };
+    }
+    const want = killFoodPayout(target);
+    const room = Math.max(0, killFoodCap() - b.killFoodWindow.accrued);
+    const pay = Math.min(want, room);
+    if (pay <= 0) return;
+    b.killFoodWindow.accrued += pay;
+    state.food += pay;
+    spawnFoodFloater(target.x, target.y, pay);
+  }
+
+  function awardKillRewards(target) {
+    awardKillGold(target);
+    awardKillFood(target);
     syncResourceDisplays();
   }
 
@@ -1635,11 +1679,19 @@
     }
   }
 
+  function armyCapacity() {
+    const lv = state.upgradeLevels.granary || 0;
+    return Math.min(
+      FIELD_SOFT_CAP,
+      BASE_ARMY_CAPACITY + GRANARY_CAPACITY_PER_LEVEL * lv
+    );
+  }
+
   function createPlayerUnit(typeId) {
     if (!inBattle()) return false;
     const type = unitType(typeId);
     if (!type) return false;
-    if (countSide("player") >= FIELD_SOFT_CAP) return false;
+    if (countSide("player") >= armyCapacity()) return false;
 
     const stats = playerUnitStats(type);
     const homeY = pickSpawnY("player");
@@ -1690,7 +1742,7 @@
     const type = unitType(typeId);
     if (!type) return false;
     if (state.gold < type.cost || state.food < type.foodCost) return false;
-    if (countSide("player") >= FIELD_SOFT_CAP) return false;
+    if (countSide("player") >= armyCapacity()) return false;
 
     state.gold -= type.cost;
     state.food -= type.foodCost;
@@ -1728,7 +1780,7 @@
     }
     if (state.gold < type.cost) return "Need more gold";
     if (state.food < type.foodCost) return "Need more food";
-    if (countSide("player") >= FIELD_SOFT_CAP) return "Field is full";
+    if (countSide("player") >= armyCapacity()) return "Army at capacity";
     return "Can't train right now";
   }
 
@@ -1754,7 +1806,7 @@
       isUnitUnlocked(typeId) &&
       inBattle() &&
       !inCountdown() &&
-      countSide("player") < FIELD_SOFT_CAP
+      countSide("player") < armyCapacity()
     ) {
       const type = unitType(typeId);
       if (
@@ -1790,7 +1842,7 @@
   function tryStartNextTraining() {
     const b = state.battle;
     if (!b || b.training) return false;
-    if (countSide("player") >= FIELD_SOFT_CAP) return false;
+    if (countSide("player") >= armyCapacity()) return false;
 
     if (b.preferType) {
       const prefer = b.preferType;
@@ -2059,7 +2111,7 @@
       markDead(target);
       appendLog("log-kill", `${attacker.name} fells ${target.name}!`);
       if (attacker.side === "player" && target.side === "enemy") {
-        awardKillGold(target);
+        awardKillRewards(target);
       }
     }
   }
@@ -2280,11 +2332,11 @@
       training: null,
       preferType: null,
       trainRetryAt: 0,
-      foodStarvedWarned: false,
       countdown: opening ? OPENING_COUNTDOWN_S : 0,
       countdownMax: opening ? OPENING_COUNTDOWN_S : 0,
       catapultUsed: false,
       killGoldWindow: null,
+      killFoodWindow: null,
       elitePending: isEliteWave(state.wave),
       enemySpawned: 0,
     };
@@ -2326,10 +2378,7 @@
     if (def.id === "armor") return `+${level} armor`;
     if (def.id === "vitality") return `+${Math.round(12 * level)}% HP`;
     if (def.id === "barracks") return `−${Math.round(100 * (1 - Math.pow(0.88, level)))}% time`;
-    if (def.id === "granary") {
-      const rate = upkeepPerUnit();
-      return `${format(rate)} f/s per troop`;
-    }
+    if (def.id === "granary") return `Army cap ${armyCapacity()}`;
     if (def.id === "plunder") return `+${Math.round(15 * level)}% kill gold`;
     if (def.id === "caravan") return `+${Math.round(12 * level)}% win gold`;
     return def.desc;
@@ -2338,11 +2387,6 @@
   function trainDuration() {
     const lv = state.upgradeLevels.barracks || 0;
     return Math.max(MIN_TRAIN_TIME, BASE_TRAIN_TIME * Math.pow(0.88, lv));
-  }
-
-  function upkeepPerUnit() {
-    const lv = state.upgradeLevels.granary || 0;
-    return Math.max(0.12, FOOD_UPKEEP_PER_UNIT * Math.pow(0.9, lv));
   }
 
   let lastAffordableUpgradeCount = -1;
@@ -2642,34 +2686,8 @@
     if (cataCostEl) cataCostEl.textContent = format(cataCost) + " g";
   }
 
-  function foodUpkeepRate() {
-    // No upkeep during opening countdown — field is empty until combat starts.
-    if (!inBattle() || inCountdown()) return 0;
-    return countSide("player") * upkeepPerUnit();
-  }
-
-  function netFoodPerSecond() {
-    return state.foodPerSecond - foodUpkeepRate();
-  }
-
-  function applyFoodUpkeep(dt) {
-    const drain = foodUpkeepRate() * dt;
-    if (drain <= 0) return;
-    const before = state.food;
-    state.food = Math.max(0, state.food - drain);
-    if (
-      state.battle &&
-      !state.battle.foodStarvedWarned &&
-      before > 0 &&
-      state.food <= 0 &&
-      countSide("player") > 0
-    ) {
-      state.battle.foodStarvedWarned = true;
-      appendLog(
-        "log-loss",
-        "Larder empty — upkeep drained your food. Forage or cut the field."
-      );
-    }
+  function foodIncomePerSecond() {
+    return state.foodPerSecond;
   }
 
   function formatCost(type) {
@@ -2694,9 +2712,8 @@
 
   function spawnHintText(live, playerCount) {
     const enabled = enabledSpawnTypes();
-    const upkeep = foodUpkeepRate();
-    const upkeepBit =
-      playerCount > 0 ? ` · Upkeep ${format(upkeep)} f/s` : "";
+    const cap = armyCapacity();
+    const fieldBit = ` · Field ${playerCount}/${cap}`;
     const typesN = distinctPlayerTypes();
     const mixBit =
       typesN >= 3
@@ -2706,24 +2723,24 @@
           : "";
 
     if (state.waveTransitioning) {
-      return `Wave resolving — next assault shortly${upkeepBit}`;
+      return `Wave resolving — next assault shortly`;
     }
     if (inCountdown()) {
       const secs = Math.ceil(state.battle.countdown);
-      return `Assault in ${secs}… turn Auto on — training starts when combat begins${upkeepBit}`;
+      return `Assault in ${secs}… turn Auto on — training starts when combat begins`;
     }
     if (!live) {
-      return `Battle looping — train troops or enable Auto${upkeepBit}`;
+      return `Battle looping — train troops or enable Auto${fieldBit}`;
     }
-    if (playerCount >= FIELD_SOFT_CAP) {
-      return `Field at capacity (${FIELD_SOFT_CAP}) — wait for space${upkeepBit}${mixBit}`;
+    if (playerCount >= cap) {
+      return `Army at capacity (${cap}) — wait for space or buy Granary${mixBit}`;
     }
     const unlockable = UNIT_TYPES.filter(
       (t) => unitNeedsUnlock(t) && !isUnitUnlocked(t.id) && unitUnlockWaveReached(t)
     );
     if (unlockable.length > 0 && enabled.length === 0) {
       const u = unlockable[0];
-      return `Unlock ${u.name} for ${format(u.unlockCost)} g (wave ${u.unlockWave}+)${upkeepBit}`;
+      return `Unlock ${u.name} for ${format(u.unlockCost)} g (wave ${u.unlockWave}+)${fieldBit}`;
     }
     const prefer =
       state.battle && state.battle.preferType
@@ -2735,13 +2752,13 @@
       const left = Math.max(0, training.duration - training.elapsed);
       const nextBit = prefer ? ` · Next ${prefer.name}` : "";
       const autoBit = training.fromAuto ? " (Auto)" : "";
-      return `Training ${type ? type.name : "unit"}${autoBit}… ${left.toFixed(1)}s${nextBit}${upkeepBit}${mixBit}`;
+      return `Training ${type ? type.name : "unit"}${autoBit}… ${left.toFixed(1)}s${nextBit}${fieldBit}${mixBit}`;
     }
     if (prefer) {
-      return `Queued ${prefer.name} (manual)${upkeepBit}${mixBit}`;
+      return `Queued ${prefer.name} (manual)${fieldBit}${mixBit}`;
     }
     if (enabled.length === 0) {
-      return `Click a unit to train (faster than Auto), or turn Auto on${upkeepBit}${mixBit}`;
+      return `Click a unit to train (faster than Auto), or turn Auto on${fieldBit}${mixBit}`;
     }
     const canAny = enabled.some(
       (t) => state.gold >= t.cost && state.food >= t.foodCost
@@ -2750,14 +2767,14 @@
       const needGold = enabled.every((t) => state.gold < t.cost);
       const needFood = enabled.every((t) => state.food < t.foodCost);
       if (needGold && needFood) {
-        return `Need more gold and food to spawn${upkeepBit}${mixBit}`;
+        return `Need more gold and food to spawn${fieldBit}${mixBit}`;
       }
-      if (needGold) return `Need more gold to spawn${upkeepBit}${mixBit}`;
-      if (needFood) return `Need more food to spawn${upkeepBit}${mixBit}`;
-      return `Can't afford enabled units yet${upkeepBit}${mixBit}`;
+      if (needGold) return `Need more gold to spawn${fieldBit}${mixBit}`;
+      if (needFood) return `Need more food to spawn${fieldBit}${mixBit}`;
+      return `Can't afford enabled units yet${fieldBit}${mixBit}`;
     }
     const names = enabled.map((t) => t.name).join(", ");
-    return `Auto: ${names} · Field ${playerCount}${upkeepBit}${mixBit}`;
+    return `Auto: ${names}${fieldBit}${mixBit}`;
   }
 
   function renderSpawn() {
@@ -2804,7 +2821,7 @@
           !training &&
           state.gold >= type.cost &&
           state.food >= type.foodCost &&
-          playerCount < FIELD_SOFT_CAP;
+          playerCount < armyCapacity();
         const pct = isTraining
           ? Math.min(100, (training.elapsed / training.duration) * 100)
           : 0;
@@ -2903,7 +2920,7 @@
         !training &&
         state.gold >= type.cost &&
         state.food >= type.foodCost &&
-        playerCount < FIELD_SOFT_CAP;
+        playerCount < armyCapacity();
       const canBuy = canQueue;
       const pct =
         isTraining
@@ -3049,11 +3066,11 @@
   }
 
   function syncFoodRateDisplay() {
-    const net = netFoodPerSecond();
-    el.fps.textContent = format(Math.abs(net));
-    el.fpsPrefix.textContent = net < -0.05 ? "−" : "+";
+    const income = foodIncomePerSecond();
+    el.fps.textContent = format(income);
+    el.fpsPrefix.textContent = "+";
     const rate = el.fps.closest(".resource-fps");
-    if (rate) rate.classList.toggle("is-drain", net < -0.05);
+    if (rate) rate.classList.remove("is-drain");
   }
 
   function renderHud() {
@@ -3174,7 +3191,6 @@
     if (state.foodPerSecond > 0) {
       state.food += state.foodPerSecond * dt;
     }
-    applyFoodUpkeep(dt);
 
     if (inBattle()) {
       battleTick(dt);
