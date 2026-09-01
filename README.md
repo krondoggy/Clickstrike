@@ -2,11 +2,13 @@
 
 Browser idle clicker / continuous base assault. Mine gold, forage food, train troops, destroy the enemy keep.
 
-## Play
+**Play online:** [https://krondoggy.github.io/Clickstrike/](https://krondoggy.github.io/Clickstrike/)
+
+## Play locally
 
 Open `index.html` (or a local static server). No build step.
 
-1. **Mine Gold** / **Forage** and buy upgrades — the economy is the main game. Hire **miners** and **foragers** in Treasury (Economy): each one auto-presses Mine/Forage **once per second** for a **full** +per-click payout. **Mining Drill** / **Forage Tools** make them click faster.
+1. **Mine Gold** / **Forage** and buy upgrades — the economy is the main game. Hire **miners** and **foragers** in Treasury (Economy): each one auto-clicks once per second at **40% of your manual click yield**. **Mining Drill** / **Forage Tools** make them click faster. Manual clicking stays full strength.
 2. Wave 1 opens with a short **countdown**, then battle **always loops** — your keep (left) vs theirs (right). During countdown you can arm **Auto**, but training and War Chest wait until combat starts.
 3. **Army** — hire an expensive **hero** (gold + food sink), then train troops. Click a unit card to train one (gold + food charged when training starts). Manual trains are faster than **Auto**; clicking while a train is in progress queues that type next. Toggle **Auto** on several cards to round-robin a mixed draft. **Drill Yard** shortens recruit time (with a floor so fights stay deliberate).
 4. Troops exit your castle gate, fan out, and march on the enemy keep. Counter types matter: spears beat cavalry, archers beat infantry, knights beat ranged, riders beat backline (ranged, magic, support), mages shred armor, guardians beat magic, healers mend wounded allies and are soft vs cavalry. Fielding 2–3+ unit types grants a small damage bonus.
@@ -15,7 +17,7 @@ Open `index.html` (or a local static server). No build step.
 
 ### Heroes
 
-Hire one champion from the Army panel (Bulwark, Bonesinger, or Raid Captain). Hire costs are a large gold + food sink. Heroes do **not** free-respawn — when they fall, pay **40%** of that hero’s hire cost to **Rez** them. Replacing with a different hero costs the new hero’s full hire.
+Hire one champion from the Army panel (Bulwark, Bonesinger, or Raid Captain). Hire costs are a large gold + food sink. Heroes do **not** free-respawn — when they fall, pay **40%** of that hero's hire cost to **Rez** them. Replacing with a different hero costs the new hero's full hire.
 
 | Hero | Role | Synergy |
 |------|------|---------|
@@ -30,10 +32,10 @@ On narrow screens the UI switches to tabs (**Battle** / **Upgrades** / **Army**)
 ## Economy
 
 - **Gold** — upgrades, troop pay, unit unlocks, hero hire/rez, and War Chest tactics. Win bonuses and enemy kills drip gold (kills are soft-capped so mining still matters).
-- **Food** — larder stock spent when you recruit or hire/rez heroes. Forage and Foraging Camp fill the stockpile; kills scavenge a little food back. No continuous upkeep drain.
-- **Hired Miner / Gather Crew** — each level hires one worker who clicks once/sec (full Mine or Forage payout). Toggle **Auto** on the dock button after your first hire. **Mining Drill** and **Forage Tools** speed them up (+15% per level). Orbiting cursors show how many you have.
+- **Food** — larder stock spent when you recruit or hire/rez heroes, plus **continuous army upkeep** while fighting (0.12 food/s per unit, 0.5 food/s for your hero). Forage and Foraging Camp fill the stockpile; kills scavenge a little food back. The top bar shows **net food rate** (income minus upkeep). At zero food with active upkeep, your army **starves**: −35% damage, healers stop, recruiting blocked, and units desert over time.
+- **Hired Miner / Gather Crew** — each level hires one worker who auto-clicks once/sec at 40% yield. Toggle **Auto** on the dock button after your first hire. **Mining Drill** and **Forage Tools** speed them up (+15% per level). Orbiting cursors show how many you have.
 - Unit costs lean different ways (spearman food-heavy early, knight/guardian food-heavy mid, mage gold-heavy).
-- **Granary** raises army capacity (+3 per level; hard ceiling ~40 for performance).
+- **Granary** raises army capacity (+3 per level; hard ceiling ~40 for performance) and reduces upkeep (−2% per level, max −40%).
 - **Plunder Maps** / **Caravan Guard** boost kill gold and win gold.
 - **War Chest** (Treasury) — spend gold mid-fight on **Repair Keep** (restore HP) or **Catapult Strike** (enemy keep damage, once per wave).
 - Upgrades split into **Economy** and **Troops** tabs under Treasury.
@@ -41,6 +43,20 @@ On narrow screens the UI switches to tabs (**Battle** / **Upgrades** / **Army**)
 
 ## Notes
 
-Enemy packs mix archetypes (grunts, raiders, skirmishers, brutes, cultists, hounds). Waves ending in **3** open with a mini-boss; every **5th** wave opens with a larger named boss that summons minions (two at a time from wave 15). Keep adds slow while the boss lives, then return to normal pace. Player units auto-spawn from enabled unlocked types while you can afford them; counter-pick manually when the wave mix demands it. Numbers are placeholders to tune.
+Enemy packs mix archetypes (grunts, raiders, skirmishers, brutes, cultists, hounds). Waves ending in **3** open with a mini-boss; every **5th** wave opens with a larger named boss that summons minions (two at a time from wave 15). Keep adds slow while the boss lives, then return to normal pace. Player units auto-spawn from enabled unlocked types while you can afford them; counter-pick manually when the wave mix demands it. Balance is tuned for v1.0.
 
 Progress autosaves in the browser (`localStorage`). Refresh resumes meta progress (gold, food, upgrades, wave, unlocks, auto-spawn toggles, hired hero / down state); mid-battle fights are not restored — the next assault starts immediately.
+
+## Music
+
+Background tracks: `07-human-1.mp3`, `13-arrival-at-kalimdor.mp3` (included for personal use in this project).
+
+## Deploy (GitHub Pages)
+
+1. Push to `main` — the GitHub Action in `.github/workflows/deploy-pages.yml` deploys the site.
+2. In the repo on GitHub: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+3. Live URL: [https://krondoggy.github.io/Clickstrike/](https://krondoggy.github.io/Clickstrike/)
+
+## License
+
+MIT — see [LICENSE](LICENSE).

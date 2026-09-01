@@ -667,6 +667,54 @@ body {
     0 1px 0 rgba(0, 0, 0, 0.45);
 }
 
+.resource-food.is-starving {
+  box-shadow:
+    inset 0 2px 8px rgba(0, 0, 0, 0.55),
+    inset 0 0 18px rgba(196, 64, 48, 0.42),
+    0 1px 0 rgba(0, 0, 0, 0.45);
+}
+
+.resource-food.is-starving #food-display {
+  color: var(--loss);
+  text-shadow: 0 0 10px rgba(196, 64, 48, 0.45);
+}
+
+.starvation-warning {
+  position: absolute;
+  top: -0.45rem;
+  right: 0.35rem;
+  z-index: 2;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff;
+  background: linear-gradient(180deg, rgba(210, 72, 56, 0.95), rgba(160, 40, 32, 0.95));
+  box-shadow: 0 0 12px rgba(196, 64, 48, 0.45);
+  animation: starvation-pulse 1.2s ease-in-out infinite;
+}
+
+.resource-food {
+  position: relative;
+}
+
+@keyframes starvation-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.72; }
+}
+
+.army-upkeep {
+  margin: 0 0 0.45rem;
+  font-size: 0.82rem;
+  color: var(--food-dim);
+}
+
+.army-upkeep:not([hidden]) {
+  display: block;
+}
+
 .resource-wave {
   gap: 0.45rem;
   padding-right: 0.85rem;
@@ -747,7 +795,8 @@ body {
 }
 
 .new-game-btn,
-.music-mute-btn {
+.music-mute-btn,
+.help-btn {
   font-family: var(--font-display);
   font-size: 0.62rem;
   font-weight: 700;
@@ -766,8 +815,19 @@ body {
   white-space: nowrap;
 }
 
+.version-label {
+  font-family: var(--font-display);
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: rgba(140, 150, 170, 0.65);
+  white-space: nowrap;
+  padding: 0 0.15rem;
+}
+
 .new-game-btn:hover,
-.music-mute-btn:hover {
+.music-mute-btn:hover,
+.help-btn:hover {
   color: var(--gold-bright);
   border-color: var(--gold-dim);
   background:
@@ -777,6 +837,154 @@ body {
 .music-mute-btn[aria-pressed="true"] {
   color: var(--danger, #c45a4a);
   border-color: rgba(140, 60, 48, 0.7);
+}
+
+body.modal-open {
+  overflow: hidden;
+}
+
+.game-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.game-modal[hidden] {
+  display: none !important;
+}
+
+.game-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  background: rgba(4, 6, 10, 0.72);
+  cursor: pointer;
+}
+
+.game-modal-panel {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 32rem);
+  max-height: min(85vh, 36rem);
+  overflow: auto;
+  background:
+    linear-gradient(165deg, rgba(55, 48, 32, 0.35) 0%, transparent 42%),
+    linear-gradient(180deg, #1c2434 0%, #121820 55%, #0c1018 100%);
+  border: 2px solid rgba(74, 61, 40, 0.85);
+  border-radius: calc(var(--radius) + 2px);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.game-modal-panel-sm {
+  width: min(100%, 22rem);
+}
+
+.game-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem 0.5rem;
+  border-bottom: 1px solid rgba(74, 61, 40, 0.45);
+}
+
+.game-modal-header h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--gold-bright);
+}
+
+.game-modal-close {
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid rgba(74, 61, 40, 0.6);
+  border-radius: var(--radius);
+  padding: 0.35rem 0.55rem;
+  cursor: pointer;
+}
+
+.game-modal-close:hover {
+  color: var(--gold-bright);
+  border-color: var(--gold-dim);
+}
+
+.game-modal-body {
+  padding: 0.85rem 1rem 1rem;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.game-modal-body p {
+  margin: 0;
+}
+
+.help-list {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.help-list li {
+  margin-bottom: 0.65rem;
+}
+
+.help-list li:last-child {
+  margin-bottom: 0;
+}
+
+.help-list strong {
+  color: var(--gold-bright);
+}
+
+.game-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0 1rem 1rem;
+}
+
+.game-modal-btn {
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background:
+    linear-gradient(180deg, #2a3344 0%, #1a2030 55%, #121820 100%);
+  border: 1px solid rgba(74, 61, 40, 0.85);
+  border-radius: var(--radius);
+  padding: 0.45rem 0.75rem;
+  cursor: pointer;
+}
+
+.game-modal-btn:hover {
+  color: var(--gold-bright);
+  border-color: var(--gold-dim);
+}
+
+.game-modal-btn-primary {
+  color: #1a1208;
+  background: linear-gradient(180deg, #d4b060 0%, #a88030 55%, #806020 100%);
+  border-color: #c8a040;
+}
+
+.game-modal-btn-primary:hover {
+  color: #1a1208;
+  border-color: #e0c070;
 }
 
 .stat-pill.flash-win {
@@ -3380,7 +3588,8 @@ button:disabled {
   }
 
   .new-game-btn,
-  .music-mute-btn {
+  .music-mute-btn,
+  .help-btn {
     flex: 1 1 auto;
     padding: 0.45rem 0.55rem;
     font-size: 0.6rem;
@@ -3433,6 +3642,7 @@ button:focus-visible,
 .army-dock-btn:focus-visible,
 .army-sheet-close:focus-visible,
 .music-mute-btn:focus-visible,
+.help-btn:focus-visible,
 .new-game-btn:focus-visible,
 .mobile-tab:focus-visible,
 .upgrade-cat-tab:focus-visible {

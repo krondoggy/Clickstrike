@@ -59,6 +59,8 @@
   const GRANARY_CAPACITY_PER_LEVEL = 3;
   const SAVE_KEY = "clickstrike-save-v1";
   const SAVE_VERSION = 6;
+  const GAME_VERSION = "1.0.0";
+  const HELP_SEEN_KEY = "clickstrike-seen-help-v1";
   const SAVE_THROTTLE_MS = 2000;
   /** Bonesinger bone minions capped on the field. */
   const BONE_MINION_MAX = 3;
@@ -89,6 +91,20 @@
   const MOBILE_PANE_KEY = "clickstrike-mobile-pane";
   /** Kill gold / scavenge soft cap window (ms). */
   const KILL_GOLD_WINDOW_MS = 1000;
+  /** Auto-workers earn this fraction of a manual click (min 1). */
+  const AUTO_CLICK_YIELD = 0.4;
+  /** Food drained per living army unit per second. */
+  const UNIT_UPKEEP_PER_SEC = 0.12;
+  /** Food drained per active hero per second. */
+  const HERO_UPKEEP_PER_SEC = 0.5;
+  /** Player damage multiplier while starving (food at 0 with upkeep). */
+  const STARVATION_DAMAGE_MULT = 0.65;
+  /** Seconds of continued starvation before a random unit deserts. */
+  const STARVATION_DESERTION_INTERVAL = 5;
+  /** Granary upkeep reduction per level (multiplicative). */
+  const GRANARY_UPKEEP_REDUCTION_PER_LEVEL = 0.02;
+  /** Floor for Granary upkeep reduction (−40% max). */
+  const GRANARY_UPKEEP_REDUCTION_FLOOR = 0.6;
 
   const UPGRADES = [
     {
@@ -97,7 +113,7 @@
       desc: "+1 gold per click",
       icon: "pick",
       baseCost: 15,
-      growth: 1.55,
+      growth: 1.7,
       apply(state) {
         state.clickPower += 1;
       },
@@ -105,10 +121,10 @@
     {
       id: "autoMiner",
       name: "Hired Miner",
-      desc: "+1 auto miner (1 full click/sec each)",
+      desc: "+1 auto miner (40% click yield each)",
       icon: "miner",
       baseCost: 45,
-      growth: 1.55,
+      growth: 1.7,
       apply() {},
     },
     {
@@ -126,7 +142,7 @@
       desc: "+0.5 gold / sec",
       icon: "routes",
       baseCost: 40,
-      growth: 1.65,
+      growth: 1.85,
       apply(state) {
         state.goldPerSecond += 0.5;
       },
@@ -137,7 +153,7 @@
       desc: "+0.5 food per click",
       icon: "basket",
       baseCost: 12,
-      growth: 1.5,
+      growth: 1.7,
       food: true,
       apply(state) {
         state.foodClickPower += 0.5;
@@ -146,10 +162,10 @@
     {
       id: "autoForager",
       name: "Gather Crew",
-      desc: "+1 auto forager (1 full click/sec each)",
+      desc: "+1 auto forager (40% click yield each)",
       icon: "gather",
       baseCost: 40,
-      growth: 1.55,
+      growth: 1.7,
       food: true,
       apply() {},
     },
@@ -169,7 +185,7 @@
       desc: "+0.8 food / sec",
       icon: "camp",
       baseCost: 35,
-      growth: 1.6,
+      growth: 1.85,
       food: true,
       apply(state) {
         state.foodPerSecond += 0.8;
@@ -181,7 +197,7 @@
       desc: "+2 gold click, +0.25 g/s",
       icon: "anvil",
       baseCost: 120,
-      growth: 1.8,
+      growth: 1.85,
       apply(state) {
         state.clickPower += 2;
         state.goldPerSecond += 0.25;
@@ -190,7 +206,7 @@
     {
       id: "granary",
       name: "Granary",
-      desc: "+3 army capacity / level",
+      desc: "+3 army capacity, −2% upkeep / level",
       icon: "grain",
       baseCost: 55,
       growth: 1.7,
@@ -1030,6 +1046,9 @@
     food: document.getElementById("food-display"),
     fps: document.getElementById("fps-display"),
     fpsPrefix: document.getElementById("fps-prefix"),
+    foodPill: document.querySelector(".resource-food"),
+    starvationWarning: document.getElementById("starvation-warning"),
+    armyUpkeep: document.getElementById("army-upkeep"),
     wave: document.getElementById("wave-display"),
     clickPower: document.getElementById("click-power-display"),
     foodClickPower: document.getElementById("food-click-power-display"),
@@ -1065,6 +1084,15 @@
     bgMusic: document.getElementById("bg-music"),
     musicMuteBtn: document.getElementById("music-mute-btn"),
     newGameBtn: document.getElementById("new-game-btn"),
+    helpBtn: document.getElementById("help-btn"),
+    versionLabel: document.getElementById("version-label"),
+    helpModal: document.getElementById("help-modal"),
+    helpModalClose: document.getElementById("help-modal-close"),
+    confirmModal: document.getElementById("confirm-modal"),
+    confirmModalTitle: document.getElementById("confirm-modal-title"),
+    confirmModalBody: document.getElementById("confirm-modal-body"),
+    confirmModalOk: document.getElementById("confirm-modal-ok"),
+    confirmModalCancel: document.getElementById("confirm-modal-cancel"),
     goldPill: document.querySelector(".resource-gold"),
     foodPill: document.querySelector(".resource-food"),
     mobileNav: document.getElementById("mobile-nav"),
@@ -1095,7 +1123,7 @@
     clickPower: 1,
     foodClickPower: 1,
     goldPerSecond: 0,
-    foodPerSecond: 0.2,
+    foodPerSecond: 0.3,
     upgradeLevels: defaultUpgradeLevelsDraft(),
     nextUnitId: 1,
     wave: 1,
@@ -1164,6 +1192,7 @@
   function serializeSave() {
     return {
       v: SAVE_VERSION,
+      gameVersion: GAME_VERSION,
       gold: state.gold,
       food: state.food,
       clickPower: state.clickPower,
@@ -1289,7 +1318,7 @@
     state.clickPower = 1;
     state.foodClickPower = 1;
     state.goldPerSecond = 0;
-    state.foodPerSecond = 0.2;
+    state.foodPerSecond = 0.3;
     state.upgradeLevels = defaultUpgradeLevels();
     state.nextUnitId = 1;
     state.wave = 1;
@@ -1302,17 +1331,116 @@
     state.waveTransitioning = false;
     state.heroId = null;
     state.heroDown = false;
+    starvationDesertionAccum = 0;
     el.fieldUnits.innerHTML = "";
   }
 
-  function newGame() {
-    if (
-      !window.confirm(
-        "Wipe save and start over? Music volume will be kept."
-      )
-    ) {
-      return;
+  let confirmResolve = null;
+
+  function openModal(modal) {
+    if (!modal) return;
+    modal.hidden = false;
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+  }
+
+  function closeModal(modal) {
+    if (!modal) return;
+    modal.hidden = true;
+    modal.setAttribute("aria-hidden", "true");
+    if (!document.querySelector(".game-modal:not([hidden])")) {
+      document.body.classList.remove("modal-open");
     }
+  }
+
+  function showConfirm(title, body) {
+    return new Promise((resolve) => {
+      if (!el.confirmModal) {
+        resolve(window.confirm(body));
+        return;
+      }
+      confirmResolve = resolve;
+      if (el.confirmModalTitle) el.confirmModalTitle.textContent = title;
+      if (el.confirmModalBody) el.confirmModalBody.textContent = body;
+      openModal(el.confirmModal);
+      if (el.confirmModalOk) el.confirmModalOk.focus();
+    });
+  }
+
+  function resolveConfirm(ok) {
+    if (confirmResolve) {
+      const fn = confirmResolve;
+      confirmResolve = null;
+      fn(ok);
+    }
+    closeModal(el.confirmModal);
+  }
+
+  function openHelpModal() {
+    openModal(el.helpModal);
+    if (el.helpModalClose) el.helpModalClose.focus();
+  }
+
+  function closeHelpModal() {
+    closeModal(el.helpModal);
+    try {
+      localStorage.setItem(HELP_SEEN_KEY, "1");
+    } catch (_) {
+      /* private mode */
+    }
+  }
+
+  function initModals() {
+    if (el.helpBtn) {
+      el.helpBtn.addEventListener("click", openHelpModal);
+    }
+    if (el.helpModalClose) {
+      el.helpModalClose.addEventListener("click", closeHelpModal);
+    }
+    if (el.helpModal) {
+      const backdrop = el.helpModal.querySelector(".game-modal-backdrop");
+      if (backdrop) backdrop.addEventListener("click", closeHelpModal);
+    }
+    if (el.confirmModalOk) {
+      el.confirmModalOk.addEventListener("click", () => resolveConfirm(true));
+    }
+    if (el.confirmModalCancel) {
+      el.confirmModalCancel.addEventListener("click", () => resolveConfirm(false));
+    }
+    if (el.confirmModal) {
+      const backdrop = el.confirmModal.querySelector(".game-modal-backdrop");
+      if (backdrop) backdrop.addEventListener("click", () => resolveConfirm(false));
+    }
+    document.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Escape") return;
+      if (el.confirmModal && !el.confirmModal.hidden) {
+        resolveConfirm(false);
+      } else if (el.helpModal && !el.helpModal.hidden) {
+        closeHelpModal();
+      }
+    });
+  }
+
+  function maybeShowFirstRunHelp() {
+    let seen = false;
+    try {
+      seen = localStorage.getItem(HELP_SEEN_KEY) === "1";
+    } catch (_) {
+      /* private mode */
+    }
+    if (!seen) openHelpModal();
+  }
+
+  function syncVersionLabel() {
+    if (el.versionLabel) el.versionLabel.textContent = "v" + GAME_VERSION;
+  }
+
+  async function newGame() {
+    const ok = await showConfirm(
+      "New Game",
+      "Wipe save and start over? Music volume will be kept."
+    );
+    if (!ok) return;
     clearSave();
     resetMetaState();
     lastRecruitSig = "";
@@ -1441,6 +1569,100 @@
       return String(Math.round(n));
     }
     return n.toFixed(1);
+  }
+
+  function autoGoldPayout() {
+    return Math.max(1, Math.ceil(state.clickPower * AUTO_CLICK_YIELD));
+  }
+
+  function autoFoodPayout() {
+    return Math.max(1, Math.ceil(state.foodClickPower * AUTO_CLICK_YIELD));
+  }
+
+  function upkeepReductionMult() {
+    const lv = state.upgradeLevels.granary || 0;
+    return Math.max(
+      GRANARY_UPKEEP_REDUCTION_FLOOR,
+      1 - GRANARY_UPKEEP_REDUCTION_PER_LEVEL * lv
+    );
+  }
+
+  function countUpkeepUnits() {
+    let n = countArmyUnits();
+    if (state.battle && state.battle.training) n += 1;
+    return n;
+  }
+
+  function countUpkeepHeroes() {
+    if (!inBattle() || inCountdown()) return 0;
+    if (!state.heroId || state.heroDown) return 0;
+    return 1;
+  }
+
+  function foodUpkeepPerSecond() {
+    if (!inBattle() || inCountdown()) return 0;
+    const units = countUpkeepUnits();
+    const heroes = countUpkeepHeroes();
+    if (units <= 0 && heroes <= 0) return 0;
+    return (
+      (units * UNIT_UPKEEP_PER_SEC + heroes * HERO_UPKEEP_PER_SEC) *
+      upkeepReductionMult()
+    );
+  }
+
+  function isStarving() {
+    return state.food <= 0 && foodUpkeepPerSecond() > 0;
+  }
+
+  function foodIncomePerSecond() {
+    return (
+      state.foodPerSecond +
+      (foodAutoActive() ? foodAutoCps() * autoFoodPayout() : 0)
+    );
+  }
+
+  function foodNetPerSecond() {
+    return foodIncomePerSecond() - foodUpkeepPerSecond();
+  }
+
+  function goldIncomePerSecond() {
+    return (
+      state.goldPerSecond +
+      (goldAutoActive() ? goldAutoCps() * autoGoldPayout() : 0)
+    );
+  }
+
+  let starvationDesertionAccum = 0;
+
+  function desertRandomUnit() {
+    if (!state.battle) return;
+    const candidates = state.battle.units.filter(
+      (u) => u.side === "player" && u.hp > 0 && !u.hero && !u.minion
+    );
+    if (!candidates.length) return;
+    const pick = candidates[Math.floor(Math.random() * candidates.length)];
+    appendLog("log-loss", `${pick.name} deserted — no food!`);
+    markDead(pick);
+  }
+
+  function tickFoodUpkeep(dt) {
+    if (!inBattle() || inCountdown()) {
+      starvationDesertionAccum = 0;
+      return;
+    }
+    const upkeep = foodUpkeepPerSecond();
+    if (upkeep > 0) {
+      state.food = Math.max(0, state.food - upkeep * dt);
+    }
+    if (isStarving()) {
+      starvationDesertionAccum += dt;
+      while (starvationDesertionAccum >= STARVATION_DESERTION_INTERVAL) {
+        starvationDesertionAccum -= STARVATION_DESERTION_INTERVAL;
+        desertRandomUnit();
+      }
+    } else {
+      starvationDesertionAccum = 0;
+    }
   }
 
   function upgradeCost(def) {
@@ -1748,20 +1970,21 @@
     if (attacker && attacker.side === "player") {
       mult *= compositionDamageBonus();
       mult *= heroAuraDamageMult(attacker);
+      if (isStarving()) mult *= STARVATION_DAMAGE_MULT;
     }
     return Math.max(1, Math.round(attacker.atk * mult) - (defender.armor || 0));
   }
 
   function winBonus(wave) {
-    const base = Math.floor(25 + 14 * wave);
+    const base = Math.floor(20 + 8 * wave);
     const lv = state.upgradeLevels.caravan || 0;
     return Math.max(1, Math.floor(base * (1 + 0.12 * lv)));
   }
 
   function lossPenalty(wave) {
     return {
-      gold: Math.floor(15 + 10 * wave),
-      food: Math.floor(12 + 8 * wave),
+      gold: Math.floor(25 + 16 * wave),
+      food: Math.floor(20 + 12 * wave),
     };
   }
 
@@ -2089,7 +2312,7 @@
   }
 
   function killGoldPayout(target) {
-    let amount = 2 + state.wave * 0.5;
+    let amount = 2 + state.wave * 0.35;
     if (target && target.boss) amount *= 1.5;
     else if (target && target.mini) amount *= 1.25;
     const lv = state.upgradeLevels.plunder || 0;
@@ -2098,11 +2321,11 @@
   }
 
   function killGoldCap() {
-    return 8 + state.wave;
+    return 6 + state.wave * 0.5;
   }
 
   function killFoodPayout(target) {
-    let amount = 1 + Math.floor(state.wave / 4);
+    let amount = 1 + Math.floor(state.wave / 6);
     if (target && target.boss) amount = Math.max(1, Math.floor(amount * 1.5));
     else if (target && target.mini) amount = Math.max(1, Math.floor(amount * 1.25));
     return amount;
@@ -2340,6 +2563,7 @@
     const type = unitType(typeId);
     if (!type) return false;
     if (state.gold < type.cost || state.food < type.foodCost) return false;
+    if (isStarving()) return false;
     if (countArmyUnits() >= armyCapacity()) return false;
 
     state.gold -= type.cost;
@@ -2378,6 +2602,7 @@
     }
     if (state.gold < type.cost) return "Need more gold";
     if (state.food < type.foodCost) return "Need more food";
+    if (isStarving()) return "Army is starving — forage more food";
     if (countArmyUnits() >= armyCapacity()) return "Army at capacity";
     return "Can't train right now";
   }
@@ -2410,7 +2635,8 @@
       if (
         type &&
         state.gold >= type.cost &&
-        state.food >= type.foodCost
+        state.food >= type.foodCost &&
+        !isStarving()
       ) {
         b.preferType = typeId;
         pulseRecruitCard(card, "buy-flash");
@@ -2797,6 +3023,7 @@
   }
 
   function healAlly(healer, target) {
+    if (isStarving()) return;
     if (!target || target.hp <= 0 || target.hp >= target.maxHp) return;
     healer.attackCd = healer.atkCdMax;
     flashToken(healer.id, "attack");
@@ -3157,7 +3384,10 @@
     }
     if (def.id === "medicine") return `+${Math.round(20 * level)}% heal`;
     if (def.id === "siege") return `+${Math.round(15 * level)}% keep dmg`;
-    if (def.id === "granary") return `Army cap ${armyCapacity()}`;
+    if (def.id === "granary") {
+      const red = Math.round((1 - upkeepReductionMult()) * 100);
+      return `Army cap ${armyCapacity()} · −${red}% upkeep`;
+    }
     if (def.id === "plunder") return `+${Math.round(15 * level)}% kill gold`;
     if (def.id === "caravan") return `+${Math.round(12 * level)}% win gold`;
     return def.desc;
@@ -3500,13 +3730,6 @@
     if (cataCostEl) cataCostEl.textContent = format(cataCost) + " g";
   }
 
-  function foodIncomePerSecond() {
-    return (
-      state.foodPerSecond +
-      (foodAutoActive() ? foodAutoCps() * state.foodClickPower : 0)
-    );
-  }
-
   function formatCost(type) {
     return (
       `<span class="cost-gold">${format(type.cost)} g</span>` +
@@ -3730,6 +3953,7 @@
           unlocked &&
           live &&
           !training &&
+          !isStarving() &&
           state.gold >= type.cost &&
           state.food >= type.foodCost &&
           playerCount < armyCapacity();
@@ -3829,6 +4053,7 @@
         unlocked &&
         live &&
         !training &&
+        !isStarving() &&
         state.gold >= type.cost &&
         state.food >= type.foodCost &&
         playerCount < armyCapacity();
@@ -3981,21 +4206,53 @@
   }
 
   function syncFoodRateDisplay() {
-    const income = foodIncomePerSecond();
-    el.fps.textContent = format(income);
-    el.fpsPrefix.textContent = "+";
+    const net = foodNetPerSecond();
+    el.fps.textContent = format(Math.abs(net));
+    el.fpsPrefix.textContent = net >= 0 ? "+" : "−";
     const rate = el.fps.closest(".resource-fps");
-    if (rate) rate.classList.remove("is-drain");
+    if (rate) rate.classList.toggle("is-drain", net < 0);
+  }
+
+  function syncStarvationHud() {
+    const starving = isStarving();
+    if (el.foodPill) el.foodPill.classList.toggle("is-starving", starving);
+    if (el.starvationWarning) {
+      el.starvationWarning.hidden = !starving;
+      el.starvationWarning.setAttribute(
+        "aria-hidden",
+        starving ? "false" : "true"
+      );
+    }
+  }
+
+  function syncArmyUpkeepDisplay() {
+    if (!el.armyUpkeep) return;
+    const upkeep = foodUpkeepPerSecond();
+    if (!inBattle() || inCountdown() || upkeep <= 0) {
+      el.armyUpkeep.textContent = "";
+      el.armyUpkeep.hidden = true;
+      return;
+    }
+    el.armyUpkeep.hidden = false;
+    const units = countUpkeepUnits();
+    const heroes = countUpkeepHeroes();
+    let text = `Army upkeep: −${format(upkeep)} food/s (${units} unit${
+      units === 1 ? "" : "s"
+    }`;
+    if (heroes) text += ", hero";
+    text += ")";
+    if (isStarving()) text += " · STARVING";
+    el.armyUpkeep.textContent = text;
+    el.armyUpkeep.title = "Living troops and your hero consume food every second";
   }
 
   function renderHud() {
     el.gold.textContent = format(state.gold);
-    el.gps.textContent = format(
-      state.goldPerSecond +
-        (goldAutoActive() ? goldAutoCps() * state.clickPower : 0)
-    );
+    el.gps.textContent = format(goldIncomePerSecond());
     el.food.textContent = format(state.food);
     syncFoodRateDisplay();
+    syncStarvationHud();
+    syncArmyUpkeepDisplay();
     el.wave.textContent = String(state.wave);
     syncHeroChip();
     syncAutoCursorRings();
@@ -4009,12 +4266,11 @@
 
   function syncResourceDisplays() {
     el.gold.textContent = format(state.gold);
-    el.gps.textContent = format(
-      state.goldPerSecond +
-        (goldAutoActive() ? goldAutoCps() * state.clickPower : 0)
-    );
+    el.gps.textContent = format(goldIncomePerSecond());
     el.food.textContent = format(state.food);
     syncFoodRateDisplay();
+    syncStarvationHud();
+    syncArmyUpkeepDisplay();
     updateUpgradeTabBadge();
   }
 
@@ -4228,7 +4484,8 @@
 
   function doMineClick(opts) {
     opts = opts || {};
-    const amount = state.clickPower;
+    const amount =
+      opts.amount != null ? opts.amount : state.clickPower;
     state.gold += amount;
     pulseResourceClick(el.clickBtn, amount, "gold", {
       showFloater: opts.showFloater !== false,
@@ -4240,7 +4497,8 @@
 
   function doForageClick(opts) {
     opts = opts || {};
-    const amount = state.foodClickPower;
+    const amount =
+      opts.amount != null ? opts.amount : state.foodClickPower;
     state.food += amount;
     pulseResourceClick(el.foodClickBtn, amount, "food", {
       showFloater: opts.showFloater !== false,
@@ -4262,7 +4520,12 @@
         fired += 1;
         const showFloater = goldFloaterCooldown <= 0;
         if (showFloater) goldFloaterCooldown = AUTO_FLOATER_MIN_INTERVAL;
-        doMineClick({ showFloater, jabCursor: true, press: true });
+        doMineClick({
+          showFloater,
+          jabCursor: true,
+          press: true,
+          amount: autoGoldPayout(),
+        });
       }
     } else {
       goldAutoAccum = 0;
@@ -4276,7 +4539,12 @@
         fired += 1;
         const showFloater = foodFloaterCooldown <= 0;
         if (showFloater) foodFloaterCooldown = AUTO_FLOATER_MIN_INTERVAL;
-        doForageClick({ showFloater, jabCursor: true, press: true });
+        doForageClick({
+          showFloater,
+          jabCursor: true,
+          press: true,
+          amount: autoFoodPayout(),
+        });
       }
     } else {
       foodAutoAccum = 0;
@@ -4347,6 +4615,7 @@
       state.food += state.foodPerSecond * dt;
     }
     tickAutoClicks(dt);
+    tickFoodUpkeep(dt);
 
     if (inBattle()) {
       battleTick(dt);
@@ -4662,6 +4931,9 @@
     );
   }
   initMobileChrome();
+  initModals();
+  syncVersionLabel();
   startBattle();
   initMusic();
+  maybeShowFirstRunHelp();
 })();

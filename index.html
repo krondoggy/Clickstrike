@@ -8,6 +8,13 @@
   <meta property="og:title" content="Clickstrike" />
   <meta property="og:description" content="Mine gold, forage food, auto-train troops, and destroy the enemy keep." />
   <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://krondoggy.github.io/Clickstrike/" />
+  <meta property="og:image" content="https://krondoggy.github.io/Clickstrike/assets/og-image.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Clickstrike" />
+  <meta name="twitter:description" content="Mine gold, forage food, auto-train troops, and destroy the enemy keep." />
+  <meta name="twitter:image" content="https://krondoggy.github.io/Clickstrike/assets/og-image.png" />
+  <link rel="canonical" href="https://krondoggy.github.io/Clickstrike/" />
   <title>Clickstrike</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -61,13 +68,19 @@
         </span>
       </div>
       <div class="stat-pill resource-food" title="Larder — spend to recruit">
+        <span
+          id="starvation-warning"
+          class="starvation-warning"
+          hidden
+          aria-live="polite"
+        >Starving!</span>
         <span class="stat-icon food" aria-hidden="true"></span>
         <span class="stat-body">
           <span class="stat-row">
             <span id="food-display">0</span>
             <span class="stat-label">Food</span>
           </span>
-          <span class="stat-rate resource-fps" title="Food per second">
+          <span class="stat-rate resource-fps" title="Net food per second (income − army upkeep)">
             <span id="fps-prefix" class="stat-prefix">+</span>
             <span id="fps-display">0</span>
             <span class="stat-rate-unit">/s</span>
@@ -96,6 +109,15 @@
       </div>
     </div>
     <div class="topbar-actions">
+      <span id="version-label" class="version-label" aria-label="Game version">v1.0.0</span>
+      <button
+        type="button"
+        id="help-btn"
+        class="help-btn"
+        title="How to play"
+      >
+        Help
+      </button>
       <button
         type="button"
         id="music-mute-btn"
@@ -259,6 +281,7 @@
 
         <h2>Army</h2>
         <div id="army-home">
+          <p id="army-upkeep" class="army-upkeep" hidden></p>
           <p id="spawn-hint" class="log-muted">Click a unit to train (faster than Auto). Toggle Auto on several types for a mixed draft — counters matter.</p>
           <h3 class="army-subhead">Heroes</h3>
           <div id="hero-list" class="hero-list"></div>
@@ -322,6 +345,52 @@
           <button type="button" id="army-sheet-close" class="army-sheet-close">Close</button>
         </div>
         <div id="army-sheet-body" class="army-sheet-body"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="help-modal" class="game-modal" hidden aria-hidden="true">
+    <button type="button" class="game-modal-backdrop" aria-label="Close help"></button>
+    <div
+      class="game-modal-panel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="help-modal-title"
+    >
+      <div class="game-modal-header">
+        <h2 id="help-modal-title">How to Play</h2>
+        <button type="button" id="help-modal-close" class="game-modal-close">Close</button>
+      </div>
+      <div class="game-modal-body">
+        <ul class="help-list">
+          <li><strong>Mine Gold</strong> and <strong>Forage</strong> to fund your war. Buy Economy upgrades in Treasury — miners and foragers auto-click at 40% yield.</li>
+          <li>Your <strong>army eats food</strong> every second while fighting. Watch the net food rate in the top bar. Run out and troops weaken, healers stop, and units desert.</li>
+          <li>Wave 1 starts with a countdown. Then battle loops — destroy the enemy keep (right) before yours (left) falls.</li>
+          <li><strong>Army panel:</strong> click a unit to train (faster than Auto). Toggle Auto on several types for a mixed draft. Counters matter — spears beat cavalry, archers beat infantry, and so on.</li>
+          <li><strong>Heroes</strong> are expensive gold + food sinks. When they fall, pay 40% of hire cost to rez. One hero at a time.</li>
+          <li><strong>Win</strong> a wave for gold and advance. <strong>Lose</strong> and you drop gold, food, and a wave. Progress autosaves in your browser.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div id="confirm-modal" class="game-modal" hidden aria-hidden="true">
+    <button type="button" class="game-modal-backdrop" aria-label="Cancel"></button>
+    <div
+      class="game-modal-panel game-modal-panel-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="confirm-modal-title"
+    >
+      <div class="game-modal-header">
+        <h2 id="confirm-modal-title">Confirm</h2>
+      </div>
+      <div class="game-modal-body">
+        <p id="confirm-modal-body"></p>
+      </div>
+      <div class="game-modal-actions">
+        <button type="button" id="confirm-modal-cancel" class="game-modal-btn">Cancel</button>
+        <button type="button" id="confirm-modal-ok" class="game-modal-btn game-modal-btn-primary">Confirm</button>
       </div>
     </div>
   </div>
