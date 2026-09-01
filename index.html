@@ -3,70 +3,134 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Browser idle clicker — mine gold, forage food, auto-train troops, and destroy the enemy keep in a looping assault." />
+  <meta name="theme-color" content="#0a0c12" />
+  <meta property="og:title" content="Clickstrike" />
+  <meta property="og:description" content="Mine gold, forage food, auto-train troops, and destroy the enemy keep." />
+  <meta property="og:type" content="website" />
   <title>Clickstrike</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
-<body>
+<body data-mobile-pane="battle">
   <header id="topbar">
-    <h1 class="brand">Clickstrike</h1>
+    <div class="topbar-rivet topbar-rivet-tl" aria-hidden="true"></div>
+    <div class="topbar-rivet topbar-rivet-tr" aria-hidden="true"></div>
+    <h1 class="visually-hidden">Clickstrike</h1>
+    <div
+      id="battle-strip"
+      class="battle-strip"
+      role="status"
+      aria-live="polite"
+      aria-label="Battle progress"
+    >
+      <div class="battle-strip-side player">
+        <span class="battle-strip-count" id="player-unit-count">0</span>
+        <span class="battle-strip-label">You</span>
+      </div>
+      <div class="battle-strip-meter" title="Keep strength">
+        <div class="battle-strip-track player" aria-hidden="true">
+          <div id="strip-player-fill" class="battle-strip-fill"></div>
+        </div>
+        <div class="battle-strip-vs" aria-hidden="true">vs</div>
+        <div class="battle-strip-track enemy" aria-hidden="true">
+          <div id="strip-enemy-fill" class="battle-strip-fill"></div>
+        </div>
+      </div>
+      <div class="battle-strip-side enemy">
+        <span class="battle-strip-count" id="enemy-unit-count">0</span>
+        <span class="battle-strip-label">Foe</span>
+      </div>
+    </div>
     <div class="topbar-stats">
       <div class="stat-pill resource-gold" title="Your treasury">
-        <span class="stat-icon" aria-hidden="true"></span>
-        <span id="gold-display">0</span>
-        <span class="stat-label">Gold</span>
-      </div>
-      <div class="stat-pill resource-gps" title="Gold per second">
-        <span class="stat-prefix">+</span>
-        <span id="gps-display">0</span>
-        <span class="stat-label">g/s</span>
+        <span class="stat-icon gold" aria-hidden="true"></span>
+        <span class="stat-body">
+          <span class="stat-row">
+            <span id="gold-display">0</span>
+            <span class="stat-label">Gold</span>
+          </span>
+          <span class="stat-rate" title="Gold per second">
+            <span class="stat-prefix">+</span>
+            <span id="gps-display">0</span>
+            <span class="stat-rate-unit">/s</span>
+          </span>
+        </span>
       </div>
       <div class="stat-pill resource-food" title="Provisions for troops">
         <span class="stat-icon food" aria-hidden="true"></span>
-        <span id="food-display">0</span>
-        <span class="stat-label">Food</span>
-      </div>
-      <div class="stat-pill resource-fps" title="Food per second (net of upkeep in battle)">
-        <span id="fps-prefix" class="stat-prefix">+</span>
-        <span id="fps-display">0</span>
-        <span class="stat-label">f/s</span>
+        <span class="stat-body">
+          <span class="stat-row">
+            <span id="food-display">0</span>
+            <span class="stat-label">Food</span>
+          </span>
+          <span class="stat-rate resource-fps" title="Food per second (net of upkeep in battle)">
+            <span id="fps-prefix" class="stat-prefix">+</span>
+            <span id="fps-display">0</span>
+            <span class="stat-rate-unit">/s</span>
+          </span>
+        </span>
       </div>
       <div class="stat-pill resource-wave" title="Current enemy wave">
-        <span class="stat-label">Wave</span>
-        <span id="wave-display">1</span>
+        <span class="stat-icon wave" aria-hidden="true"></span>
+        <span class="stat-body">
+          <span class="stat-label">Wave</span>
+          <span id="wave-display">1</span>
+        </span>
       </div>
-      <label class="stat-pill music-control" title="Music volume" for="music-volume">
-        <span class="stat-label">Music</span>
-        <input
-          id="music-volume"
-          type="range"
-          min="0"
-          max="100"
-          value="35"
-          step="1"
-          aria-label="Music volume"
-        />
-      </label>
+    </div>
+    <div class="topbar-actions">
+      <button
+        type="button"
+        id="music-mute-btn"
+        class="music-mute-btn"
+        aria-pressed="false"
+        title="Mute music"
+      >
+        Music
+      </button>
+      <button
+        type="button"
+        id="new-game-btn"
+        class="new-game-btn"
+        title="Wipe save and start over"
+      >
+        New Game
+      </button>
     </div>
   </header>
 
   <audio id="bg-music" preload="auto" playsinline></audio>
 
   <div id="hud">
+    <nav id="mobile-nav" aria-label="Mobile sections">
+      <button type="button" class="mobile-tab is-active" data-pane="battle" aria-pressed="true">Battle</button>
+      <button type="button" class="mobile-tab" data-pane="upgrades" aria-pressed="false" aria-label="Upgrades">
+        Upgrades<span class="mobile-tab-badge" hidden aria-hidden="true"></span>
+      </button>
+      <button type="button" class="mobile-tab" data-pane="army" aria-pressed="false">Army</button>
+    </nav>
+
     <section id="stage" class="panel" aria-label="Battlefield">
       <div class="panel-ornament panel-ornament-tl" aria-hidden="true"></div>
       <div class="panel-ornament panel-ornament-tr" aria-hidden="true"></div>
       <div class="panel-ornament panel-ornament-bl" aria-hidden="true"></div>
       <div class="panel-ornament panel-ornament-br" aria-hidden="true"></div>
 
-      <header class="panel-header">
-        <h2>Battlefield</h2>
-        <div id="wave-preview"></div>
-      </header>
-
       <div id="battle-arena">
+        <div class="battlefield-chrome">
+          <div id="wave-preview"></div>
+          <div id="loop-status" class="loop-status" role="status">
+            <span id="loop-status-text" class="loop-status-text">Wave 1 continuous</span>
+            <div id="countdown-bar" class="countdown-bar" hidden aria-hidden="true">
+              <div id="countdown-bar-fill" class="countdown-bar-fill"></div>
+            </div>
+          </div>
+        </div>
+
         <div id="base-hp-row">
           <div class="base-hp-block player">
             <span class="base-hp-label">Your Keep</span>
@@ -134,17 +198,6 @@
           <div id="field-units"></div>
         </div>
       </div>
-
-      <div class="stage-actions">
-        <div id="loop-status" class="loop-status">Wave 1 continuous</div>
-      </div>
-
-      <div class="log-block">
-        <h3>Battle Log</h3>
-        <div id="battle-log">
-          <p class="log-muted">Keep gold and food flowing — troops auto-spawn while the assault loops. Defeat costs gold and food and pushes you back one wave.</p>
-        </div>
-      </div>
     </section>
 
     <footer id="console">
@@ -155,19 +208,34 @@
         <div class="panel-ornament panel-ornament-br" aria-hidden="true"></div>
 
         <h2>Treasury</h2>
-        <div class="resource-click-row">
-          <button id="click-btn" type="button">
-            <span class="click-btn-label">Mine Gold</span>
-            <span class="click-btn-sub">+<span id="click-power-display">1</span> per click</span>
+        <h3>War Chest</h3>
+        <div id="war-chest-list" class="command-list"></div>
+        <div class="upgrade-cat-tabs" role="tablist" aria-label="Upgrade categories">
+          <button
+            type="button"
+            class="upgrade-cat-tab is-active"
+            role="tab"
+            id="upgrade-tab-economy"
+            data-upgrade-cat="economy"
+            aria-selected="true"
+            aria-controls="upgrade-list"
+          >
+            Economy<span class="upgrade-cat-badge" hidden aria-hidden="true"></span>
           </button>
-          <button id="food-click-btn" type="button">
-            <span class="click-btn-label">Forage</span>
-            <span class="click-btn-sub">+<span id="food-click-power-display">1</span> food</span>
+          <button
+            type="button"
+            class="upgrade-cat-tab"
+            role="tab"
+            id="upgrade-tab-troops"
+            data-upgrade-cat="troops"
+            aria-selected="false"
+            aria-controls="upgrade-list"
+            tabindex="-1"
+          >
+            Troops<span class="upgrade-cat-badge" hidden aria-hidden="true"></span>
           </button>
         </div>
-
-        <h3>Upgrades</h3>
-        <div id="upgrade-list" class="command-list"></div>
+        <div id="upgrade-list" class="command-list" role="tabpanel" aria-labelledby="upgrade-tab-economy"></div>
       </section>
 
       <section class="panel console-panel" id="panel-commands">
@@ -177,10 +245,43 @@
         <div class="panel-ornament panel-ornament-br" aria-hidden="true"></div>
 
         <h2>Army</h2>
-        <p id="spawn-hint" class="log-muted">Tap a unit to toggle auto-train. Progress bar fills, then the troop deploys.</p>
-        <div id="recruit-list" class="command-grid"></div>
+        <div id="army-home">
+          <p id="spawn-hint" class="log-muted">Click a unit to train one. Use Auto to keep recruiting when you can afford it.</p>
+          <div id="recruit-list" class="command-grid"></div>
+        </div>
       </section>
     </footer>
+
+    <div id="resource-dock" class="resource-click-row">
+      <button id="click-btn" type="button">
+        <span class="click-btn-label">Mine Gold</span>
+        <span class="click-btn-sub">+<span id="click-power-display">1</span> per click</span>
+      </button>
+      <button id="food-click-btn" type="button">
+        <span class="click-btn-label">Forage</span>
+        <span class="click-btn-sub">+<span id="food-click-power-display">1</span> food</span>
+      </button>
+      <button id="army-dock-btn" type="button" class="army-dock-btn" aria-expanded="false" aria-controls="army-sheet">
+        <span class="click-btn-label">Army</span>
+        <span class="click-btn-sub">Train troops</span>
+      </button>
+    </div>
+
+    <div id="army-sheet" class="army-sheet" hidden aria-hidden="true">
+      <button type="button" class="army-sheet-backdrop" aria-label="Close army panel"></button>
+      <div
+        class="army-sheet-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="army-sheet-title"
+      >
+        <div class="army-sheet-header">
+          <h2 id="army-sheet-title">Army</h2>
+          <button type="button" id="army-sheet-close" class="army-sheet-close">Close</button>
+        </div>
+        <div id="army-sheet-body" class="army-sheet-body"></div>
+      </div>
+    </div>
   </div>
 
   <script src="game.js"></script>

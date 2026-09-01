@@ -7,29 +7,48 @@
   const FIELD_SOFT_CAP = 40;
   const PLAYER_BASE_HP = 120;
   const MELEE_RANGE = 6;
-  const LANE_TARGET_Y = 18;
+  /** How far in Y (%) a unit may still lock a foe. */
+  const LANE_TARGET_Y = 24;
   const PLAYER_SPAWN_X = 14;
   const ENEMY_SPAWN_X = 86;
   const BASE_EDGE_PLAYER = 12;
   const BASE_EDGE_ENEMY = 88;
-  const LANES = [48, 58, 68];
+  /** Vertical band of the field usable for troops (percent). */
+  const FIELD_Y_MIN = 28;
+  const FIELD_Y_MAX = 80;
+  const LANE_COUNT = 7;
+  const LANES = Array.from({ length: LANE_COUNT }, (_, i) =>
+    FIELD_Y_MIN + (i / (LANE_COUNT - 1)) * (FIELD_Y_MAX - FIELD_Y_MIN)
+  );
+  const LANE_JITTER = 3.2;
+  const SPAWN_X_JITTER = 2.4;
+  /** Soft push so stacks break into a front. */
+  const SEPARATION_DIST = 6.2;
+  const SEPARATION_STRENGTH = 10;
   /** Base seconds to train one unit before it hits the field. */
   const BASE_TRAIN_TIME = 2;
   const TRAIN_RETRY = 0.25;
   const WAVE_TRANSITION_MS = 900;
   /** Seconds before wave 1 combat starts. */
-  const OPENING_COUNTDOWN_S = 3;
+  const OPENING_COUNTDOWN_S = 8;
+  /** Multiplier applied to unit.spd when marching (lower = slower field pace). */
+  const UNIT_MOVE_MULT = 0.9;
   /** Food drained per living player unit per second while battle is live. */
   const FOOD_UPKEEP_PER_UNIT = 0.35;
   const SAVE_KEY = "clickstrike-save-v1";
-  const SAVE_VERSION = 2;
+  const SAVE_VERSION = 3;
   const SAVE_THROTTLE_MS = 2000;
   const MUSIC_VOLUME_KEY = "clickstrike-music-volume";
+  const MUSIC_MUTED_KEY = "clickstrike-music-muted";
   const MUSIC_TRACKS = [
     "assets/audio/music/07-human-1.mp3",
     "assets/audio/music/13-arrival-at-kalimdor.mp3",
   ];
   const FOOD_UPGRADE_IDS = { baskets: true, foragers: true };
+  const MOBILE_MQ = "(max-width: 900px)";
+  const MOBILE_PANE_KEY = "clickstrike-mobile-pane";
+  /** Kill gold soft cap window (ms). */
+  const KILL_GOLD_WINDOW_MS = 1000;
 
   const UPGRADES = [
     {
@@ -86,6 +105,30 @@
       },
     },
     {
+      id: "granary",
+      name: "Granary",
+      desc: "−10% food upkeep / level",
+      baseCost: 55,
+      growth: 1.7,
+      apply() {},
+    },
+    {
+      id: "plunder",
+      name: "Plunder Maps",
+      desc: "+15% kill gold / level",
+      baseCost: 65,
+      growth: 1.65,
+      apply() {},
+    },
+    {
+      id: "caravan",
+      name: "Caravan Guard",
+      desc: "+12% win gold / level",
+      baseCost: 70,
+      growth: 1.7,
+      apply() {},
+    },
+    {
       id: "weapons",
       name: "Forged Tips",
       desc: "+15% unit ATK",
@@ -131,7 +174,7 @@
       foodCost: 18,
       hp: 28,
       atk: 5,
-      spd: 5,
+      spd: 3,
       armor: 1,
       atkCd: 0.55,
       range: 6,
@@ -145,7 +188,7 @@
       foodCost: 20,
       hp: 14,
       atk: 11,
-      spd: 8,
+      spd: 4.5,
       armor: 0,
       atkCd: 0.4,
       range: 28,
@@ -156,15 +199,63 @@
       id: "knight",
       name: "Knight",
       cost: 100,
-      foodCost: 45,
+      foodCost: 52,
       hp: 45,
       atk: 13,
-      spd: 4,
+      spd: 2.5,
       armor: 3,
       atkCd: 0.7,
       range: 6,
       atkStyle: "melee",
       blurb: "Slow and sturdy",
+    },
+    {
+      id: "rider",
+      name: "Rider",
+      cost: 55,
+      foodCost: 28,
+      hp: 22,
+      atk: 9,
+      spd: 5.5,
+      armor: 0,
+      atkCd: 0.45,
+      range: 6,
+      atkStyle: "melee",
+      blurb: "Fast harasser",
+      unlockWave: 3,
+      unlockCost: 80,
+    },
+    {
+      id: "mage",
+      name: "Mage",
+      cost: 85,
+      foodCost: 35,
+      hp: 12,
+      atk: 18,
+      spd: 3.2,
+      armor: 0,
+      atkCd: 0.75,
+      range: 32,
+      atkStyle: "magic",
+      blurb: "Magic siege bolts",
+      unlockWave: 5,
+      unlockCost: 150,
+    },
+    {
+      id: "guardian",
+      name: "Guardian",
+      cost: 70,
+      foodCost: 60,
+      hp: 70,
+      atk: 6,
+      spd: 1.8,
+      armor: 5,
+      atkCd: 0.85,
+      range: 6,
+      atkStyle: "melee",
+      blurb: "Keep wall tank",
+      unlockWave: 7,
+      unlockCost: 120,
     },
   ];
 
@@ -202,6 +293,38 @@
       `<path class="u-accent" d="M44 36v12M40 42h8"/>` +
       `<rect class="u-metal" x="14" y="36" width="4" height="18" rx="1"/>` +
       `</svg>`,
+    rider:
+      `<svg class="unit-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
+      `<ellipse class="u-body" cx="34" cy="42" rx="18" ry="10"/>` +
+      `<path class="u-metal" d="M16 40c2-6 6-10 10-10 2 4 2 10 0 14z"/>` +
+      `<circle class="u-skin" cx="28" cy="18" r="7"/>` +
+      `<path class="u-helm" d="M20 18c0-8 4-12 8-12s8 4 8 12v3H20z"/>` +
+      `<path class="u-visor" d="M23 19h10v2H23z"/>` +
+      `<path class="u-accent" d="M24 28h10l2 10H22z"/>` +
+      `<path class="u-point" d="M42 22l14 6-14 2z"/>` +
+      `<path class="u-claw" d="M48 48l6 6M52 44l8 4"/>` +
+      `</svg>`,
+    mage:
+      `<svg class="unit-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
+      `<path class="u-hood" d="M18 30c2-16 10-24 14-24s12 8 14 24l-4 6H22z"/>` +
+      `<circle class="u-skin" cx="32" cy="28" r="7"/>` +
+      `<path class="u-body" d="M22 36h20l4 22H18z"/>` +
+      `<path class="u-accent" d="M28 42h8v14h-8z"/>` +
+      `<circle class="u-gem" cx="32" cy="48" r="3"/>` +
+      `<rect class="u-metal" x="44" y="20" width="3" height="28" rx="1"/>` +
+      `<circle class="u-point" cx="45.5" cy="18" r="4"/>` +
+      `</svg>`,
+    guardian:
+      `<svg class="unit-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
+      `<path class="u-helm" d="M18 20c0-10 6-16 14-16s14 6 14 16v8H18z"/>` +
+      `<path class="u-visor" d="M22 24h20v5H22z"/>` +
+      `<circle class="u-skin" cx="32" cy="18" r="5"/>` +
+      `<path class="u-body" d="M16 34h32l3 24H13z"/>` +
+      `<path class="u-shield" d="M8 28h18v26c0 4-4 8-9 8s-9-4-9-8z"/>` +
+      `<path class="u-accent" d="M17 36v14M12 43h10"/>` +
+      `<rect class="u-metal" x="42" y="32" width="5" height="22" rx="1"/>` +
+      `<path class="u-point" d="M44.5 28l2.5-4 2.5 4z"/>` +
+      `</svg>`,
     foe:
       `<svg class="unit-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
       `<path class="u-horn" d="M18 18l-8-10 4 12zm28 0l8-10-4 12z"/>` +
@@ -211,6 +334,59 @@
       `<path class="u-body" d="M20 36h24l4 20H16z"/>` +
       `<path class="u-accent" d="M28 42h8v3h-8z"/>` +
       `<path class="u-claw" d="M18 48l-6 8h6zm28 0l6 8h-6z"/>` +
+      `</svg>`,
+    "foe-raider":
+      `<svg class="unit-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
+      `<path class="u-horn" d="M20 16l-6-8 2 10zm24 0l6-8-2 10z"/>` +
+      `<path class="u-hood" d="M18 24c2-10 8-16 14-16s12 6 14 16v5H18z"/>` +
+      `<circle class="u-skin" cx="32" cy="26" r="7"/>` +
+      `<path class="u-eye" d="M27 25h3v2h-3zm7 0h3v2h-3z"/>` +
+      `<path class="u-body" d="M22 34h20l2 18H20z"/>` +
+      `<path class="u-point" d="M44 30l12 4-12 3z"/>` +
+      `<path class="u-accent" d="M26 40h12v2H26z"/>` +
+      `</svg>`,
+    "foe-skirmisher":
+      `<svg class="unit-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
+      `<path class="u-hood" d="M18 28c2-14 10-20 14-20s12 6 14 20l-4 4H22z"/>` +
+      `<circle class="u-skin" cx="32" cy="26" r="7"/>` +
+      `<path class="u-eye" d="M27 25h3v2h-3zm7 0h3v2h-3z"/>` +
+      `<path class="u-body" d="M23 34h18l2 20H21z"/>` +
+      `<path class="u-bow" d="M48 18c2 10 2 22 0 32-8-6-12-14-12-16s4-10 12-16z" fill="none"/>` +
+      `<line class="u-string" x1="46" y1="20" x2="46" y2="48"/>` +
+      `<line class="u-arrow" x1="46" y1="34" x2="22" y2="34"/>` +
+      `<path class="u-accent" d="M28 38h8v2h-8z"/>` +
+      `</svg>`,
+    "foe-brute":
+      `<svg class="unit-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
+      `<path class="u-horn" d="M14 20l-10-8 4 14zm36 0l10-8-4 14z"/>` +
+      `<path class="u-hood" d="M12 28c2-12 12-18 20-18s18 6 20 18v8H12z"/>` +
+      `<circle class="u-skin" cx="32" cy="30" r="10"/>` +
+      `<path class="u-eye" d="M24 29h5v3h-5zm11 0h5v3h-5z"/>` +
+      `<path class="u-body" d="M14 40h36l4 18H10z"/>` +
+      `<path class="u-metal" d="M20 46h24v6H20z"/>` +
+      `<path class="u-claw" d="M12 52l-8 8h8zm40 0l8 8h-8z"/>` +
+      `<path class="u-accent" d="M26 44h12v3H26z"/>` +
+      `</svg>`,
+    "foe-cultist":
+      `<svg class="unit-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
+      `<path class="u-hood" d="M16 30c2-16 10-24 16-24s14 8 16 24l-5 6H21z"/>` +
+      `<circle class="u-skin" cx="32" cy="28" r="7"/>` +
+      `<path class="u-eye" d="M27 27h3v2h-3zm7 0h3v2h-3z"/>` +
+      `<path class="u-body" d="M20 36h24l4 22H16z"/>` +
+      `<circle class="u-gem" cx="32" cy="48" r="4"/>` +
+      `<rect class="u-metal" x="46" y="18" width="3" height="30" rx="1"/>` +
+      `<circle class="u-point" cx="47.5" cy="16" r="4"/>` +
+      `<path class="u-accent" d="M28 40h8v3h-8z"/>` +
+      `</svg>`,
+    "foe-hound":
+      `<svg class="unit-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
+      `<ellipse class="u-body" cx="34" cy="38" rx="18" ry="12"/>` +
+      `<path class="u-hood" d="M12 34c2-8 8-14 14-14 2 4 2 10 0 14z"/>` +
+      `<circle class="u-skin" cx="18" cy="30" r="6"/>` +
+      `<path class="u-eye" d="M15 28h3v2h-3z"/>` +
+      `<path class="u-horn" d="M14 22l-4-8 2 8zm8 0l4-8-2 8z"/>` +
+      `<path class="u-claw" d="M44 46l6 8M50 42l8 6"/>` +
+      `<path class="u-accent" d="M28 36h14v3H28z"/>` +
       `</svg>`,
     boss:
       `<svg class="unit-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
@@ -230,35 +406,317 @@
     const boss = opts && opts.boss;
     if (boss) return UNIT_ART.boss;
     if (typeId && UNIT_ART[typeId]) return UNIT_ART[typeId];
+    if (typeId && UNIT_ART["foe-" + typeId]) return UNIT_ART["foe-" + typeId];
     return UNIT_ART.foe;
   }
 
+  const ENEMY_TYPES = {
+    grunt: {
+      id: "grunt",
+      label: "Grunt",
+      hp: 1,
+      atk: 1,
+      spd: 1,
+      armorFlat: 0,
+      atkCd: 1,
+      range: 6,
+      atkStyle: "melee",
+      art: "foe",
+    },
+    raider: {
+      id: "raider",
+      label: "Raider",
+      hp: 0.75,
+      atk: 1.1,
+      spd: 1.45,
+      armorFlat: 0,
+      atkCd: 0.95,
+      range: 6,
+      atkStyle: "melee",
+      art: "foe-raider",
+    },
+    skirmisher: {
+      id: "skirmisher",
+      label: "Skirmisher",
+      hp: 0.7,
+      atk: 1.15,
+      spd: 1.1,
+      armorFlat: 0,
+      atkCd: 0.9,
+      range: 26,
+      atkStyle: "ranged",
+      art: "foe-skirmisher",
+    },
+    brute: {
+      id: "brute",
+      label: "Brute",
+      hp: 1.55,
+      atk: 0.9,
+      spd: 0.7,
+      armorFlat: 2,
+      atkCd: 1.15,
+      range: 6,
+      atkStyle: "melee",
+      art: "foe-brute",
+    },
+    cultist: {
+      id: "cultist",
+      label: "Cultist",
+      hp: 0.65,
+      atk: 1.35,
+      spd: 0.95,
+      armorFlat: 0,
+      atkCd: 1.2,
+      range: 30,
+      atkStyle: "magic",
+      art: "foe-cultist",
+    },
+    hound: {
+      id: "hound",
+      label: "Hound",
+      hp: 0.55,
+      atk: 0.95,
+      spd: 1.7,
+      armorFlat: 0,
+      atkCd: 0.85,
+      range: 6,
+      atkStyle: "melee",
+      art: "foe-hound",
+    },
+  };
+
+  const DEFAULT_ENEMY_MIX = [
+    { type: "grunt", w: 3 },
+    { type: "raider", w: 1 },
+  ];
+
+  const LATE_ENEMY_MIX = [
+    { type: "brute", w: 2 },
+    { type: "skirmisher", w: 2 },
+    { type: "cultist", w: 2 },
+    { type: "raider", w: 1 },
+    { type: "grunt", w: 1 },
+  ];
+
   const WAVE_ROSTER = [
-    { name: "Ragged Bandits", packLabel: "bandits" },
-    { name: "Wolf Pack", packLabel: "wolves" },
-    { name: "Hill Raiders", packLabel: "raiders" },
-    { name: "Marsh Skirmishers", packLabel: "skirmishers" },
-    { name: "Outlaw Captain", packLabel: "outlaws", boss: true },
-    { name: "Ogre Scout", packLabel: "ogres" },
-    { name: "Bone Shamblers", packLabel: "shamblers" },
-    { name: "Mercenary Company", packLabel: "mercenaries" },
-    { name: "Ash Cultists", packLabel: "cultists" },
-    { name: "Warband Chief", packLabel: "warriors", boss: true },
-    { name: "Ironclad Footmen", packLabel: "footmen" },
-    { name: "Night Stalkers", packLabel: "stalkers" },
-    { name: "Siege Brutes", packLabel: "brutes" },
-    { name: "Plague Bearers", packLabel: "bearers" },
-    { name: "Dark Champion", packLabel: "champions", boss: true },
-    { name: "Frost Raiders", packLabel: "raiders" },
-    { name: "Cinder Knights", packLabel: "knights" },
-    { name: "Hollow Legion", packLabel: "legionaries" },
-    { name: "Blood Hounds", packLabel: "hounds" },
-    { name: "Tyrant of the Vale", packLabel: "tyrants", boss: true },
-    { name: "Obsidian Guard", packLabel: "guards" },
-    { name: "Storm Callers", packLabel: "callers" },
-    { name: "Ruin Walkers", packLabel: "walkers" },
-    { name: "Dread Lancers", packLabel: "lancers" },
-    { name: "Age Warden", packLabel: "wardens", boss: true },
+    {
+      name: "Ragged Bandits",
+      mix: [
+        { type: "grunt", w: 3 },
+        { type: "raider", w: 1 },
+      ],
+    },
+    {
+      name: "Wolf Pack",
+      mix: [
+        { type: "hound", w: 4 },
+        { type: "raider", w: 1 },
+      ],
+      bossType: "hound",
+    },
+    {
+      name: "Hill Raiders",
+      mix: [
+        { type: "raider", w: 3 },
+        { type: "grunt", w: 2 },
+      ],
+      bossType: "raider",
+    },
+    {
+      name: "Marsh Skirmishers",
+      mix: [
+        { type: "skirmisher", w: 3 },
+        { type: "grunt", w: 2 },
+        { type: "raider", w: 1 },
+      ],
+      bossType: "skirmisher",
+    },
+    {
+      name: "Outlaw Captain",
+      boss: true,
+      bossType: "raider",
+      mix: [
+        { type: "raider", w: 2 },
+        { type: "grunt", w: 2 },
+        { type: "skirmisher", w: 1 },
+      ],
+    },
+    {
+      name: "Ogre Scout",
+      mix: [
+        { type: "brute", w: 2 },
+        { type: "grunt", w: 2 },
+        { type: "raider", w: 1 },
+      ],
+      bossType: "brute",
+    },
+    {
+      name: "Bone Shamblers",
+      mix: [
+        { type: "grunt", w: 3 },
+        { type: "brute", w: 1 },
+        { type: "cultist", w: 1 },
+      ],
+    },
+    {
+      name: "Mercenary Company",
+      mix: [
+        { type: "grunt", w: 2 },
+        { type: "skirmisher", w: 2 },
+        { type: "raider", w: 1 },
+      ],
+      bossType: "skirmisher",
+    },
+    {
+      name: "Ash Cultists",
+      mix: [
+        { type: "cultist", w: 3 },
+        { type: "grunt", w: 2 },
+        { type: "hound", w: 1 },
+      ],
+      bossType: "cultist",
+    },
+    {
+      name: "Warband Chief",
+      boss: true,
+      bossType: "brute",
+      mix: [
+        { type: "brute", w: 2 },
+        { type: "raider", w: 2 },
+        { type: "grunt", w: 1 },
+      ],
+    },
+    {
+      name: "Ironclad Footmen",
+      mix: [
+        { type: "grunt", w: 2 },
+        { type: "brute", w: 2 },
+        { type: "skirmisher", w: 1 },
+      ],
+      bossType: "brute",
+    },
+    {
+      name: "Night Stalkers",
+      mix: [
+        { type: "raider", w: 2 },
+        { type: "hound", w: 2 },
+        { type: "skirmisher", w: 1 },
+      ],
+      bossType: "raider",
+    },
+    {
+      name: "Siege Brutes",
+      mix: [
+        { type: "brute", w: 4 },
+        { type: "grunt", w: 1 },
+      ],
+      bossType: "brute",
+    },
+    {
+      name: "Plague Bearers",
+      mix: [
+        { type: "grunt", w: 2 },
+        { type: "cultist", w: 2 },
+        { type: "brute", w: 1 },
+      ],
+      bossType: "cultist",
+    },
+    {
+      name: "Dark Champion",
+      boss: true,
+      bossType: "brute",
+      mix: [
+        { type: "brute", w: 2 },
+        { type: "cultist", w: 2 },
+        { type: "skirmisher", w: 1 },
+      ],
+    },
+    {
+      name: "Frost Raiders",
+      mix: [
+        { type: "raider", w: 3 },
+        { type: "skirmisher", w: 2 },
+        { type: "hound", w: 1 },
+      ],
+      bossType: "raider",
+    },
+    {
+      name: "Cinder Knights",
+      mix: [
+        { type: "brute", w: 3 },
+        { type: "cultist", w: 1 },
+        { type: "grunt", w: 1 },
+      ],
+      bossType: "brute",
+    },
+    {
+      name: "Hollow Legion",
+      mix: [
+        { type: "grunt", w: 3 },
+        { type: "skirmisher", w: 2 },
+        { type: "brute", w: 1 },
+      ],
+    },
+    {
+      name: "Blood Hounds",
+      mix: [
+        { type: "hound", w: 4 },
+        { type: "raider", w: 2 },
+      ],
+      bossType: "hound",
+    },
+    {
+      name: "Tyrant of the Vale",
+      boss: true,
+      bossType: "brute",
+      mix: [
+        { type: "brute", w: 2 },
+        { type: "cultist", w: 2 },
+        { type: "raider", w: 1 },
+        { type: "skirmisher", w: 1 },
+      ],
+    },
+    {
+      name: "Obsidian Guard",
+      mix: [
+        { type: "brute", w: 3 },
+        { type: "skirmisher", w: 2 },
+      ],
+      bossType: "brute",
+    },
+    {
+      name: "Storm Callers",
+      mix: [
+        { type: "cultist", w: 4 },
+        { type: "skirmisher", w: 1 },
+        { type: "grunt", w: 1 },
+      ],
+      bossType: "cultist",
+    },
+    {
+      name: "Ruin Walkers",
+      mix: [
+        { type: "brute", w: 2 },
+        { type: "grunt", w: 2 },
+        { type: "cultist", w: 1 },
+      ],
+      bossType: "brute",
+    },
+    {
+      name: "Dread Lancers",
+      mix: [
+        { type: "raider", w: 3 },
+        { type: "brute", w: 1 },
+        { type: "skirmisher", w: 1 },
+      ],
+      bossType: "raider",
+    },
+    {
+      name: "Age Warden",
+      boss: true,
+      bossType: "brute",
+      mix: LATE_ENEMY_MIX,
+    },
   ];
 
   const el = {
@@ -273,21 +731,48 @@
     clickBtn: document.getElementById("click-btn"),
     foodClickBtn: document.getElementById("food-click-btn"),
     upgradeList: document.getElementById("upgrade-list"),
+    warChestList: document.getElementById("war-chest-list"),
+    upgradeCatTabs: document.querySelectorAll(".upgrade-cat-tab"),
     recruitList: document.getElementById("recruit-list"),
     spawnHint: document.getElementById("spawn-hint"),
     wavePreview: document.getElementById("wave-preview"),
     loopStatus: document.getElementById("loop-status"),
-    battleLog: document.getElementById("battle-log"),
+    loopStatusText: document.getElementById("loop-status-text"),
+    countdownBar: document.getElementById("countdown-bar"),
+    countdownBarFill: document.getElementById("countdown-bar-fill"),
     statusLabel: document.getElementById("battle-status-label"),
     playerBaseFill: document.getElementById("player-base-fill"),
     playerBaseText: document.getElementById("player-base-text"),
     enemyBaseFill: document.getElementById("enemy-base-fill"),
     enemyBaseText: document.getElementById("enemy-base-text"),
+    stripPlayerFill: document.getElementById("strip-player-fill"),
+    stripEnemyFill: document.getElementById("strip-enemy-fill"),
+    playerUnitCount: document.getElementById("player-unit-count"),
+    enemyUnitCount: document.getElementById("enemy-unit-count"),
+    battleStrip: document.getElementById("battle-strip"),
     basePlayer: document.getElementById("base-player"),
     baseEnemy: document.getElementById("base-enemy"),
     fieldUnits: document.getElementById("field-units"),
-    musicVolume: document.getElementById("music-volume"),
     bgMusic: document.getElementById("bg-music"),
+    musicMuteBtn: document.getElementById("music-mute-btn"),
+    newGameBtn: document.getElementById("new-game-btn"),
+    goldPill: document.querySelector(".resource-gold"),
+    foodPill: document.querySelector(".resource-food"),
+    mobileNav: document.getElementById("mobile-nav"),
+    upgradesTab: document.querySelector('#mobile-nav .mobile-tab[data-pane="upgrades"]'),
+    upgradesTabBadge: document.querySelector(
+      '#mobile-nav .mobile-tab[data-pane="upgrades"] .mobile-tab-badge'
+    ),
+    resourceDock: document.getElementById("resource-dock"),
+    armyDockBtn: document.getElementById("army-dock-btn"),
+    armySheet: document.getElementById("army-sheet"),
+    armySheetBody: document.getElementById("army-sheet-body"),
+    armySheetClose: document.getElementById("army-sheet-close"),
+    armyHome: document.getElementById("army-home"),
+    panelCommands: document.getElementById("panel-commands"),
+    panelResource: document.getElementById("panel-resource"),
+    hud: document.getElementById("hud"),
+    topbar: document.getElementById("topbar"),
   };
 
   const state = {
@@ -297,36 +782,44 @@
     foodClickPower: 1,
     goldPerSecond: 0,
     foodPerSecond: 0.2,
-    upgradeLevels: {
-      pickaxe: 0,
-      traders: 0,
-      baskets: 0,
-      foragers: 0,
-      smithy: 0,
-      weapons: 0,
-      armor: 0,
-      vitality: 0,
-      barracks: 0,
-    },
+    upgradeLevels: defaultUpgradeLevelsDraft(),
     nextUnitId: 1,
     wave: 1,
     battle: null,
     laneCursor: 0,
     spawnCursor: 0,
-    autoSpawn: { spearman: true, archer: false, knight: false },
+    autoSpawn: defaultAutoSpawnDraft(),
+    unlockedUnits: {},
     waveTransitioning: false,
+    upgradeCategory: "economy",
   };
 
-  function defaultAutoSpawn() {
-    return { spearman: true, archer: false, knight: false };
-  }
-
-  let lastSaveAt = 0;
-
-  function defaultUpgradeLevels() {
+  function defaultUpgradeLevelsDraft() {
     const levels = {};
     for (const def of UPGRADES) levels[def.id] = 0;
     return levels;
+  }
+
+  function defaultAutoSpawnDraft() {
+    const o = {};
+    for (const t of UNIT_TYPES) o[t.id] = t.id === "spearman";
+    return o;
+  }
+
+  function defaultAutoSpawn() {
+    return defaultAutoSpawnDraft();
+  }
+
+  function defaultUnlockedUnits() {
+    return {};
+  }
+
+  let lastSaveAt = 0;
+  let lastRecruitSig = "";
+  let waveTransitionTimer = null;
+
+  function defaultUpgradeLevels() {
+    return defaultUpgradeLevelsDraft();
   }
 
   function isNonNegNum(n) {
@@ -346,6 +839,7 @@
       wave: state.wave,
       nextUnitId: state.nextUnitId,
       autoSpawn: { ...state.autoSpawn },
+      unlockedUnits: { ...state.unlockedUnits },
     };
   }
 
@@ -374,8 +868,8 @@
     } catch (_) {
       return false;
     }
-    // Accept v1 (migrate) and v2 saves.
-    if (!data || (data.v !== 1 && data.v !== SAVE_VERSION)) return false;
+    // Accept v1–v3 saves (migrate forward).
+    if (!data || data.v < 1 || data.v > SAVE_VERSION) return false;
     if (
       !isNonNegNum(data.gold) ||
       !isNonNegNum(data.food) ||
@@ -403,6 +897,14 @@
         }
       }
     }
+    const unlocked = defaultUnlockedUnits();
+    if (data.unlockedUnits && typeof data.unlockedUnits === "object") {
+      for (const type of UNIT_TYPES) {
+        if (type.unlockWave || type.unlockCost) {
+          if (data.unlockedUnits[type.id] === true) unlocked[type.id] = true;
+        }
+      }
+    }
     state.gold = data.gold;
     state.food = data.food;
     state.clickPower = data.clickPower;
@@ -413,9 +915,72 @@
     state.wave = Math.max(1, Math.floor(data.wave));
     state.nextUnitId = Math.max(1, Math.floor(data.nextUnitId));
     state.autoSpawn = auto;
+    state.unlockedUnits = unlocked;
     state.battle = null;
     state.waveTransitioning = false;
     return true;
+  }
+
+  function clearSave() {
+    try {
+      localStorage.removeItem(SAVE_KEY);
+    } catch (_) {
+      /* private mode */
+    }
+  }
+
+  function resetMetaState() {
+    if (waveTransitionTimer) {
+      clearTimeout(waveTransitionTimer);
+      waveTransitionTimer = null;
+    }
+    state.gold = 0;
+    state.food = 36;
+    state.clickPower = 1;
+    state.foodClickPower = 1;
+    state.goldPerSecond = 0;
+    state.foodPerSecond = 0.2;
+    state.upgradeLevels = defaultUpgradeLevels();
+    state.nextUnitId = 1;
+    state.wave = 1;
+    state.battle = null;
+    state.laneCursor = 0;
+    state.spawnCursor = 0;
+    state.autoSpawn = defaultAutoSpawn();
+    state.unlockedUnits = defaultUnlockedUnits();
+    state.waveTransitioning = false;
+    el.fieldUnits.innerHTML = "";
+  }
+
+  function newGame() {
+    if (
+      !window.confirm(
+        "Wipe save and start over? Music volume will be kept."
+      )
+    ) {
+      return;
+    }
+    clearSave();
+    resetMetaState();
+    lastRecruitSig = "";
+    appendLog("log-muted", "New game — wave 1 assault begins.");
+    startBattle();
+    renderHud();
+  }
+
+  function flashStatPills(mode) {
+    const cls = mode === "win" ? "flash-win" : "flash-loss";
+    const pills =
+      mode === "win"
+        ? [el.goldPill]
+        : [el.goldPill, el.foodPill];
+    for (const pill of pills) {
+      if (!pill) continue;
+      pill.classList.remove("flash-win", "flash-loss");
+      void pill.offsetWidth;
+      pill.classList.add(cls);
+      setTimeout(() => pill.classList.remove(cls), 700);
+    }
   }
 
   function format(n) {
@@ -435,23 +1000,78 @@
     return UNIT_TYPES.find((t) => t.id === id);
   }
 
+  function unitNeedsUnlock(type) {
+    return !!(type && (type.unlockWave || type.unlockCost));
+  }
+
+  function isUnitUnlocked(id) {
+    const type = unitType(id);
+    if (!type) return false;
+    if (!unitNeedsUnlock(type)) return true;
+    return !!state.unlockedUnits[id];
+  }
+
+  function unitUnlockWaveReached(type) {
+    return state.wave >= (type.unlockWave || 1);
+  }
+
+  function canUnlockUnit(id) {
+    const type = unitType(id);
+    if (!type || !unitNeedsUnlock(type) || isUnitUnlocked(id)) return false;
+    if (!unitUnlockWaveReached(type)) return false;
+    return state.gold >= (type.unlockCost || 0);
+  }
+
+  function unlockUnit(id) {
+    const type = unitType(id);
+    if (!canUnlockUnit(id)) return false;
+    state.gold -= type.unlockCost || 0;
+    state.unlockedUnits[id] = true;
+    appendLog("log-win", `Unlocked ${type.name} for the army.`);
+    saveGame(true);
+    return true;
+  }
+
   function isBossWave(wave) {
     return wave % 5 === 0;
   }
 
+  function isMiniBossWave(wave) {
+    return wave % 5 === 3;
+  }
+
+  function isEliteWave(wave) {
+    return isBossWave(wave) || isMiniBossWave(wave);
+  }
+
+  function waveKindLabel(wave) {
+    if (isBossWave(wave)) return "Boss";
+    if (isMiniBossWave(wave)) return "Mini-boss";
+    return "Assault";
+  }
+
+  function waveRosterEntry(wave) {
+    if (wave <= WAVE_ROSTER.length) return WAVE_ROSTER[wave - 1];
+    return null;
+  }
+
   function waveMeta(wave) {
-    if (wave <= WAVE_ROSTER.length) {
-      const entry = WAVE_ROSTER[wave - 1];
+    const entry = waveRosterEntry(wave);
+    if (entry) {
       return {
         name: entry.name,
-        packLabel: entry.packLabel,
-        boss: !!entry.boss || isBossWave(wave),
+        boss: isBossWave(wave) || !!entry.boss,
+        mini: isMiniBossWave(wave),
+        mix: entry.mix || DEFAULT_ENEMY_MIX,
+        bossType: entry.bossType || null,
       };
     }
     return {
       name: "Age Warden " + (wave - WAVE_ROSTER.length),
-      packLabel: "wardens",
       boss: isBossWave(wave),
+      mini: isMiniBossWave(wave),
+      mix: LATE_ENEMY_MIX,
+      bossType: "brute",
     };
   }
 
@@ -465,29 +1085,78 @@
     return Math.max(1.2, 2.8 - wave * 0.08);
   }
 
-  function enemyUnitStats(wave) {
-    const boss = isBossWave(wave);
-    // ~10% tougher than pre-upgrade curve to offset player combat shops
-    let hp = Math.floor(15 * Math.pow(1.13, wave - 1));
-    let atk = Math.floor(3.5 + wave * 1.15);
-    let spd = 4 + Math.floor((wave - 1) / 6);
-    let armor = Math.floor((wave - 1) / 4);
-    let atkCd = Math.max(0.35, 0.55 - wave * 0.008);
-    if (boss) {
+  function enemyBaseStats(wave) {
+    // Shared wave curve; archetypes multiply on top.
+    return {
+      hp: Math.floor(15 * Math.pow(1.13, wave - 1)),
+      atk: Math.floor(3.5 + wave * 1.15),
+      spd: 2.5 + Math.floor((wave - 1) / 6) * 0.6,
+      armor: Math.floor((wave - 1) / 4),
+      atkCd: Math.max(0.35, 0.55 - wave * 0.008),
+    };
+  }
+
+  function enemyTypeDef(typeId) {
+    return ENEMY_TYPES[typeId] || ENEMY_TYPES.grunt;
+  }
+
+  function pickWeightedEnemyType(mix) {
+    const list = mix && mix.length ? mix : DEFAULT_ENEMY_MIX;
+    let total = 0;
+    for (const entry of list) total += Math.max(0, entry.w || 0);
+    if (total <= 0) return "grunt";
+    let roll = Math.random() * total;
+    for (const entry of list) {
+      roll -= Math.max(0, entry.w || 0);
+      if (roll <= 0) return entry.type in ENEMY_TYPES ? entry.type : "grunt";
+    }
+    const last = list[list.length - 1];
+    return last && last.type in ENEMY_TYPES ? last.type : "grunt";
+  }
+
+  function pickEliteEnemyType(meta) {
+    if (meta.bossType && ENEMY_TYPES[meta.bossType]) return meta.bossType;
+    const mix = meta.mix || DEFAULT_ENEMY_MIX;
+    const ids = mix.map((m) => m.type);
+    if (ids.includes("brute")) return "brute";
+    if (ids.includes("grunt")) return "grunt";
+    return ids[0] && ENEMY_TYPES[ids[0]] ? ids[0] : "grunt";
+  }
+
+  /** @param {"normal"|"mini"|"boss"} rank */
+  function enemyArchetypeStats(wave, typeId, rank) {
+    const base = enemyBaseStats(wave);
+    const arch = enemyTypeDef(typeId);
+    let hp = Math.max(1, Math.floor(base.hp * arch.hp));
+    let atk = Math.max(1, Math.floor(base.atk * arch.atk));
+    let spd = Math.max(0.8, base.spd * arch.spd);
+    let armor = Math.max(0, Math.floor(base.armor + (arch.armorFlat || 0)));
+    let atkCd = Math.max(0.28, base.atkCd * (arch.atkCd || 1));
+
+    if (rank === "boss") {
       hp = Math.floor(hp * 1.25);
       atk = Math.floor(atk * 1.15);
       armor += 1;
       atkCd += 0.05;
+    } else if (rank === "mini") {
+      hp = Math.floor(hp * 1.45);
+      atk = Math.floor(atk * 1.2);
+      armor += 1;
     }
+
     return {
       hp,
       atk,
       spd,
       armor,
       atkCd,
-      range: MELEE_RANGE,
-      atkStyle: "melee",
-      boss,
+      range: arch.range || MELEE_RANGE,
+      atkStyle: arch.atkStyle || "melee",
+      typeId: arch.id,
+      label: arch.label,
+      art: arch.art,
+      boss: rank === "boss",
+      mini: rank === "mini",
     };
   }
 
@@ -511,7 +1180,9 @@
   }
 
   function winBonus(wave) {
-    return Math.floor(25 + 14 * wave);
+    const base = Math.floor(25 + 14 * wave);
+    const lv = state.upgradeLevels.caravan || 0;
+    return Math.max(1, Math.floor(base * (1 + 0.12 * lv)));
   }
 
   function lossPenalty(wave) {
@@ -529,26 +1200,70 @@
     return !!(state.battle && state.battle.countdown > 0);
   }
 
+  function setLoopStatusText(text) {
+    if (el.loopStatusText) el.loopStatusText.textContent = text;
+    else if (el.loopStatus) el.loopStatus.textContent = text;
+  }
+
+  function syncCountdownBar() {
+    if (!el.countdownBar || !el.countdownBarFill) return;
+    if (!inCountdown()) {
+      el.countdownBar.hidden = true;
+      el.countdownBar.setAttribute("aria-hidden", "true");
+      el.countdownBarFill.style.width = "0%";
+      if (el.loopStatus) el.loopStatus.classList.remove("is-countdown");
+      return;
+    }
+    const b = state.battle;
+    const max = Math.max(0.001, b.countdownMax || OPENING_COUNTDOWN_S);
+    const pct = Math.max(0, Math.min(100, (b.countdown / max) * 100));
+    el.countdownBar.hidden = false;
+    el.countdownBar.setAttribute("aria-hidden", "false");
+    el.countdownBarFill.style.width = pct + "%";
+    if (el.loopStatus) el.loopStatus.classList.add("is-countdown");
+  }
+
   function countSide(side) {
     if (!state.battle) return 0;
     return state.battle.units.filter((u) => u.side === side && u.hp > 0).length;
   }
 
-  function nextLane() {
-    const y = LANES[state.laneCursor % LANES.length];
-    state.laneCursor += 1;
-    return y;
+  function clampFieldY(y) {
+    return Math.max(FIELD_Y_MIN, Math.min(FIELD_Y_MAX, y));
   }
 
-  function appendLog(cls, text) {
-    const line = document.createElement("p");
-    line.className = cls;
-    line.textContent = text;
-    el.battleLog.appendChild(line);
-    while (el.battleLog.children.length > 8) {
-      el.battleLog.removeChild(el.battleLog.firstChild);
+  function nextLane() {
+    const living = state.battle
+      ? state.battle.units.filter((u) => u.hp > 0)
+      : [];
+    let bestIdx = state.laneCursor % LANES.length;
+    let bestCount = Infinity;
+    for (let i = 0; i < LANES.length; i++) {
+      const idx = (state.laneCursor + i) % LANES.length;
+      const laneY = LANES[idx];
+      const count = living.filter((u) => Math.abs(u.y - laneY) < 7).length;
+      if (count < bestCount) {
+        bestCount = count;
+        bestIdx = idx;
+      }
     }
-    el.battleLog.scrollTop = el.battleLog.scrollHeight;
+    state.laneCursor = (bestIdx + 1) % LANES.length;
+    const jitter = (Math.random() * 2 - 1) * LANE_JITTER;
+    return clampFieldY(LANES[bestIdx] + jitter);
+  }
+
+  function spawnXFor(side) {
+    const base = side === "player" ? PLAYER_SPAWN_X : ENEMY_SPAWN_X;
+    return base + (Math.random() * 2 - 1) * SPAWN_X_JITTER;
+  }
+
+  function appendLog(cls, message) {
+    if (!message) return;
+    // Kill spam stays on floaters; muted hooks stay silent.
+    if (cls === "log-kill" || cls === "log-muted") return;
+    const statusCls =
+      cls === "log-win" ? "won" : cls === "log-loss" ? "lost" : "fighting";
+    setStatus(message, statusCls);
   }
 
   function setStatus(text, cls) {
@@ -590,6 +1305,35 @@
 
     el.basePlayer.classList.toggle("critical", pb.hp / pb.maxHp <= 0.25);
     el.baseEnemy.classList.toggle("critical", eb.hp / eb.maxHp <= 0.25);
+
+    renderBattleStrip(pb, eb, pPct, ePct, pc, ec);
+  }
+
+  function renderBattleStrip(pb, eb, pPct, ePct, pc, ec) {
+    if (!el.battleStrip) return;
+
+    const playerUnits = countSide("player");
+    const enemyUnits = countSide("enemy");
+
+    if (el.stripPlayerFill) {
+      el.stripPlayerFill.style.width = pPct + "%";
+      el.stripPlayerFill.classList.remove("low", "critical");
+      if (pc) el.stripPlayerFill.classList.add(pc);
+    }
+    if (el.stripEnemyFill) {
+      el.stripEnemyFill.style.width = ePct + "%";
+      el.stripEnemyFill.classList.remove("low", "critical");
+      if (ec) el.stripEnemyFill.classList.add(ec);
+    }
+    if (el.playerUnitCount) el.playerUnitCount.textContent = String(playerUnits);
+    if (el.enemyUnitCount) el.enemyUnitCount.textContent = String(enemyUnits);
+
+    const pHp = Math.ceil(Math.max(0, pb.hp));
+    const eHp = Math.ceil(Math.max(0, eb.hp));
+    el.battleStrip.setAttribute(
+      "aria-label",
+      `Battle: you ${playerUnits} units, keep ${pHp}/${pb.maxHp}; foe ${enemyUnits} units, keep ${eHp}/${eb.maxHp}`
+    );
   }
 
   function getTokenEl(id) {
@@ -610,18 +1354,24 @@
     else if (pct <= 50) fill = "low";
 
     const typeClass =
-      u.side === "player" ? "type-" + (u.typeId || "spearman") : "foe";
+      u.side === "player"
+        ? "type-" + (u.typeId || "spearman")
+        : "foe foe-" + (u.typeId || "grunt");
     const classes = [
       "unit-token",
       typeClass,
       u.side === "enemy" ? "enemy" : "player",
       u.boss ? "boss" : "",
+      u.mini ? "elite" : "",
       "spawning",
     ]
       .filter(Boolean)
       .join(" ");
 
-    const artKey = u.side === "player" ? u.typeId || "spearman" : "foe";
+    const artKey =
+      u.side === "player"
+        ? u.typeId || "spearman"
+        : u.art || "foe-" + (u.typeId || "grunt");
     wrap.className = classes;
     wrap.dataset.fighterId = u.id;
     wrap.style.setProperty("--x", u.x + "%");
@@ -687,6 +1437,46 @@
     setTimeout(() => d.remove(), 700);
   }
 
+  function spawnGoldFloater(x, y, amount) {
+    const d = document.createElement("div");
+    d.className = "dmg-floater gold-gain";
+    d.style.setProperty("--x", x + "%");
+    d.style.setProperty("--y", y + "%");
+    d.textContent = "+" + amount + "g";
+    el.fieldUnits.appendChild(d);
+    setTimeout(() => d.remove(), 700);
+  }
+
+  function killGoldPayout(target) {
+    let amount = 2 + state.wave * 0.5;
+    if (target && target.boss) amount *= 1.5;
+    else if (target && target.mini) amount *= 1.25;
+    const lv = state.upgradeLevels.plunder || 0;
+    amount *= 1 + 0.15 * lv;
+    return Math.max(1, Math.floor(amount));
+  }
+
+  function killGoldCap() {
+    return 8 + state.wave;
+  }
+
+  function awardKillGold(target) {
+    const b = state.battle;
+    if (!b || !b.active) return;
+    const now = Date.now();
+    if (!b.killGoldWindow || now - b.killGoldWindow.t0 >= KILL_GOLD_WINDOW_MS) {
+      b.killGoldWindow = { t0: now, accrued: 0 };
+    }
+    const want = killGoldPayout(target);
+    const room = Math.max(0, killGoldCap() - b.killGoldWindow.accrued);
+    const pay = Math.min(want, room);
+    if (pay <= 0) return;
+    b.killGoldWindow.accrued += pay;
+    state.gold += pay;
+    spawnGoldFloater(target.x, target.y, pay);
+    syncResourceDisplays();
+  }
+
   function markDead(u) {
     u.hp = 0;
     u.removeAt = Date.now() + 400;
@@ -721,6 +1511,7 @@
     if (countSide("player") >= FIELD_SOFT_CAP) return false;
 
     const stats = playerUnitStats(type);
+    const homeY = nextLane();
     const unit = {
       id: "p" + state.nextUnitId++,
       side: "player",
@@ -734,8 +1525,9 @@
       atkCdMax: stats.atkCd,
       range: stats.range,
       atkStyle: stats.atkStyle,
-      x: PLAYER_SPAWN_X,
-      y: nextLane(),
+      x: spawnXFor("player"),
+      y: homeY,
+      homeY,
       attackCd: 0,
       boss: false,
     };
@@ -754,6 +1546,7 @@
 
   function startTraining(typeId) {
     if (!inBattle() || inCountdown()) return false;
+    if (!isUnitUnlocked(typeId)) return false;
     const b = state.battle;
     if (!b || b.training) return false;
     const type = unitType(typeId);
@@ -774,6 +1567,49 @@
     saveGame(true);
     syncSpawnProgress();
     return true;
+  }
+
+  function trainBlockReason(typeId) {
+    if (!inBattle() || inCountdown()) {
+      return "Wait for the assault to begin";
+    }
+    if (!isUnitUnlocked(typeId)) return "Unit is locked";
+    const b = state.battle;
+    if (!b) return "No active battle";
+    if (b.training) {
+      const t = unitType(b.training.typeId);
+      return t ? `Training ${t.name}…` : "Already training…";
+    }
+    const type = unitType(typeId);
+    if (!type) return "Unknown unit";
+    if (state.gold < type.cost && state.food < type.foodCost) {
+      return "Need more gold and food";
+    }
+    if (state.gold < type.cost) return "Need more gold";
+    if (state.food < type.foodCost) return "Need more food";
+    if (countSide("player") >= FIELD_SOFT_CAP) return "Field is full";
+    return "Can't train right now";
+  }
+
+  function pulseRecruitCard(card, cls) {
+    if (!card) return;
+    card.classList.remove("buy-flash", "buy-deny");
+    void card.offsetWidth;
+    card.classList.add(cls);
+    setTimeout(() => card.classList.remove(cls), cls === "buy-flash" ? 480 : 320);
+  }
+
+  function tryBuyUnit(typeId, card) {
+    if (startTraining(typeId)) {
+      pulseRecruitCard(card, "buy-flash");
+      renderHud();
+      return true;
+    }
+    pulseRecruitCard(card, "buy-deny");
+    if (el.spawnHint) {
+      el.spawnHint.textContent = trainBlockReason(typeId);
+    }
+    return false;
   }
 
   function completeTraining() {
@@ -826,14 +1662,14 @@
   function syncSpawnProgress() {
     if (!el.recruitList) return;
     const training = state.battle && state.battle.training;
-    const buttons = el.recruitList.querySelectorAll(".recruit-btn");
-    for (const btn of buttons) {
-      const fill = btn.querySelector(".spawn-bar-fill");
-      const track = btn.querySelector(".spawn-bar");
+    const cards = el.recruitList.querySelectorAll(".recruit-card");
+    for (const card of cards) {
+      const fill = card.querySelector(".spawn-bar-fill");
+      const track = card.querySelector(".spawn-bar");
       if (!fill || !track) continue;
-      const active = !!(training && training.typeId === btn.dataset.id);
+      const active = !!(training && training.typeId === card.dataset.id);
       track.classList.toggle("active", active);
-      btn.classList.toggle("training", active);
+      card.classList.toggle("training", active);
       if (active) {
         const pct = Math.min(100, (training.elapsed / training.duration) * 100);
         fill.style.width = pct + "%";
@@ -847,19 +1683,33 @@
     if (!inBattle()) return;
     if (countSide("enemy") >= FIELD_SOFT_CAP) return;
 
+    const b = state.battle;
     const meta = waveMeta(state.wave);
-    const stats = enemyUnitStats(state.wave);
-    const isBoss = stats.boss && countSide("enemy") === 0;
-    let name;
-    if (isBoss) name = meta.name;
-    else {
-      const s = packSingular(meta.packLabel);
-      name = s.charAt(0).toUpperCase() + s.slice(1);
+    let rank = "normal";
+    let typeId;
+
+    if (b.elitePending) {
+      b.elitePending = false;
+      if (isBossWave(state.wave)) rank = "boss";
+      else if (isMiniBossWave(state.wave)) rank = "mini";
+      typeId = pickEliteEnemyType(meta);
+    } else {
+      typeId = pickWeightedEnemyType(meta.mix);
     }
+
+    const stats = enemyArchetypeStats(state.wave, typeId, rank);
+    let name;
+    if (rank === "boss" || rank === "mini") {
+      name = meta.name;
+    } else {
+      name = stats.label;
+    }
+    const homeY = nextLane();
     const unit = {
       id: "e" + state.nextUnitId++,
       side: "enemy",
-      typeId: "foe",
+      typeId: stats.typeId,
+      art: stats.art,
       name,
       hp: stats.hp,
       maxHp: stats.hp,
@@ -869,20 +1719,16 @@
       atkCdMax: stats.atkCd,
       range: stats.range,
       atkStyle: stats.atkStyle,
-      x: ENEMY_SPAWN_X,
-      y: nextLane(),
+      x: spawnXFor("enemy"),
+      y: homeY,
+      homeY,
       attackCd: 0,
-      boss: isBoss,
+      boss: !!stats.boss,
+      mini: !!stats.mini,
     };
-    state.battle.units.push(unit);
+    b.enemySpawned = (b.enemySpawned || 0) + 1;
+    b.units.push(unit);
     mountToken(unit);
-  }
-
-  function packSingular(packLabel) {
-    if (packLabel.endsWith("ves")) return packLabel.slice(0, -3) + "f";
-    if (packLabel.endsWith("ies")) return packLabel.slice(0, -3) + "y";
-    if (packLabel.endsWith("s")) return packLabel.slice(0, -1);
-    return packLabel;
   }
 
   function findTarget(unit) {
@@ -902,11 +1748,14 @@
   }
 
   function enabledSpawnTypes() {
-    return UNIT_TYPES.filter((t) => state.autoSpawn[t.id]);
+    return UNIT_TYPES.filter(
+      (t) => state.autoSpawn[t.id] && isUnitUnlocked(t.id)
+    );
   }
 
   function toggleAutoSpawn(typeId) {
     if (!(typeId in state.autoSpawn)) return;
+    if (!isUnitUnlocked(typeId)) return;
     state.autoSpawn[typeId] = !state.autoSpawn[typeId];
     if (state.autoSpawn[typeId]) {
       tryStartNextTraining();
@@ -930,6 +1779,7 @@
         `Enemy keep destroyed! +${format(bonus)} gold. Advancing to wave ${state.wave + 1}.`
       );
       state.wave += 1;
+      flashStatPills("win");
     } else {
       const prev = state.wave;
       const penalty = lossPenalty(prev);
@@ -952,12 +1802,15 @@
           `Your keep fell. ${lossBits}. Holding wave 1.`
         );
       }
+      flashStatPills("loss");
     }
 
     saveGame(true);
     renderHud();
 
-    setTimeout(() => {
+    if (waveTransitionTimer) clearTimeout(waveTransitionTimer);
+    waveTransitionTimer = setTimeout(() => {
+      waveTransitionTimer = null;
       el.fieldUnits.innerHTML = "";
       state.battle = null;
       state.waveTransitioning = false;
@@ -997,6 +1850,9 @@
     if (target.hp <= 0) {
       markDead(target);
       appendLog("log-kill", `${attacker.name} fells ${target.name}!`);
+      if (attacker.side === "player" && target.side === "enemy") {
+        awardKillGold(target);
+      }
     }
   }
 
@@ -1041,8 +1897,37 @@
       if (unit.x < targetX) unit.x = Math.min(unit.x + step, targetX - stopAt);
       else unit.x = Math.max(unit.x - step, targetX + stopAt);
     }
-    if (Math.abs(unit.y - targetY) > 1) {
-      unit.y += Math.sign(targetY - unit.y) * Math.min(8 * dt, Math.abs(unit.y - targetY));
+    const home = unit.homeY != null ? unit.homeY : unit.y;
+    // Keep some lane identity so melees don't collapse into one file.
+    const desiredY = targetY * 0.5 + home * 0.5;
+    const dy = desiredY - unit.y;
+    if (Math.abs(dy) > 1) {
+      unit.y = clampFieldY(
+        unit.y + Math.sign(dy) * Math.min(5.5 * dt, Math.abs(dy))
+      );
+    }
+  }
+
+  function applyUnitSeparation(living, dt) {
+    for (let i = 0; i < living.length; i++) {
+      const a = living[i];
+      let pushX = 0;
+      let pushY = 0;
+      for (let j = 0; j < living.length; j++) {
+        if (i === j) continue;
+        const b = living[j];
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        const dist = Math.hypot(dx, dy * 1.35);
+        if (dist < 0.05 || dist >= SEPARATION_DIST) continue;
+        const force = (SEPARATION_DIST - dist) / SEPARATION_DIST;
+        const weight = a.side === b.side ? 1.2 : 0.45;
+        pushX += (dx / dist) * force * weight;
+        pushY += (dy / dist) * force * weight;
+      }
+      if (!pushX && !pushY) continue;
+      a.x = Math.max(8, Math.min(92, a.x + pushX * SEPARATION_STRENGTH * dt));
+      a.y = clampFieldY(a.y + pushY * SEPARATION_STRENGTH * 1.4 * dt);
     }
   }
 
@@ -1050,9 +1935,11 @@
     const b = state.battle;
     if (!b || !b.active) return;
     b.countdown = 0;
+    b.countdownMax = 0;
     b.enemySpawnAt = 0.6;
     b.training = null;
     b.trainRetryAt = 0;
+    syncCountdownBar();
     appendLog(
       "log-muted",
       `Wave ${state.wave}: ${waveMeta(state.wave).name} — keep the line fed!`
@@ -1076,12 +1963,10 @@
       }
       const nextCeil = Math.ceil(b.countdown);
       if (nextCeil !== prevCeil) {
-        setStatus(String(nextCeil), "fighting");
+        setStatus(`Starts in ${nextCeil}`, "fighting");
       }
-      if (el.loopStatus) {
-        el.loopStatus.textContent = `Wave 1 begins in ${nextCeil}…`;
-        el.loopStatus.classList.add("is-countdown");
-      }
+      setLoopStatusText(`Starts in ${nextCeil}…`);
+      syncCountdownBar();
       renderBaseBars();
       return;
     }
@@ -1100,7 +1985,7 @@
       unit.attackCd = Math.max(0, unit.attackCd - dt);
       const target = findTarget(unit);
       const dir = unit.side === "player" ? 1 : -1;
-      const moveSpeed = unit.spd * 1.05;
+      const moveSpeed = unit.spd * UNIT_MOVE_MULT;
       const step = moveSpeed * dt;
       const engage = engageRange(unit);
 
@@ -1123,9 +2008,18 @@
           unit.x += dir * step;
           if (unit.side === "player") unit.x = Math.min(unit.x, baseX);
           else unit.x = Math.max(unit.x, baseX);
+          const home = unit.homeY != null ? unit.homeY : unit.y;
+          const dy = home - unit.y;
+          if (Math.abs(dy) > 0.8) {
+            unit.y = clampFieldY(
+              unit.y + Math.sign(dy) * Math.min(3.8 * dt, Math.abs(dy))
+            );
+          }
         }
       }
     }
+
+    applyUnitSeparation(living, dt);
 
     const now = Date.now();
     b.units = b.units.filter((u) => u.hp > 0 || (u.removeAt && now < u.removeAt));
@@ -1149,6 +2043,11 @@
       trainRetryAt: 0,
       foodStarvedWarned: false,
       countdown: opening ? OPENING_COUNTDOWN_S : 0,
+      countdownMax: opening ? OPENING_COUNTDOWN_S : 0,
+      catapultUsed: false,
+      killGoldWindow: null,
+      elitePending: isEliteWave(state.wave),
+      enemySpawned: 0,
     };
     state.laneCursor = 0;
     state.waveTransitioning = false;
@@ -1156,9 +2055,9 @@
     if (opening) {
       appendLog(
         "log-muted",
-        `Wave 1 assault begins in ${OPENING_COUNTDOWN_S}… prepare your economy.`
+        `Wave ${state.wave} assault begins in ${OPENING_COUNTDOWN_S}… prepare your economy.`
       );
-      setStatus(String(OPENING_COUNTDOWN_S), "fighting");
+      setStatus(`Starts in ${OPENING_COUNTDOWN_S}`, "fighting");
       renderHud();
     } else {
       appendLog(
@@ -1188,6 +2087,12 @@
     if (def.id === "armor") return `+${level} armor`;
     if (def.id === "vitality") return `+${Math.round(12 * level)}% HP`;
     if (def.id === "barracks") return `−${Math.round(100 * (1 - Math.pow(0.88, level)))}% time`;
+    if (def.id === "granary") {
+      const rate = upkeepPerUnit();
+      return `${format(rate)} f/s per troop`;
+    }
+    if (def.id === "plunder") return `+${Math.round(15 * level)}% kill gold`;
+    if (def.id === "caravan") return `+${Math.round(12 * level)}% win gold`;
     return def.desc;
   }
 
@@ -1196,34 +2101,268 @@
     return Math.max(0.45, BASE_TRAIN_TIME * Math.pow(0.88, lv));
   }
 
+  function upkeepPerUnit() {
+    const lv = state.upgradeLevels.granary || 0;
+    return Math.max(0.12, FOOD_UPKEEP_PER_UNIT * Math.pow(0.9, lv));
+  }
+
+  let lastAffordableUpgradeCount = -1;
+  let lastAffordableEconomyCount = -1;
+  let lastAffordableTroopsCount = -1;
+
+  function upgradeMatchesCategory(def, category) {
+    const isCombat = !!def.combat;
+    return category === "troops" ? isCombat : !isCombat;
+  }
+
+  function countAffordableUpgrades(category) {
+    let n = 0;
+    for (const def of UPGRADES) {
+      if (category && !upgradeMatchesCategory(def, category)) continue;
+      if (state.gold >= upgradeCost(def)) n += 1;
+    }
+    return n;
+  }
+
+  function setUpgradeCategory(category) {
+    if (category !== "economy" && category !== "troops") return;
+    if (state.upgradeCategory === category) return;
+    state.upgradeCategory = category;
+    syncUpgradeCatTabs();
+    renderUpgrades();
+  }
+
+  function syncUpgradeCatTabs() {
+    const activeId =
+      state.upgradeCategory === "troops"
+        ? "upgrade-tab-troops"
+        : "upgrade-tab-economy";
+    el.upgradeCatTabs.forEach((tab) => {
+      const on = tab.dataset.upgradeCat === state.upgradeCategory;
+      tab.classList.toggle("is-active", on);
+      tab.setAttribute("aria-selected", on ? "true" : "false");
+      tab.tabIndex = on ? 0 : -1;
+    });
+    if (el.upgradeList) {
+      el.upgradeList.setAttribute("aria-labelledby", activeId);
+    }
+  }
+
+  function updateUpgradeCatBadges() {
+    const economyN = countAffordableUpgrades("economy");
+    const troopsN = countAffordableUpgrades("troops");
+    if (
+      economyN === lastAffordableEconomyCount &&
+      troopsN === lastAffordableTroopsCount
+    ) {
+      return;
+    }
+    lastAffordableEconomyCount = economyN;
+    lastAffordableTroopsCount = troopsN;
+
+    el.upgradeCatTabs.forEach((tab) => {
+      const cat = tab.dataset.upgradeCat;
+      const n = cat === "troops" ? troopsN : economyN;
+      const badge = tab.querySelector(".upgrade-cat-badge");
+      const label = cat === "troops" ? "Troops" : "Economy";
+      const has = n > 0;
+      tab.classList.toggle("has-available", has);
+      if (!badge) return;
+      if (has) {
+        badge.hidden = false;
+        badge.setAttribute("aria-hidden", "false");
+        badge.textContent = String(n);
+        tab.setAttribute(
+          "aria-label",
+          n === 1 ? `${label}, 1 available` : `${label}, ${n} available`
+        );
+      } else {
+        badge.hidden = true;
+        badge.setAttribute("aria-hidden", "true");
+        badge.textContent = "";
+        tab.setAttribute("aria-label", label);
+      }
+    });
+  }
+
+  function updateUpgradeTabBadge() {
+    const tab = el.upgradesTab;
+    const badge = el.upgradesTabBadge;
+    if (tab && badge) {
+      const n = countAffordableUpgrades();
+      if (n !== lastAffordableUpgradeCount) {
+        lastAffordableUpgradeCount = n;
+        const has = n > 0;
+        tab.classList.toggle("has-available", has);
+        if (has) {
+          badge.hidden = false;
+          badge.setAttribute("aria-hidden", "false");
+          badge.textContent = String(n);
+          tab.setAttribute(
+            "aria-label",
+            n === 1 ? "Upgrades, 1 available" : `Upgrades, ${n} available`
+          );
+        } else {
+          badge.hidden = true;
+          badge.setAttribute("aria-hidden", "true");
+          badge.textContent = "";
+          tab.setAttribute("aria-label", "Upgrades");
+        }
+      }
+    }
+    updateUpgradeCatBadges();
+  }
+
   function renderUpgrades() {
     el.upgradeList.innerHTML = "";
     for (const def of UPGRADES) {
+      if (!upgradeMatchesCategory(def, state.upgradeCategory)) continue;
       const cost = upgradeCost(def);
       const level = state.upgradeLevels[def.id];
       const meta = def.combat
-        ? `Lv ${level} · ${def.desc}` + (level > 0 ? ` (${combatBonusText(def, level)})` : "")
-        : `Lv ${level} · ${def.desc}`;
+        ? def.desc + (level > 0 ? ` (${combatBonusText(def, level)})` : "")
+        : def.desc +
+          (level > 0 &&
+          (def.id === "granary" || def.id === "plunder" || def.id === "caravan")
+            ? ` (${combatBonusText(def, level)})`
+            : "");
       const btn = document.createElement("button");
       btn.dataset.id = def.id;
       const foodTag = def.food || FOOD_UPGRADE_IDS[def.id] ? " food-upgrade" : "";
       btn.className =
         "shop-btn" +
         foodTag +
-        (state.gold >= cost ? " affordable" : "");
+        (state.gold >= cost ? " affordable" : "") +
+        (level > 0 ? " has-level" : "");
       btn.disabled = state.gold < cost;
       btn.innerHTML =
-        `<span><span class="item-name">${def.name}</span>` +
-        `<br><span class="item-meta">${meta}</span></span>` +
+        `<span class="shop-btn-body">` +
+        `<span class="item-name">${def.name}` +
+        `<span class="level-badge" title="Level ${level}">Lv ${level}</span></span>` +
+        `<span class="item-meta">${meta}</span></span>` +
         `<span class="item-cost"><span class="cost-gold">${format(cost)} g</span></span>`;
       btn.addEventListener("click", () => buyUpgrade(def.id));
       el.upgradeList.appendChild(btn);
     }
+    updateUpgradeTabBadge();
+  }
+
+  function repairKeepCost() {
+    return 25 + 4 * state.wave;
+  }
+
+  function catapultCost() {
+    return 45 + 8 * state.wave;
+  }
+
+  function catapultDamage() {
+    return 18 + 4 * state.wave;
+  }
+
+  function canRepairKeep() {
+    if (!inBattle() || inCountdown()) return false;
+    const base = state.battle.playerBase;
+    if (!base || base.hp >= base.maxHp) return false;
+    return state.gold >= repairKeepCost();
+  }
+
+  function canCatapult() {
+    if (!inBattle() || inCountdown()) return false;
+    if (state.battle.catapultUsed) return false;
+    return state.gold >= catapultCost();
+  }
+
+  function repairKeep() {
+    if (!inBattle() || inCountdown()) return;
+    const base = state.battle.playerBase;
+    if (!base) return;
+    const missing = base.maxHp - base.hp;
+    if (missing <= 0) return;
+    const cost = repairKeepCost();
+    if (state.gold < cost) return;
+    const heal = Math.min(30, missing);
+    state.gold -= cost;
+    base.hp += heal;
+    appendLog("log-win", `Repaired the keep (+${heal} HP).`);
+    saveGame(true);
+    renderBaseBars();
+    renderHud();
+  }
+
+  function catapultStrike() {
+    if (!inBattle() || inCountdown()) return;
+    const b = state.battle;
+    if (!b || b.catapultUsed) return;
+    const cost = catapultCost();
+    if (state.gold < cost) return;
+    const dmg = catapultDamage();
+    state.gold -= cost;
+    b.catapultUsed = true;
+    const enemy = b.enemyBase;
+    enemy.hp -= dmg;
+    spawnFloater(BASE_EDGE_ENEMY, LANE_TARGET_Y + 40, dmg, enemy.hp <= 0);
+    appendLog("log-win", `Catapult strike! −${dmg} keep HP.`);
+    saveGame(true);
+    if (enemy.hp <= 0) {
+      enemy.hp = 0;
+      renderBaseBars();
+      endBattle(true);
+      return;
+    }
+    renderBaseBars();
+    renderHud();
+  }
+
+  function renderWarChest() {
+    if (!el.warChestList) return;
+    const live = inBattle() && !inCountdown();
+    const repairCost = repairKeepCost();
+    const cataCost = catapultCost();
+    const cataDmg = catapultDamage();
+    const missing =
+      live && state.battle.playerBase
+        ? Math.max(0, state.battle.playerBase.maxHp - state.battle.playerBase.hp)
+        : 0;
+    const canRepair = canRepairKeep();
+    const canCata = canCatapult();
+    const used = !!(state.battle && state.battle.catapultUsed);
+
+    el.warChestList.innerHTML = "";
+
+    const repairBtn = document.createElement("button");
+    repairBtn.type = "button";
+    repairBtn.className =
+      "shop-btn war-chest-btn" + (canRepair ? " affordable" : "");
+    repairBtn.disabled = !canRepair;
+    repairBtn.innerHTML =
+      `<span><span class="item-name">Repair Keep</span>` +
+      `<br><span class="item-meta">Restore up to 30 HP` +
+      (live && missing > 0 ? ` · Missing ${missing}` : "") +
+      `</span></span>` +
+      `<span class="item-cost"><span class="cost-gold">${format(repairCost)} g</span></span>`;
+    repairBtn.addEventListener("click", repairKeep);
+    el.warChestList.appendChild(repairBtn);
+
+    const cataBtn = document.createElement("button");
+    cataBtn.type = "button";
+    cataBtn.className =
+      "shop-btn war-chest-btn" + (canCata ? " affordable" : "");
+    cataBtn.disabled = !canCata;
+    const cataMeta = used
+      ? "Used this wave"
+      : `Deal ${cataDmg} enemy keep damage · Once per wave`;
+    cataBtn.innerHTML =
+      `<span><span class="item-name">Catapult Strike</span>` +
+      `<br><span class="item-meta">${cataMeta}</span></span>` +
+      `<span class="item-cost"><span class="cost-gold">${format(cataCost)} g</span></span>`;
+    cataBtn.addEventListener("click", catapultStrike);
+    el.warChestList.appendChild(cataBtn);
   }
 
   function foodUpkeepRate() {
-    if (!inBattle()) return 0;
-    return countSide("player") * FOOD_UPKEEP_PER_UNIT;
+    // No upkeep during opening countdown — field is empty until combat starts.
+    if (!inBattle() || inCountdown()) return 0;
+    return countSide("player") * upkeepPerUnit();
   }
 
   function netFoodPerSecond() {
@@ -1258,6 +2397,18 @@
     );
   }
 
+  function formatUnlockCost(type) {
+    return `<span class="cost-gold">Unlock ${format(type.unlockCost)} g</span>`;
+  }
+
+  function affordCount(type) {
+    if (!type || type.cost <= 0 || type.foodCost <= 0) return 0;
+    return Math.min(
+      Math.floor(state.gold / type.cost),
+      Math.floor(state.food / type.foodCost)
+    );
+  }
+
   function spawnHintText(live, playerCount) {
     const enabled = enabledSpawnTypes();
     const upkeep = foodUpkeepRate();
@@ -1269,16 +2420,23 @@
     }
     if (inCountdown()) {
       const secs = Math.ceil(state.battle.countdown);
-      return `Assault in ${secs}… toggle auto-spawn, then hold the line${upkeepBit}`;
+      return `Assault in ${secs}… turn Auto on — training starts when combat begins${upkeepBit}`;
     }
     if (!live) {
-      return `Battle looping — toggle units to auto-spawn${upkeepBit}`;
+      return `Battle looping — train troops or enable Auto${upkeepBit}`;
     }
     if (playerCount >= FIELD_SOFT_CAP) {
       return `Field at capacity (${FIELD_SOFT_CAP}) — wait for space${upkeepBit}`;
     }
+    const unlockable = UNIT_TYPES.filter(
+      (t) => unitNeedsUnlock(t) && !isUnitUnlocked(t.id) && unitUnlockWaveReached(t)
+    );
+    if (unlockable.length > 0 && enabled.length === 0) {
+      const u = unlockable[0];
+      return `Unlock ${u.name} for ${format(u.unlockCost)} g (wave ${u.unlockWave}+)${upkeepBit}`;
+    }
     if (enabled.length === 0) {
-      return `No auto-train on — tap a unit to enable${upkeepBit}`;
+      return `Click a unit to train, or turn Auto on${upkeepBit}`;
     }
     const training = state.battle && state.battle.training;
     if (training) {
@@ -1309,79 +2467,243 @@
     const training = state.battle && state.battle.training;
     el.spawnHint.textContent = spawnHintText(inBattle(), playerCount);
 
-    el.recruitList.innerHTML = "";
+    const trainDur = trainDuration().toFixed(1);
+    const parts = [];
     for (const type of UNIT_TYPES) {
       const stats = playerUnitStats(type);
-      const autoOn = !!state.autoSpawn[type.id];
+      const unlocked = isUnitUnlocked(type.id);
+      const waveOk = !unitNeedsUnlock(type) || unitUnlockWaveReached(type);
+      const autoOn = unlocked && !!state.autoSpawn[type.id];
       const isTraining = !!(training && training.typeId === type.id);
+      const canUnlock = canUnlockUnit(type.id);
       const canQueue =
+        unlocked &&
         live &&
         !training &&
         state.gold >= type.cost &&
         state.food >= type.foodCost &&
         playerCount < FIELD_SOFT_CAP;
+      parts.push(
+        [
+          type.id,
+          unlocked ? 1 : 0,
+          waveOk ? 1 : 0,
+          canUnlock ? 1 : 0,
+          autoOn ? 1 : 0,
+          isTraining ? 1 : 0,
+          canQueue ? 1 : 0,
+          stats.maxHp,
+          stats.atk,
+          stats.armor,
+          trainDur,
+          state.wave,
+        ].join(":")
+      );
+    }
+    const sig = parts.join("|");
+
+    const existing = el.recruitList.querySelectorAll(".recruit-card");
+    const canPatch =
+      existing.length === UNIT_TYPES.length &&
+      Array.from(existing).every(
+        (card, i) => card.dataset.id === UNIT_TYPES[i].id
+      );
+
+    if (canPatch && sig === lastRecruitSig) {
+      for (const type of UNIT_TYPES) {
+        const card = el.recruitList.querySelector(
+          '.recruit-card[data-id="' + type.id + '"]'
+        );
+        if (!card) continue;
+        const isTraining = !!(training && training.typeId === type.id);
+        const pct = isTraining
+          ? Math.min(100, (training.elapsed / training.duration) * 100)
+          : 0;
+        const fill = card.querySelector(".spawn-bar-fill");
+        const bar = card.querySelector(".spawn-bar");
+        if (fill) fill.style.width = pct + "%";
+        if (bar) bar.classList.toggle("active", isTraining);
+        card.classList.toggle("training", isTraining);
+        const countEl = card.querySelector(".afford-count");
+        const unlocked = isUnitUnlocked(type.id);
+        if (unlocked && countEl) {
+          const count = affordCount(type);
+          countEl.textContent = "×" + count;
+          countEl.classList.toggle("is-zero", count <= 0);
+        }
+        if (!unlocked) {
+          const costEl = card.querySelector(".item-cost");
+          if (
+            costEl &&
+            (!unitNeedsUnlock(type) || unitUnlockWaveReached(type))
+          ) {
+            costEl.innerHTML = formatUnlockCost(type);
+          }
+        }
+      }
+      return;
+    }
+
+    lastRecruitSig = sig;
+    const focused =
+      document.activeElement &&
+      document.activeElement.closest &&
+      document.activeElement.closest(".recruit-card");
+    const focusedId = focused ? focused.dataset.id : null;
+    const focusedAuto =
+      focused &&
+      document.activeElement.classList.contains("auto-toggle");
+
+    el.recruitList.innerHTML = "";
+    for (const type of UNIT_TYPES) {
+      const stats = playerUnitStats(type);
+      const unlocked = isUnitUnlocked(type.id);
+      const waveOk = !unitNeedsUnlock(type) || unitUnlockWaveReached(type);
+      const autoOn = unlocked && !!state.autoSpawn[type.id];
+      const isTraining = !!(training && training.typeId === type.id);
+      const canUnlock = canUnlockUnit(type.id);
+      const canQueue =
+        unlocked &&
+        live &&
+        !training &&
+        state.gold >= type.cost &&
+        state.food >= type.foodCost &&
+        playerCount < FIELD_SOFT_CAP;
+      const canBuy = canQueue;
       const pct =
         isTraining
           ? Math.min(100, (training.elapsed / training.duration) * 100)
           : 0;
+      const count = unlocked ? affordCount(type) : 0;
+
+      const card = document.createElement("div");
+      card.dataset.id = type.id;
+      card.className =
+        "recruit-card" +
+        (unlocked ? "" : " locked") +
+        (autoOn ? " auto-on" : "") +
+        (canQueue || canUnlock ? " affordable" : "") +
+        (isTraining ? " training" : "");
+
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.dataset.id = type.id;
-      btn.className =
-        "recruit-btn" +
-        (autoOn ? " auto-on" : "") +
-        (canQueue ? " affordable" : "") +
-        (isTraining ? " training" : "");
-      btn.setAttribute("aria-pressed", autoOn ? "true" : "false");
-      btn.title = autoOn
-        ? "Auto-train on — click to disable, Shift+click to queue one"
-        : "Click to enable auto-train";
+      btn.className = "recruit-btn";
+      btn.title = !unlocked
+        ? !waveOk
+          ? `Unlocks at wave ${type.unlockWave}`
+          : canUnlock
+            ? `Unlock ${type.name} for ${type.unlockCost} gold`
+            : `Need ${type.unlockCost} gold to unlock`
+        : canBuy
+          ? `Train ${type.name}`
+          : trainBlockReason(type.id);
+
+      let metaLine;
+      let costHtml;
+      let nameExtra;
+      if (!unlocked) {
+        nameExtra = `<span class="lock-badge">${waveOk ? "LOCKED" : "WAVE " + type.unlockWave}</span>`;
+        metaLine = waveOk
+          ? `Unlock once · ${format(type.unlockCost)} g`
+          : `Unlocks at wave ${type.unlockWave}`;
+        costHtml = waveOk
+          ? formatUnlockCost(type)
+          : `<span class="cost-muted">Wave ${type.unlockWave}</span>`;
+      } else {
+        nameExtra = `<span class="afford-count${count <= 0 ? " is-zero" : ""}">×${count}</span>`;
+        metaLine = `${stats.maxHp} HP · ${stats.atk} ATK · ${stats.armor} ARM · ${trainDur}s`;
+        costHtml = formatCost(type);
+      }
+
       btn.innerHTML =
         `<span class="cmd-portrait type-${type.id}" aria-hidden="true">${unitArt(type.id)}</span>` +
         `<span class="cmd-body">` +
-        `<span class="item-name">${type.name}` +
-        `<span class="auto-badge">${autoOn ? "AUTO" : "OFF"}</span></span>` +
-        `<span class="item-meta">${type.blurb} · ${stats.maxHp} HP / ${stats.atk} ATK / ${stats.armor} ARM` +
-        ` · ${trainDuration().toFixed(1)}s</span>` +
-        `<span class="spawn-bar${isTraining ? " active" : ""}" aria-hidden="true">` +
-        `<span class="spawn-bar-fill" style="width:${pct}%"></span></span>` +
+        `<span class="item-top">` +
+        `<span class="item-name">${type.name}${nameExtra}</span>` +
+        `<span class="item-cost">${costHtml}</span>` +
         `</span>` +
-        `<span class="item-cost">${formatCost(type)}</span>`;
-      btn.addEventListener("click", (ev) => {
-        if (ev.shiftKey) {
-          if (startTraining(type.id)) renderHud();
-          return;
-        }
+        `<span class="item-meta">${metaLine}</span>` +
+        (unlocked
+          ? `<span class="spawn-bar${isTraining ? " active" : ""}" aria-hidden="true">` +
+            `<span class="spawn-bar-fill" style="width:${pct}%"></span></span>`
+          : "") +
+        `</span>`;
+
+      if (!unlocked) {
+        btn.addEventListener("click", () => {
+          if (!waveOk) return;
+          if (unlockUnit(type.id)) {
+            pulseRecruitCard(card, "buy-flash");
+            renderHud();
+          } else {
+            pulseRecruitCard(card, "buy-deny");
+          }
+        });
+        card.appendChild(btn);
+        el.recruitList.appendChild(card);
+        if (focusedId === type.id && !focusedAuto) btn.focus();
+        continue;
+      }
+
+      btn.addEventListener("click", () => {
+        tryBuyUnit(type.id, card);
+      });
+
+      const autoBtn = document.createElement("button");
+      autoBtn.type = "button";
+      autoBtn.className = "auto-toggle" + (autoOn ? " is-on" : "");
+      autoBtn.setAttribute("aria-pressed", autoOn ? "true" : "false");
+      autoBtn.title = autoOn
+        ? "Auto-train on — click to disable"
+        : "Auto-train off — click to enable";
+      autoBtn.innerHTML = `<span class="auto-toggle-label">Auto</span>`;
+      autoBtn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
         toggleAutoSpawn(type.id);
       });
-      el.recruitList.appendChild(btn);
+
+      card.appendChild(btn);
+      card.appendChild(autoBtn);
+      el.recruitList.appendChild(card);
+      if (focusedId === type.id) {
+        if (focusedAuto) autoBtn.focus();
+        else btn.focus();
+      }
     }
   }
 
   function renderBattlePanel() {
     const meta = waveMeta(state.wave);
     const eMax = enemyBaseMaxHp(state.wave);
+    const penalty = lossPenalty(state.wave);
     el.wavePreview.innerHTML =
+      `<div class="wave-preview-main">` +
       `<span class="enemy-name">${meta.name}</span>` +
-      `<div class="wave-subtitle">${meta.boss ? "Boss wave" : "Assault"} · Destroy their keep</div>` +
-      `Enemy keep ${eMax} HP · Your keep ${PLAYER_BASE_HP} HP` +
-      `<br>Win bonus: <span class="item-cost">${format(winBonus(state.wave))} gold</span>` +
-      `<br><span class="wave-demote-hint">Defeat: −${format(lossPenalty(state.wave).gold)} g / −${format(lossPenalty(state.wave).food)} f · −1 wave</span>`;
+      `<span class="wave-subtitle">${waveKindLabel(state.wave)} · Keep ${eMax} · Yours ${PLAYER_BASE_HP}</span>` +
+      `</div>` +
+      `<div class="wave-stakes">` +
+      `<span class="wave-win-hint">Win +${format(winBonus(state.wave))} g</span>` +
+      `<span class="wave-stakes-sep">·</span>` +
+      `<span class="wave-demote-hint">Loss −${format(penalty.gold)} g / −${format(penalty.food)} f · −1 wave</span>` +
+      `</div>`;
 
     if (el.loopStatus) {
-      el.loopStatus.classList.remove("is-countdown");
       if (state.waveTransitioning) {
-        el.loopStatus.textContent = "Resolving wave… next assault shortly";
+        setLoopStatusText("Resolving…");
+        syncCountdownBar();
       } else if (inCountdown()) {
         const secs = Math.ceil(state.battle.countdown);
-        el.loopStatus.textContent = `Wave 1 begins in ${secs}…`;
-        el.loopStatus.classList.add("is-countdown");
+        setLoopStatusText(`Starts in ${secs}…`);
+        syncCountdownBar();
       } else if (inBattle()) {
         const enabled = enabledSpawnTypes().length;
-        el.loopStatus.textContent =
-          `Wave ${state.wave} continuous · ${enabled} auto-spawn type${enabled === 1 ? "" : "s"}`;
+        setLoopStatusText(
+          `Wave ${state.wave} · ${enabled} auto-spawn`
+        );
+        syncCountdownBar();
       } else {
-        el.loopStatus.textContent = `Wave ${state.wave} continuous · preparing…`;
+        setLoopStatusText(`Wave ${state.wave}`);
+        syncCountdownBar();
       }
     }
 
@@ -1392,8 +2714,8 @@
     const net = netFoodPerSecond();
     el.fps.textContent = format(Math.abs(net));
     el.fpsPrefix.textContent = net < -0.05 ? "−" : "+";
-    const pill = el.fps.closest(".resource-fps");
-    if (pill) pill.classList.toggle("is-drain", net < -0.05);
+    const rate = el.fps.closest(".resource-fps");
+    if (rate) rate.classList.toggle("is-drain", net < -0.05);
   }
 
   function renderHud() {
@@ -1404,6 +2726,7 @@
     el.wave.textContent = String(state.wave);
     el.clickPower.textContent = format(state.clickPower);
     el.foodClickPower.textContent = format(state.foodClickPower);
+    renderWarChest();
     renderUpgrades();
     renderSpawn();
     renderBattlePanel();
@@ -1414,6 +2737,7 @@
     el.gps.textContent = format(state.goldPerSecond);
     el.food.textContent = format(state.food);
     syncFoodRateDisplay();
+    updateUpgradeTabBadge();
   }
 
   function pulseResourceClick(btn, amount, kind) {
@@ -1441,6 +2765,29 @@
     renderHud();
   });
 
+  el.upgradeCatTabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      setUpgradeCategory(tab.dataset.upgradeCat);
+    });
+    tab.addEventListener("keydown", (ev) => {
+      if (ev.key !== "ArrowLeft" && ev.key !== "ArrowRight") return;
+      ev.preventDefault();
+      const tabs = Array.from(el.upgradeCatTabs);
+      const idx = tabs.indexOf(tab);
+      if (idx < 0) return;
+      const next =
+        ev.key === "ArrowRight"
+          ? tabs[(idx + 1) % tabs.length]
+          : tabs[(idx - 1 + tabs.length) % tabs.length];
+      setUpgradeCategory(next.dataset.upgradeCat);
+      next.focus();
+    });
+  });
+
+  if (el.newGameBtn) {
+    el.newGameBtn.addEventListener("click", newGame);
+  }
+
   let lastBattle = Date.now();
   let hudAccum = 0;
   let saveAccum = 0;
@@ -1465,6 +2812,7 @@
       syncResourceDisplays();
       if (hudAccum >= 0.15) {
         hudAccum = 0;
+        renderWarChest();
         renderSpawn();
         renderBattlePanel();
       } else {
@@ -1488,19 +2836,54 @@
 
   function initMusic() {
     const audio = el.bgMusic;
-    if (!MUSIC_TRACKS.length || !el.musicVolume || !audio) return;
+    if (!MUSIC_TRACKS.length || !audio) return;
 
     let trackIndex = 0;
-    let wantPlaying = true;
+    const DEFAULT_VOLUME = 35;
 
     const stored = localStorage.getItem(MUSIC_VOLUME_KEY);
-    const initial =
+    let preferred =
       stored !== null && !Number.isNaN(Number(stored))
         ? Math.max(0, Math.min(100, Number(stored)))
-        : Number(el.musicVolume.value) || 35;
-    el.musicVolume.value = String(initial);
-    audio.volume = initial / 100;
-    wantPlaying = initial > 0;
+        : DEFAULT_VOLUME;
+    // Legacy: volume 0 meant muted — keep a usable unmute level.
+    if (preferred <= 0) preferred = DEFAULT_VOLUME;
+    else {
+      try {
+        localStorage.setItem(MUSIC_VOLUME_KEY, String(preferred));
+      } catch (_) {}
+    }
+
+    let muted = localStorage.getItem(MUSIC_MUTED_KEY) === "1";
+    // Older saves stored 0 volume with no mute flag.
+    if (stored !== null && Number(stored) === 0) muted = true;
+
+    function applyVolume() {
+      audio.volume = muted ? 0 : preferred / 100;
+      syncMuteBtn();
+    }
+
+    function syncMuteBtn() {
+      const btn = el.musicMuteBtn;
+      if (!btn) return;
+      btn.setAttribute("aria-pressed", muted ? "true" : "false");
+      btn.title = muted ? "Unmute music" : "Mute music";
+      btn.textContent = muted ? "Muted" : "Music";
+      btn.classList.toggle("is-muted", muted);
+    }
+
+    function setMuted(next) {
+      muted = !!next;
+      try {
+        localStorage.setItem(MUSIC_MUTED_KEY, muted ? "1" : "0");
+        localStorage.setItem(MUSIC_VOLUME_KEY, String(preferred));
+      } catch (_) {}
+      applyVolume();
+      if (!muted) tryPlay();
+    }
+
+    applyVolume();
+    const wantPlaying = () => !muted && preferred > 0;
 
     function trackUrl(index) {
       const path = MUSIC_TRACKS[index];
@@ -1517,7 +2900,7 @@
     }
 
     function tryPlay() {
-      if (!wantPlaying || audio.volume <= 0) return;
+      if (!wantPlaying() || audio.volume <= 0) return;
       const playPromise = audio.play();
       if (playPromise && typeof playPromise.catch === "function") {
         playPromise.catch(() => {
@@ -1532,23 +2915,11 @@
     });
 
     audio.addEventListener("canplay", () => {
-      if (wantPlaying) tryPlay();
-    });
-
-    el.musicVolume.addEventListener("input", () => {
-      const value = Number(el.musicVolume.value);
-      audio.volume = value / 100;
-      localStorage.setItem(MUSIC_VOLUME_KEY, String(value));
-      wantPlaying = value > 0;
-      if (wantPlaying) {
-        tryPlay();
-      } else {
-        audio.pause();
-      }
+      if (wantPlaying()) tryPlay();
     });
 
     function unlockOnGesture() {
-      if (!wantPlaying) return;
+      if (!wantPlaying()) return;
       tryPlay();
     }
 
@@ -1556,21 +2927,195 @@
     document.addEventListener("keydown", unlockOnGesture);
     document.addEventListener("touchstart", unlockOnGesture, { passive: true });
 
+    if (el.musicMuteBtn) {
+      el.musicMuteBtn.addEventListener("click", () => {
+        setMuted(!muted);
+      });
+    }
+
     loadTrack(0);
     tryPlay();
   }
 
+  function isArmySheetOpen() {
+    return !!(el.armySheet && !el.armySheet.hidden);
+  }
+
+  function restoreArmyHome() {
+    if (!el.armyHome || !el.panelCommands) return;
+    if (el.armyHome.parentElement === el.panelCommands) return;
+    const h2 = el.panelCommands.querySelector(":scope > h2");
+    if (h2) h2.after(el.armyHome);
+    else el.panelCommands.appendChild(el.armyHome);
+  }
+
+  function closeArmySheet() {
+    if (!el.armySheet) return;
+    restoreArmyHome();
+    el.armySheet.hidden = true;
+    el.armySheet.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("army-sheet-open");
+    if (el.armyDockBtn) el.armyDockBtn.setAttribute("aria-expanded", "false");
+  }
+
+  function openArmySheet() {
+    if (!el.armySheet || !el.armySheetBody || !el.armyHome) return;
+    if (!window.matchMedia(MOBILE_MQ).matches) return;
+    if (document.body.dataset.mobilePane === "army") return;
+    el.armySheetBody.appendChild(el.armyHome);
+    el.armySheet.hidden = false;
+    el.armySheet.setAttribute("aria-hidden", "false");
+    document.body.classList.add("army-sheet-open");
+    if (el.armyDockBtn) el.armyDockBtn.setAttribute("aria-expanded", "true");
+    renderSpawn();
+  }
+
+  function toggleArmySheet() {
+    if (isArmySheetOpen()) closeArmySheet();
+    else openArmySheet();
+  }
+
+  function initMobileChrome() {
+    const mq = window.matchMedia(MOBILE_MQ);
+    const validPanes = { battle: true, upgrades: true, army: true };
+
+    function setPane(pane) {
+      if (!validPanes[pane]) pane = "battle";
+      document.body.dataset.mobilePane = pane;
+      try {
+        sessionStorage.setItem(MOBILE_PANE_KEY, pane);
+      } catch (_) {}
+      if (pane === "army") closeArmySheet();
+      if (!el.mobileNav) return;
+      el.mobileNav.querySelectorAll(".mobile-tab").forEach((tab) => {
+        const on = tab.dataset.pane === pane;
+        tab.classList.toggle("is-active", on);
+        tab.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+    }
+
+    function syncDockPlacement() {
+      if (!el.resourceDock || !el.panelResource || !el.hud) return;
+      if (mq.matches) {
+        if (el.resourceDock.parentElement !== el.hud) {
+          el.hud.appendChild(el.resourceDock);
+        }
+      } else {
+        const h2 = el.panelResource.querySelector(":scope > h2");
+        if (h2 && el.resourceDock.parentElement !== el.panelResource) {
+          h2.after(el.resourceDock);
+        } else if (
+          h2 &&
+          el.resourceDock.parentElement === el.panelResource &&
+          el.resourceDock.previousElementSibling !== h2
+        ) {
+          h2.after(el.resourceDock);
+        }
+      }
+    }
+
+    function syncChromeOffsets() {
+      const root = document.documentElement;
+      if (el.topbar) {
+        root.style.setProperty(
+          "--topbar-offset",
+          `${Math.ceil(el.topbar.getBoundingClientRect().height)}px`
+        );
+      }
+      if (el.mobileNav && mq.matches) {
+        root.style.setProperty(
+          "--mobile-nav-offset",
+          `${Math.ceil(el.mobileNav.getBoundingClientRect().height)}px`
+        );
+      } else {
+        root.style.setProperty("--mobile-nav-offset", "0px");
+      }
+      if (el.resourceDock && mq.matches) {
+        root.style.setProperty(
+          "--dock-offset",
+          `${Math.ceil(el.resourceDock.getBoundingClientRect().height)}px`
+        );
+      } else {
+        root.style.setProperty("--dock-offset", "0px");
+      }
+    }
+
+    if (el.mobileNav) {
+      el.mobileNav.addEventListener("click", (ev) => {
+        const tab = ev.target.closest(".mobile-tab");
+        if (!tab || !tab.dataset.pane) return;
+        setPane(tab.dataset.pane);
+      });
+    }
+
+    let stored = "battle";
+    try {
+      stored = sessionStorage.getItem(MOBILE_PANE_KEY) || "battle";
+    } catch (_) {}
+    setPane(stored);
+    syncDockPlacement();
+    syncChromeOffsets();
+
+    const ro = typeof ResizeObserver !== "undefined"
+      ? new ResizeObserver(() => {
+          syncChromeOffsets();
+        })
+      : null;
+    if (ro) {
+      if (el.topbar) ro.observe(el.topbar);
+      if (el.mobileNav) ro.observe(el.mobileNav);
+      if (el.resourceDock) ro.observe(el.resourceDock);
+    }
+
+    const onViewportChange = () => {
+      syncDockPlacement();
+      syncChromeOffsets();
+      if (!mq.matches) {
+        closeArmySheet();
+        document.body.dataset.mobilePane = "battle";
+      } else {
+        setPane(document.body.dataset.mobilePane || stored);
+      }
+    };
+
+    if (el.armyDockBtn) {
+      el.armyDockBtn.addEventListener("click", () => {
+        if (!mq.matches) return;
+        toggleArmySheet();
+        syncChromeOffsets();
+      });
+    }
+    if (el.armySheetClose) {
+      el.armySheetClose.addEventListener("click", closeArmySheet);
+    }
+    if (el.armySheet) {
+      const backdrop = el.armySheet.querySelector(".army-sheet-backdrop");
+      if (backdrop) backdrop.addEventListener("click", closeArmySheet);
+    }
+    document.addEventListener("keydown", (ev) => {
+      if (ev.key === "Escape" && isArmySheetOpen()) closeArmySheet();
+    });
+
+    if (typeof mq.addEventListener === "function") {
+      mq.addEventListener("change", onViewportChange);
+    } else if (typeof mq.addListener === "function") {
+      mq.addListener(onViewportChange);
+    }
+    window.addEventListener("resize", () => {
+      syncChromeOffsets();
+    });
+  }
+
   const restored = loadSave();
   if (restored) {
-    el.battleLog.innerHTML = "";
     appendLog("log-muted", `Restored save · Wave ${state.wave}`);
   } else {
-    el.battleLog.innerHTML = "";
     appendLog(
       "log-muted",
       "Keep gold and food flowing — troops auto-spawn while the assault loops."
     );
   }
+  initMobileChrome();
   startBattle();
   initMusic();
 })();
