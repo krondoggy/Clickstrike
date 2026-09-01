@@ -726,10 +726,14 @@ body {
   font-size: 0.85rem;
   font-family: var(--font-display);
   letter-spacing: 0.04em;
-  max-width: 9ch;
+  max-width: 12ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.resource-hero.is-down #hero-chip-name {
+  color: #e09080;
 }
 
 .topbar-actions {
@@ -1963,9 +1967,28 @@ button:disabled {
   animation: click-pulse 0.22s ease-out;
 }
 
+#click-btn.click-press,
+#food-click-btn.click-press {
+  animation: click-press 0.14s ease-out;
+}
+
 @keyframes click-pulse {
   0% { filter: brightness(1.25); transform: scale(0.98); }
   100% { filter: brightness(1); transform: scale(1); }
+}
+
+@keyframes click-press {
+  0% {
+    filter: brightness(1.15);
+    transform: translateY(2px) scale(0.97);
+    box-shadow:
+      inset 0 2px 8px rgba(0, 0, 0, 0.5),
+      0 0 0 transparent;
+  }
+  100% {
+    filter: brightness(1);
+    transform: translateY(0) scale(1);
+  }
 }
 
 .click-floater {
@@ -2378,6 +2401,174 @@ button:disabled {
   gap: 0.35rem;
   position: relative;
   z-index: 1;
+}
+
+.army-subhead {
+  margin: 0.65rem 0 0.3rem;
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold);
+  border-bottom: 1px solid rgba(154, 122, 34, 0.35);
+  padding-bottom: 0.2rem;
+}
+
+.army-subhead:first-of-type {
+  margin-top: 0.35rem;
+}
+
+.hero-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.25rem;
+}
+
+.hero-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.55rem;
+  align-items: center;
+  padding: 0.45rem 0.5rem;
+  border: 1px solid rgba(154, 122, 34, 0.4);
+  background: linear-gradient(180deg, rgba(36, 42, 54, 0.95), rgba(14, 18, 26, 0.98));
+}
+
+.hero-card.is-owned {
+  border-color: rgba(201, 162, 39, 0.7);
+}
+
+.hero-card.is-down {
+  border-color: rgba(180, 80, 60, 0.65);
+}
+
+.hero-card-portrait {
+  width: 2.8rem;
+  height: 2.8rem;
+  flex-shrink: 0;
+}
+
+.hero-card-portrait .unit-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.hero-card-portrait.type-bulwark {
+  background: radial-gradient(circle at 32% 28%, #6a7080, #2a3038 62%, #12161c);
+}
+.hero-card-portrait.type-bulwark .u-helm,
+.hero-card-portrait.type-bulwark .u-metal { fill: #c8d0dc; }
+.hero-card-portrait.type-bulwark .u-shield { fill: #4a5868; }
+.hero-card-portrait.type-bulwark .u-body { fill: #3a4450; }
+
+.hero-card-portrait.type-bonesinger {
+  background: radial-gradient(circle at 32% 28%, #4a3860, #1a1428 62%, #0c0a14);
+}
+.hero-card-portrait.type-bonesinger .u-hood { fill: #2a2038; }
+.hero-card-portrait.type-bonesinger .u-body { fill: #3a2a48; }
+.hero-card-portrait.type-bonesinger .u-gem { fill: #90e070; }
+.hero-card-portrait.type-bonesinger .u-point { fill: #a8f088; }
+.hero-card-portrait.type-bonesinger .u-eye { fill: #70e050; }
+
+.hero-card-portrait.type-raidcaptain {
+  background: radial-gradient(circle at 32% 28%, #6a5040, #2a1c14 62%, #140e0a);
+}
+.hero-card-portrait.type-raidcaptain .u-body { fill: #5a4030; }
+.hero-card-portrait.type-raidcaptain .u-accent { fill: #a87840; stroke: #c9a227; }
+.hero-card-portrait.type-raidcaptain .u-helm,
+.hero-card-portrait.type-raidcaptain .u-metal { fill: #b8a878; }
+
+.hero-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.hero-card-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.92rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--gold-bright);
+}
+
+.hero-card-role {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
+.hero-card-synergy {
+  font-size: 0.72rem;
+  line-height: 1.3;
+  color: #c8b070;
+}
+
+.hero-card-action {
+  flex-shrink: 0;
+}
+
+.hero-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  min-width: 5.5rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid rgba(154, 122, 34, 0.45);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--text);
+  cursor: pointer;
+  font-family: var(--font-ui);
+}
+
+.hero-action-btn .item-name {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.hero-action-btn .item-cost {
+  font-size: 0.7rem;
+  display: flex;
+  gap: 0.2rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.hero-action-btn.affordable {
+  border-color: var(--gold);
+  background: linear-gradient(180deg, rgba(60, 52, 28, 0.9), rgba(20, 16, 10, 0.95));
+}
+
+.hero-action-btn.affordable:hover {
+  filter: brightness(1.08);
+}
+
+.hero-status {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #9ec4f0;
+  text-align: right;
+  max-width: 7rem;
+  line-height: 1.25;
+}
+
+.hero-card.is-down .hero-status {
+  color: #e09080;
 }
 
 /* Command card grid for recruits */
@@ -3006,6 +3197,12 @@ button:disabled {
     -webkit-overflow-scrolling: touch;
   }
 
+  .army-sheet-body #hero-list {
+    flex: 0 0 auto;
+    max-height: 40%;
+    overflow-y: auto;
+  }
+
   #panel-resource #upgrade-list {
     max-height: none;
     flex: 1 1 auto;
@@ -3217,6 +3414,8 @@ button:focus-visible,
 @media (prefers-reduced-motion: reduce) {
   #click-btn.click-pulse,
   #food-click-btn.click-pulse,
+  #click-btn.click-press,
+  #food-click-btn.click-press,
   .stat-pill.flash-win,
   .stat-pill.flash-loss,
   .loop-status.is-countdown,

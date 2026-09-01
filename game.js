@@ -58,13 +58,13 @@
   /** Extra army slots per Granary level. */
   const GRANARY_CAPACITY_PER_LEVEL = 3;
   const SAVE_KEY = "clickstrike-save-v1";
-  const SAVE_VERSION = 5;
+  const SAVE_VERSION = 6;
   const SAVE_THROTTLE_MS = 2000;
-  /** Seconds before a fallen hero returns at the gate. */
-  const HERO_RESPAWN_S = 8;
   /** Bonesinger bone minions capped on the field. */
   const BONE_MINION_MAX = 3;
   const BONE_MINION_KILL_CHANCE = 0.3;
+  /** Paid hero rez is this fraction of hire gold/food. */
+  const HERO_REZ_COST_MULT = 0.4;
   const MUSIC_VOLUME_KEY = "clickstrike-music-volume";
   const MUSIC_MUTED_KEY = "clickstrike-music-muted";
   const MUSIC_TRACKS = [
@@ -75,9 +75,12 @@
     baskets: true,
     foragers: true,
     autoForager: true,
+    forageTools: true,
   };
-  /** Clicks/sec added per Hired Miners / Gather Crew level. */
-  const AUTO_CLICK_CPS_PER_LEVEL = 0.1;
+  /** Full Mine/Forage clicks per second added per Hired Miner / Gather Crew level. */
+  const AUTO_CLICK_CPS_PER_LEVEL = 1;
+  /** Auto click rate bonus per Mining Drill / Forage Tools level. */
+  const AUTO_CLICK_SPEED_PER_LEVEL = 0.15;
   /** Max orbiting cursors rendered per resource button. */
   const MAX_VISIBLE_CURSORS = 8;
   /** Min seconds between auto-click floaters (pulse still fires). */
@@ -101,11 +104,20 @@
     },
     {
       id: "autoMiner",
-      name: "Hired Miners",
-      desc: "+0.1 gold clicks / sec",
+      name: "Hired Miner",
+      desc: "+1 auto miner (1 full click/sec each)",
       icon: "miner",
-      baseCost: 25,
-      growth: 1.5,
+      baseCost: 45,
+      growth: 1.55,
+      apply() {},
+    },
+    {
+      id: "mineDrill",
+      name: "Mining Drill",
+      desc: "Miners click 15% faster",
+      icon: "drill",
+      baseCost: 55,
+      growth: 1.65,
       apply() {},
     },
     {
@@ -134,10 +146,20 @@
     {
       id: "autoForager",
       name: "Gather Crew",
-      desc: "+0.1 food clicks / sec",
+      desc: "+1 auto forager (1 full click/sec each)",
       icon: "gather",
-      baseCost: 22,
-      growth: 1.5,
+      baseCost: 40,
+      growth: 1.55,
+      food: true,
+      apply() {},
+    },
+    {
+      id: "forageTools",
+      name: "Forage Tools",
+      desc: "Crew clicks 15% faster",
+      icon: "pick",
+      baseCost: 50,
+      growth: 1.65,
       food: true,
       apply() {},
     },
@@ -401,6 +423,8 @@
       role: "Fat tank",
       blurb: "Holds the line so your archers and mages can shred.",
       synergy: "+20% damage for ranged & magic allies",
+      hireGold: 220,
+      hireFood: 160,
       hp: 160,
       atk: 10,
       spd: 2.2,
@@ -418,6 +442,8 @@
       role: "Necro ranged",
       blurb: "Rains death while melee packs trade and rise again.",
       synergy: "+15% melee ally damage · kills may raise bones",
+      hireGold: 240,
+      hireFood: 130,
       hp: 55,
       atk: 16,
       spd: 3.4,
@@ -435,6 +461,8 @@
       role: "Cavalry commander",
       blurb: "Drives a fast push — riders carve the backline.",
       synergy: "+12% ally move speed · +20% cavalry damage",
+      hireGold: 230,
+      hireFood: 145,
       hp: 85,
       atk: 14,
       spd: 5.8,
@@ -1058,6 +1086,7 @@
     heroPickGrid: document.getElementById("hero-pick-grid"),
     heroChip: document.getElementById("hero-chip"),
     heroChipName: document.getElementById("hero-chip-name"),
+    heroList: document.getElementById("hero-list"),
   };
 
   const state = {
@@ -1079,6 +1108,7 @@
     waveTransitioning: false,
     upgradeCategory: "economy",
     heroId: null,
+    heroDown: false,
   };
 
   function defaultUpgradeLevelsDraft() {
@@ -1112,6 +1142,7 @@
   let lastSaveAt = 0;
   let lastRecruitSig = "";
   let lastRecruitStructureSig = "";
+  let lastHeroSig = "";
   let waveTransitionTimer = null;
 
   function defaultUpgradeLevels() {
@@ -1146,6 +1177,7 @@
       autoClick: { ...state.autoClick },
       unlockedUnits: { ...state.unlockedUnits },
       heroId: state.heroId,
+      heroDown: !!state.heroDown,
     };
   }
 
@@ -1174,7 +1206,7 @@
     } catch (_) {
       return false;
     }
-    // Accept v1–v5 saves (migrate forward).
+    // Accept v1–v6 saves (migrate forward).
     if (!data || data.v < 1 || data.v > SAVE_VERSION) return false;
     if (
       !isNonNegNum(data.gold) ||
@@ -1233,6 +1265,7 @@
     state.autoClick = autoClick;
     state.unlockedUnits = unlocked;
     state.heroId = isValidHeroId(data.heroId) ? data.heroId : null;
+    state.heroDown = state.heroId ? !!data.heroDown : false;
     state.battle = null;
     state.waveTransitioning = false;
     return true;
@@ -1268,6 +1301,7 @@
     state.unlockedUnits = defaultUnlockedUnits();
     state.waveTransitioning = false;
     state.heroId = null;
+    state.heroDown = false;
     el.fieldUnits.innerHTML = "";
   }
 
@@ -1283,18 +1317,34 @@
     resetMetaState();
     lastRecruitSig = "";
     lastRecruitStructureSig = "";
-    appendLog("log-muted", "New game — choose your hero.");
+    lastHeroSig = "";
+    appendLog("log-muted", "New game — wave 1 assault begins.");
     renderHud();
-    beginRun();
+    startBattle();
   }
 
-  function beginRun() {
-    if (!state.heroId) {
-      showHeroPick();
-      return;
-    }
-    hideHeroPick();
-    startBattle();
+  function heroRezGold(def) {
+    return Math.max(1, Math.floor((def.hireGold || 0) * HERO_REZ_COST_MULT));
+  }
+
+  function heroRezFood(def) {
+    return Math.max(1, Math.floor((def.hireFood || 0) * HERO_REZ_COST_MULT));
+  }
+
+  function formatHireCost(def) {
+    return (
+      `<span class="cost-gold">${format(def.hireGold)} g</span>` +
+      `<span class="cost-sep">·</span>` +
+      `<span class="cost-food">${format(def.hireFood)} f</span>`
+    );
+  }
+
+  function formatRezCost(def) {
+    return (
+      `<span class="cost-gold">${format(heroRezGold(def))} g</span>` +
+      `<span class="cost-sep">·</span>` +
+      `<span class="cost-food">${format(heroRezFood(def))} f</span>`
+    );
   }
 
   function syncHeroChip() {
@@ -1302,61 +1352,71 @@
     if (el.heroChip) {
       el.heroChip.hidden = !def;
       el.heroChip.setAttribute("aria-hidden", def ? "false" : "true");
+      el.heroChip.classList.toggle("is-down", !!(def && state.heroDown));
+      el.heroChip.title = def
+        ? state.heroDown
+          ? def.name + " is down — rez from Army"
+          : def.name
+        : "Your chosen hero";
     }
     if (el.heroChipName) {
-      el.heroChipName.textContent = def ? def.name : "";
+      if (!def) el.heroChipName.textContent = "";
+      else if (state.heroDown) el.heroChipName.textContent = def.name + " · Down";
+      else el.heroChipName.textContent = def.name;
     }
   }
 
-  function showHeroPick() {
-    if (!el.heroPick || !el.heroPickGrid) return;
-    el.heroPickGrid.innerHTML = "";
-    for (const hero of HEROES) {
-      const card = document.createElement("button");
-      card.type = "button";
-      card.className = "hero-pick-card";
-      card.dataset.heroId = hero.id;
-      card.setAttribute("aria-label", `Choose ${hero.name}`);
-      card.innerHTML =
-        `<div class="hero-pick-portrait unit-sil type-${hero.id}" aria-hidden="true">` +
-        unitArt(hero.id) +
-        `</div>` +
-        `<div class="hero-pick-body">` +
-        `<span class="hero-pick-name">${hero.name}</span>` +
-        `<span class="hero-pick-role">${hero.role}</span>` +
-        `<span class="hero-pick-blurb">${hero.blurb}</span>` +
-        `<span class="hero-pick-synergy">${hero.synergy}</span>` +
-        `</div>` +
-        `<span class="hero-pick-choose">Choose</span>`;
-      card.addEventListener("click", () => selectHero(hero.id));
-      el.heroPickGrid.appendChild(card);
+  function removeFieldHero() {
+    if (!state.battle) return;
+    const living = state.battle.units.filter((u) => u.hero);
+    for (const u of living) {
+      const node = getTokenEl(u.id);
+      if (node) node.remove();
     }
-    el.heroPick.hidden = false;
-    el.heroPick.setAttribute("aria-hidden", "false");
-    document.body.classList.add("hero-pick-open");
-    syncHeroChip();
+    state.battle.units = state.battle.units.filter((u) => !u.hero);
   }
 
-  function hideHeroPick() {
-    if (!el.heroPick) return;
-    el.heroPick.hidden = true;
-    el.heroPick.setAttribute("aria-hidden", "true");
-    document.body.classList.remove("hero-pick-open");
-  }
-
-  function selectHero(id) {
-    if (!isValidHeroId(id)) return;
-    state.heroId = id;
-    saveGame(true);
-    hideHeroPick();
+  function hireHero(id) {
+    if (!isValidHeroId(id)) return false;
     const def = heroDef(id);
+    if (!def) return false;
+    // Same hero: use rez when down; otherwise already fielded.
+    if (state.heroId === id) return false;
+    if (state.gold < def.hireGold || state.food < def.hireFood) return false;
+
+    state.gold -= def.hireGold;
+    state.food -= def.hireFood;
+    removeFieldHero();
+    state.heroId = id;
+    state.heroDown = false;
+    saveGame(true);
     appendLog(
       "log-muted",
-      `${def.name} takes the field — ${def.synergy}.`
+      `${def.name} hired — ${def.synergy}.`
     );
+    if (inBattle() && !inCountdown()) ensureHero();
     syncHeroChip();
-    startBattle();
     renderHud();
+    return true;
+  }
+
+  function rezHero() {
+    if (!state.heroId || !state.heroDown) return false;
+    const def = heroDef(state.heroId);
+    if (!def) return false;
+    const g = heroRezGold(def);
+    const f = heroRezFood(def);
+    if (state.gold < g || state.food < f) return false;
+
+    state.gold -= g;
+    state.food -= f;
+    state.heroDown = false;
+    saveGame(true);
+    appendLog("log-muted", `${def.name} returns for ${format(g)}g · ${format(f)}f.`);
+    if (inBattle() && !inCountdown()) ensureHero();
+    syncHeroChip();
+    renderHud();
+    return true;
   }
 
   function flashStatPills(mode) {
@@ -1388,11 +1448,23 @@
   }
 
   function goldAutoCps() {
-    return (state.upgradeLevels.autoMiner || 0) * AUTO_CLICK_CPS_PER_LEVEL;
+    const miners = state.upgradeLevels.autoMiner || 0;
+    const drill = state.upgradeLevels.mineDrill || 0;
+    return miners * AUTO_CLICK_CPS_PER_LEVEL * (1 + AUTO_CLICK_SPEED_PER_LEVEL * drill);
   }
 
   function foodAutoCps() {
-    return (state.upgradeLevels.autoForager || 0) * AUTO_CLICK_CPS_PER_LEVEL;
+    const crew = state.upgradeLevels.autoForager || 0;
+    const tools = state.upgradeLevels.forageTools || 0;
+    return crew * AUTO_CLICK_CPS_PER_LEVEL * (1 + AUTO_CLICK_SPEED_PER_LEVEL * tools);
+  }
+
+  function goldAutoMinerCount() {
+    return state.upgradeLevels.autoMiner || 0;
+  }
+
+  function foodAutoForagerCount() {
+    return state.upgradeLevels.autoForager || 0;
   }
 
   function goldAutoActive() {
@@ -2080,12 +2152,12 @@
 
   function markDead(u) {
     u.hp = 0;
+    u.removeAt = Date.now() + 400;
+    u.respawnAt = 0;
     if (u.hero) {
-      u.respawnAt = Date.now() + HERO_RESPAWN_S * 1000;
-      u.removeAt = Date.now() + 400;
-    } else {
-      u.removeAt = Date.now() + 400;
-      u.respawnAt = 0;
+      state.heroDown = true;
+      saveGame(true);
+      syncHeroChip();
     }
     const node = getTokenEl(u.id);
     if (node) {
@@ -2195,46 +2267,13 @@
   }
 
   function ensureHero() {
-    if (!inBattle() || !state.heroId) return;
+    if (!inBattle() || !state.heroId || state.heroDown) return;
     const b = state.battle;
-    const existing = b.units.find((u) => u.hero);
-    if (existing) {
-      if (existing.hp > 0) return;
-      if (existing.respawnAt && Date.now() < existing.respawnAt) return;
-      reviveHero(existing);
-      return;
-    }
+    const existing = b.units.find((u) => u.hero && u.hp > 0);
+    if (existing) return;
+    // Drop any corpse leftover from this wave.
+    b.units = b.units.filter((u) => !u.hero);
     createHeroUnit(state.heroId);
-  }
-
-  function reviveHero(unit) {
-    if (!unit || !unit.hero || !inBattle()) return;
-    const def = heroDef(unit.typeId) || heroDef(state.heroId);
-    if (!def) return;
-    const stats = playerUnitStats(def);
-    const homeY = pickSpawnY("player");
-    unit.hp = stats.maxHp;
-    unit.maxHp = stats.maxHp;
-    unit.atk = stats.atk;
-    unit.armor = stats.armor;
-    unit.spd = stats.spd;
-    unit.atkCdMax = stats.atkCd;
-    unit.range = stats.range;
-    unit.x = spawnXFor("player");
-    unit.y = gateExitY(homeY);
-    unit.homeY = homeY;
-    unit.spreadT = SPAWN_SPREAD_S;
-    unit.attackCd = 0;
-    unit.removeAt = 0;
-    unit.respawnAt = 0;
-    const node = getTokenEl(unit.id);
-    if (node) {
-      node.classList.remove("downed", "falling");
-      updateTokenEl(unit, node);
-    } else {
-      mountToken(unit);
-    }
-    appendLog("log-muted", `${unit.name} returns to the gate!`);
   }
 
   function createBoneMinion() {
@@ -2941,8 +2980,6 @@
 
     tickTraining(dt);
 
-    tickHeroRespawn();
-
     const living = b.units.filter((u) => u.hp > 0);
     const raidSpeed =
       state.heroId === "raidcaptain" && livingHeroUnit() ? 1.12 : 1;
@@ -3043,24 +3080,9 @@
     applyUnitSeparation(living, dt);
 
     const now = Date.now();
-    b.units = b.units.filter((u) => {
-      if (u.hero && (u.hp > 0 || u.respawnAt)) return true;
-      return u.hp > 0 || (u.removeAt && now < u.removeAt);
-    });
+    b.units = b.units.filter((u) => u.hp > 0 || (u.removeAt && now < u.removeAt));
     syncFieldPositions();
     renderBaseBars();
-  }
-
-  function tickHeroRespawn() {
-    if (!state.battle || !state.heroId) return;
-    const hero = state.battle.units.find((u) => u.hero);
-    if (!hero) {
-      ensureHero();
-      return;
-    }
-    if (hero.hp > 0) return;
-    if (!hero.respawnAt || Date.now() < hero.respawnAt) return;
-    reviveHero(hero);
   }
 
   function startBattle() {
@@ -3145,12 +3167,20 @@
     if (level <= 0) return "";
     if (def.id === "pickaxe") return `+${level} gold/click`;
     if (def.id === "autoMiner") {
-      return `${format(level * AUTO_CLICK_CPS_PER_LEVEL)} clicks/sec`;
+      const n = level;
+      return `${n} miner${n === 1 ? "" : "s"} · ${format(goldAutoCps())} clicks/sec`;
+    }
+    if (def.id === "mineDrill") {
+      return `+${Math.round(AUTO_CLICK_SPEED_PER_LEVEL * 100 * level)}% mine speed`;
     }
     if (def.id === "traders") return `+${format(level * 0.5)} g/s`;
     if (def.id === "baskets") return `+${format(level * 0.5)} food/click`;
     if (def.id === "autoForager") {
-      return `${format(level * AUTO_CLICK_CPS_PER_LEVEL)} clicks/sec`;
+      const n = level;
+      return `${n} forager${n === 1 ? "" : "s"} · ${format(foodAutoCps())} clicks/sec`;
+    }
+    if (def.id === "forageTools") {
+      return `+${Math.round(AUTO_CLICK_SPEED_PER_LEVEL * 100 * level)}% forage speed`;
     }
     if (def.id === "foragers") return `+${format(level * 0.8)} food/s`;
     if (def.id === "smithy") {
@@ -3483,6 +3513,100 @@
       `<span class="cost-sep">·</span>` +
       `<span class="cost-food">${format(type.foodCost)} f</span>`
     );
+  }
+
+  function renderHeroes() {
+    if (!el.heroList) return;
+    const live = inBattle() && !inCountdown();
+    const owned = state.heroId;
+    const fielded = !!(owned && !state.heroDown && livingHeroUnit());
+
+    const sigParts = [
+      owned || "-",
+      state.heroDown ? "1" : "0",
+      fielded ? "1" : "0",
+      live ? "1" : "0",
+      Math.floor(state.gold),
+      Math.floor(state.food),
+    ];
+    for (const h of HEROES) {
+      sigParts.push(h.id + ":" + h.hireGold + ":" + h.hireFood);
+    }
+    const sig = sigParts.join("|");
+    const existing = el.heroList.querySelectorAll(".hero-card");
+    if (existing.length === HEROES.length && sig === lastHeroSig) {
+      // Still refresh affordability / labels cheaply below by rebuilding —
+      // hero count is tiny (3).
+    }
+    lastHeroSig = sig;
+
+    el.heroList.innerHTML = "";
+    for (const hero of HEROES) {
+      const isOwned = owned === hero.id;
+      const canHire =
+        !isOwned &&
+        state.gold >= hero.hireGold &&
+        state.food >= hero.hireFood;
+      const rezG = heroRezGold(hero);
+      const rezF = heroRezFood(hero);
+      const canRez =
+        isOwned &&
+        state.heroDown &&
+        state.gold >= rezG &&
+        state.food >= rezF;
+
+      const card = document.createElement("div");
+      card.className =
+        "hero-card" +
+        (isOwned ? " is-owned" : "") +
+        (isOwned && state.heroDown ? " is-down" : "");
+      card.dataset.heroId = hero.id;
+
+      let actionHtml = "";
+      if (isOwned && state.heroDown) {
+        actionHtml =
+          `<button type="button" class="hero-action-btn` +
+          (canRez ? " affordable" : "") +
+          `" data-hero-action="rez">` +
+          `<span class="item-name">Rez</span>` +
+          `<span class="item-cost">${formatRezCost(hero)}</span>` +
+          `</button>`;
+      } else if (isOwned && fielded) {
+        actionHtml = `<span class="hero-status">On the field</span>`;
+      } else if (isOwned) {
+        actionHtml = `<span class="hero-status">Ready — joins next fight</span>`;
+      } else {
+        const label = owned ? "Replace" : "Hire";
+        actionHtml =
+          `<button type="button" class="hero-action-btn` +
+          (canHire ? " affordable" : "") +
+          `" data-hero-action="hire">` +
+          `<span class="item-name">${label}</span>` +
+          `<span class="item-cost">${formatHireCost(hero)}</span>` +
+          `</button>`;
+      }
+
+      card.innerHTML =
+        `<div class="hero-card-portrait unit-sil type-${hero.id}" aria-hidden="true">` +
+        unitArt(hero.id) +
+        `</div>` +
+        `<div class="hero-card-body">` +
+        `<span class="hero-card-name">${hero.name}</span>` +
+        `<span class="hero-card-role">${hero.role}</span>` +
+        `<span class="hero-card-synergy">${hero.synergy}</span>` +
+        `</div>` +
+        `<div class="hero-card-action">${actionHtml}</div>`;
+
+      const btn = card.querySelector("[data-hero-action]");
+      if (btn) {
+        btn.addEventListener("click", () => {
+          const act = btn.dataset.heroAction;
+          if (act === "hire") hireHero(hero.id);
+          else if (act === "rez") rezHero();
+        });
+      }
+      el.heroList.appendChild(card);
+    }
   }
 
   function formatUnlockCost(type) {
@@ -3878,6 +4002,7 @@
     syncResourceAutoToggles();
     renderWarChest();
     renderUpgrades();
+    renderHeroes();
     renderSpawn();
     renderBattlePanel();
   }
@@ -3926,10 +4051,11 @@
 
   function pulseResourceClick(btn, amount, kind, opts) {
     opts = opts || {};
-    btn.classList.remove("click-pulse");
+    btn.classList.remove("click-pulse", "click-press");
     void btn.offsetWidth;
-    btn.classList.add("click-pulse");
-    setTimeout(() => btn.classList.remove("click-pulse"), 220);
+    const pressCls = opts.press ? "click-press" : "click-pulse";
+    btn.classList.add(pressCls);
+    setTimeout(() => btn.classList.remove(pressCls), opts.press ? 140 : 220);
 
     if (opts.showFloater === false) return;
 
@@ -4025,7 +4151,9 @@
         state.autoClick.gold ? "true" : "false"
       );
       el.goldAutoToggle.title = state.autoClick.gold
-        ? `Auto mine on (${format(goldAutoCps())}/s)`
+        ? `Auto mine on · ${goldAutoMinerCount()} miner${
+            goldAutoMinerCount() === 1 ? "" : "s"
+          } · ${format(goldAutoCps())} clicks/sec`
         : "Auto mine off";
     }
     if (el.foodAutoToggle) {
@@ -4037,7 +4165,9 @@
         state.autoClick.food ? "true" : "false"
       );
       el.foodAutoToggle.title = state.autoClick.food
-        ? `Auto forage on (${format(foodAutoCps())}/s)`
+        ? `Auto forage on · ${foodAutoForagerCount()} forager${
+            foodAutoForagerCount() === 1 ? "" : "s"
+          } · ${format(foodAutoCps())} clicks/sec`
         : "Auto forage off";
     }
     updateResourceClickSubs();
@@ -4047,9 +4177,10 @@
     if (el.clickPower) {
       const sub = el.clickBtn && el.clickBtn.querySelector(".click-btn-sub");
       if (sub && goldAutoActive()) {
+        const n = goldAutoMinerCount();
         sub.innerHTML =
-          `+<span id="click-power-display">${format(state.clickPower)}</span>` +
-          ` · auto ${format(goldAutoCps())}/s`;
+          `+<span id="click-power-display">${format(state.clickPower)}</span> per click` +
+          ` · ${n} miner${n === 1 ? "" : "s"}`;
         el.clickPower = document.getElementById("click-power-display");
       } else if (sub) {
         sub.innerHTML =
@@ -4063,9 +4194,10 @@
       const sub =
         el.foodClickBtn && el.foodClickBtn.querySelector(".click-btn-sub");
       if (sub && foodAutoActive()) {
+        const n = foodAutoForagerCount();
         sub.innerHTML =
-          `+<span id="food-click-power-display">${format(state.foodClickPower)}</span>` +
-          ` · auto ${format(foodAutoCps())}/s`;
+          `+<span id="food-click-power-display">${format(state.foodClickPower)}</span> per click` +
+          ` · ${n} forager${n === 1 ? "" : "s"}`;
         el.foodClickPower = document.getElementById("food-click-power-display");
       } else if (sub) {
         sub.innerHTML =
@@ -4100,8 +4232,10 @@
     state.gold += amount;
     pulseResourceClick(el.clickBtn, amount, "gold", {
       showFloater: opts.showFloater !== false,
+      press: !!opts.press,
     });
     if (opts.jabCursor) jabAutoCursor("gold");
+    syncResourceDisplays();
   }
 
   function doForageClick(opts) {
@@ -4110,8 +4244,10 @@
     state.food += amount;
     pulseResourceClick(el.foodClickBtn, amount, "food", {
       showFloater: opts.showFloater !== false,
+      press: !!opts.press,
     });
     if (opts.jabCursor) jabAutoCursor("food");
+    syncResourceDisplays();
   }
 
   function tickAutoClicks(dt) {
@@ -4126,7 +4262,7 @@
         fired += 1;
         const showFloater = goldFloaterCooldown <= 0;
         if (showFloater) goldFloaterCooldown = AUTO_FLOATER_MIN_INTERVAL;
-        doMineClick({ showFloater, jabCursor: true });
+        doMineClick({ showFloater, jabCursor: true, press: true });
       }
     } else {
       goldAutoAccum = 0;
@@ -4140,7 +4276,7 @@
         fired += 1;
         const showFloater = foodFloaterCooldown <= 0;
         if (showFloater) foodFloaterCooldown = AUTO_FLOATER_MIN_INTERVAL;
-        doForageClick({ showFloater, jabCursor: true });
+        doForageClick({ showFloater, jabCursor: true, press: true });
       }
     } else {
       foodAutoAccum = 0;
@@ -4526,6 +4662,6 @@
     );
   }
   initMobileChrome();
-  beginRun();
+  startBattle();
   initMusic();
 })();
