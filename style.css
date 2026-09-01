@@ -1505,6 +1505,11 @@ body {
   font-size: 0.95rem;
 }
 
+.dmg-floater.counter {
+  color: #9dffb0;
+  text-shadow: 0 1px 3px #000, 0 0 8px rgba(64, 180, 96, 0.55);
+}
+
 .dmg-floater.gold-gain {
   color: var(--gold-bright);
   text-shadow: 0 1px 3px #000, 0 0 10px rgba(232, 197, 71, 0.65);
@@ -2102,6 +2107,18 @@ button:disabled {
 .recruit-card .item-meta {
   font-size: 0.65rem;
   line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recruit-card .item-blurb {
+  display: block;
+  margin-top: 0.12rem;
+  font-size: 0.58rem;
+  line-height: 1.2;
+  color: var(--text-muted);
+  letter-spacing: 0.01em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

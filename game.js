@@ -21,12 +21,25 @@
     FIELD_Y_MIN + (i / (LANE_COUNT - 1)) * (FIELD_Y_MAX - FIELD_Y_MIN)
   );
   const LANE_JITTER = 3.2;
-  const SPAWN_X_JITTER = 2.4;
+  const SPAWN_X_JITTER = 1.4;
   /** Soft push so stacks break into a front. */
   const SEPARATION_DIST = 6.2;
   const SEPARATION_STRENGTH = 10;
+  /** Seconds exiting the gate before normal AI (fan-out). */
+  const SPAWN_SPREAD_S = 0.55;
+  /** Y band used when scoring threatened lanes for spawn. */
+  const LANE_THREAT_BAND = 9;
+  /** Wider peel band when a foe threatens the home keep. */
+  const LANE_KEEP_PEEL_Y = 36;
+  /** Counter damage multipliers. */
+  const COUNTER_STRONG = 1.4;
+  const COUNTER_WEAK = 0.7;
+  /** Auto trains slower than manual counter-picks. */
+  const AUTO_TRAIN_MULT = 1.35;
+  /** Drill Yard cannot shrink train time below this. */
+  const MIN_TRAIN_TIME = 1.25;
   /** Base seconds to train one unit before it hits the field. */
-  const BASE_TRAIN_TIME = 2;
+  const BASE_TRAIN_TIME = 3.5;
   const TRAIN_RETRY = 0.25;
   const WAVE_TRANSITION_MS = 900;
   /** Seconds before wave 1 combat starts. */
@@ -179,7 +192,10 @@
       atkCd: 0.55,
       range: 6,
       atkStyle: "melee",
-      blurb: "Cheap front-liner",
+      tags: ["infantry"],
+      strongVs: ["cavalry"],
+      weakVs: ["ranged"],
+      blurb: "Beats cavalry · Soft vs ranged",
     },
     {
       id: "archer",
@@ -193,7 +209,10 @@
       atkCd: 0.4,
       range: 28,
       atkStyle: "ranged",
-      blurb: "Shoots from afar",
+      tags: ["ranged"],
+      strongVs: ["infantry"],
+      weakVs: ["cavalry"],
+      blurb: "Beats infantry · Soft vs cavalry",
     },
     {
       id: "knight",
@@ -207,7 +226,10 @@
       atkCd: 0.7,
       range: 6,
       atkStyle: "melee",
-      blurb: "Slow and sturdy",
+      tags: ["infantry", "armored"],
+      strongVs: ["ranged"],
+      weakVs: ["magic"],
+      blurb: "Beats ranged · Soft vs magic",
     },
     {
       id: "rider",
@@ -221,7 +243,10 @@
       atkCd: 0.45,
       range: 6,
       atkStyle: "melee",
-      blurb: "Fast harasser",
+      tags: ["cavalry"],
+      strongVs: ["ranged", "magic"],
+      weakVs: ["infantry"],
+      blurb: "Beats ranged & magic · Soft vs spears",
       unlockWave: 3,
       unlockCost: 80,
     },
@@ -237,7 +262,10 @@
       atkCd: 0.75,
       range: 32,
       atkStyle: "magic",
-      blurb: "Magic siege bolts",
+      tags: ["magic"],
+      strongVs: ["armored"],
+      weakVs: ["cavalry"],
+      blurb: "Beats armored · Soft vs cavalry",
       unlockWave: 5,
       unlockCost: 150,
     },
@@ -253,7 +281,10 @@
       atkCd: 0.85,
       range: 6,
       atkStyle: "melee",
-      blurb: "Keep wall tank",
+      tags: ["infantry", "armored"],
+      strongVs: ["magic"],
+      weakVs: ["cavalry"],
+      blurb: "Beats magic · Soft vs cavalry",
       unlockWave: 7,
       unlockCost: 120,
     },
@@ -421,6 +452,9 @@
       atkCd: 1,
       range: 6,
       atkStyle: "melee",
+      tags: ["infantry"],
+      strongVs: ["ranged"],
+      weakVs: ["cavalry"],
       art: "foe",
     },
     raider: {
@@ -433,6 +467,9 @@
       atkCd: 0.95,
       range: 6,
       atkStyle: "melee",
+      tags: ["cavalry"],
+      strongVs: ["ranged", "magic"],
+      weakVs: ["infantry"],
       art: "foe-raider",
     },
     skirmisher: {
@@ -445,6 +482,9 @@
       atkCd: 0.9,
       range: 26,
       atkStyle: "ranged",
+      tags: ["ranged"],
+      strongVs: ["infantry"],
+      weakVs: ["cavalry"],
       art: "foe-skirmisher",
     },
     brute: {
@@ -457,6 +497,9 @@
       atkCd: 1.15,
       range: 6,
       atkStyle: "melee",
+      tags: ["infantry", "armored"],
+      strongVs: ["ranged"],
+      weakVs: ["magic"],
       art: "foe-brute",
     },
     cultist: {
@@ -469,6 +512,9 @@
       atkCd: 1.2,
       range: 30,
       atkStyle: "magic",
+      tags: ["magic"],
+      strongVs: ["armored"],
+      weakVs: ["cavalry"],
       art: "foe-cultist",
     },
     hound: {
@@ -481,6 +527,9 @@
       atkCd: 0.85,
       range: 6,
       atkStyle: "melee",
+      tags: ["cavalry"],
+      strongVs: ["ranged", "magic"],
+      weakVs: ["infantry"],
       art: "foe-hound",
     },
   };
@@ -509,8 +558,9 @@
     {
       name: "Wolf Pack",
       mix: [
-        { type: "hound", w: 4 },
+        { type: "hound", w: 3 },
         { type: "raider", w: 1 },
+        { type: "grunt", w: 1 },
       ],
       bossType: "hound",
     },
@@ -607,7 +657,8 @@
     {
       name: "Siege Brutes",
       mix: [
-        { type: "brute", w: 4 },
+        { type: "brute", w: 3 },
+        { type: "skirmisher", w: 1 },
         { type: "grunt", w: 1 },
       ],
       bossType: "brute",
@@ -660,8 +711,9 @@
     {
       name: "Blood Hounds",
       mix: [
-        { type: "hound", w: 4 },
+        { type: "hound", w: 3 },
         { type: "raider", w: 2 },
+        { type: "skirmisher", w: 1 },
       ],
       bossType: "hound",
     },
@@ -1154,6 +1206,9 @@
       atkCd,
       range: arch.range || MELEE_RANGE,
       atkStyle: arch.atkStyle || "melee",
+      tags: arch.tags ? arch.tags.slice() : ["infantry"],
+      strongVs: arch.strongVs ? arch.strongVs.slice() : [],
+      weakVs: arch.weakVs ? arch.weakVs.slice() : [],
       typeId: arch.id,
       label: arch.label,
       art: arch.art,
@@ -1174,11 +1229,53 @@
       atkCd: type.atkCd,
       range: type.range || MELEE_RANGE,
       atkStyle: type.atkStyle || "melee",
+      tags: type.tags ? type.tags.slice() : ["infantry"],
+      strongVs: type.strongVs ? type.strongVs.slice() : [],
+      weakVs: type.weakVs ? type.weakVs.slice() : [],
     };
   }
 
+  function counterMult(attacker, defender) {
+    if (!attacker || !defender) return 1;
+    const defTags = defender.tags || [];
+    if (!defTags.length) return 1;
+    const strong = attacker.strongVs || [];
+    const weak = attacker.weakVs || [];
+    for (let i = 0; i < strong.length; i++) {
+      if (defTags.indexOf(strong[i]) !== -1) return COUNTER_STRONG;
+    }
+    for (let i = 0; i < weak.length; i++) {
+      if (defTags.indexOf(weak[i]) !== -1) return COUNTER_WEAK;
+    }
+    return 1;
+  }
+
+  function distinctPlayerTypes() {
+    if (!state.battle) return 0;
+    const seen = Object.create(null);
+    let n = 0;
+    for (const u of state.battle.units) {
+      if (u.side !== "player" || u.hp <= 0 || !u.typeId) continue;
+      if (seen[u.typeId]) continue;
+      seen[u.typeId] = true;
+      n += 1;
+    }
+    return n;
+  }
+
+  function compositionDamageBonus() {
+    const n = distinctPlayerTypes();
+    if (n >= 3) return 1.1;
+    if (n >= 2) return 1.05;
+    return 1;
+  }
+
   function dealDamage(attacker, defender) {
-    return Math.max(1, attacker.atk - (defender.armor || 0));
+    let mult = counterMult(attacker, defender);
+    if (attacker && attacker.side === "player") {
+      mult *= compositionDamageBonus();
+    }
+    return Math.max(1, Math.round(attacker.atk * mult) - (defender.armor || 0));
   }
 
   function winBonus(wave) {
@@ -1234,24 +1331,53 @@
     return Math.max(FIELD_Y_MIN, Math.min(FIELD_Y_MAX, y));
   }
 
-  function nextLane() {
+  function pickSpawnY(side) {
     const living = state.battle
       ? state.battle.units.filter((u) => u.hp > 0)
       : [];
+    const allies = living.filter((u) => u.side === side);
+    const foes = living.filter((u) => u.side !== side);
+    const homeEdge = side === "player" ? BASE_EDGE_PLAYER : BASE_EDGE_ENEMY;
+
     let bestIdx = state.laneCursor % LANES.length;
-    let bestCount = Infinity;
+    let bestScore = -Infinity;
     for (let i = 0; i < LANES.length; i++) {
       const idx = (state.laneCursor + i) % LANES.length;
       const laneY = LANES[idx];
-      const count = living.filter((u) => Math.abs(u.y - laneY) < 7).length;
-      if (count < bestCount) {
-        bestCount = count;
+      const crowd = allies.filter((u) => Math.abs(u.y - laneY) < 7).length;
+      let threat = 0;
+
+      if (side === "player") {
+        for (const f of foes) {
+          if (Math.abs(f.y - laneY) >= LANE_THREAT_BAND) continue;
+          const proximity = Math.max(0, 92 - Math.abs(f.x - homeEdge));
+          threat += proximity;
+        }
+      } else {
+        const defenders = foes.filter((u) => Math.abs(u.y - laneY) < 7).length;
+        threat = 28 - defenders * 10;
+        for (const f of foes) {
+          if (Math.abs(f.y - laneY) >= LANE_THREAT_BAND) continue;
+          // Prefer lanes where the keep is less screened.
+          threat += Math.max(0, 40 - Math.abs(f.x - BASE_EDGE_PLAYER) * 0.45);
+        }
+      }
+
+      const score = threat - crowd * 14 + (i === 0 ? 0.01 : 0);
+      if (score > bestScore) {
+        bestScore = score;
         bestIdx = idx;
       }
     }
+
     state.laneCursor = (bestIdx + 1) % LANES.length;
     const jitter = (Math.random() * 2 - 1) * LANE_JITTER;
     return clampFieldY(LANES[bestIdx] + jitter);
+  }
+
+  function gateExitY(homeY) {
+    const mid = (FIELD_Y_MIN + FIELD_Y_MAX) * 0.5;
+    return clampFieldY(mid * 0.55 + homeY * 0.45);
   }
 
   function spawnXFor(side) {
@@ -1429,12 +1555,15 @@
     setTimeout(() => node.classList.remove(cls), 180);
   }
 
-  function spawnFloater(x, y, amount, slain) {
+  function spawnFloater(x, y, amount, slain, counterHit) {
     const d = document.createElement("div");
-    d.className = "dmg-floater" + (slain ? " kill" : "");
+    d.className =
+      "dmg-floater" +
+      (slain ? " kill" : "") +
+      (counterHit ? " counter" : "");
     d.style.setProperty("--x", x + "%");
     d.style.setProperty("--y", y + "%");
-    d.textContent = "−" + amount;
+    d.textContent = "−" + amount + (counterHit ? "!" : "");
     el.fieldUnits.appendChild(d);
     setTimeout(() => d.remove(), 700);
   }
@@ -1513,7 +1642,7 @@
     if (countSide("player") >= FIELD_SOFT_CAP) return false;
 
     const stats = playerUnitStats(type);
-    const homeY = nextLane();
+    const homeY = pickSpawnY("player");
     const unit = {
       id: "p" + state.nextUnitId++,
       side: "player",
@@ -1527,9 +1656,13 @@
       atkCdMax: stats.atkCd,
       range: stats.range,
       atkStyle: stats.atkStyle,
+      tags: stats.tags,
+      strongVs: stats.strongVs,
+      weakVs: stats.weakVs,
       x: spawnXFor("player"),
-      y: homeY,
+      y: gateExitY(homeY),
       homeY,
+      spreadT: SPAWN_SPREAD_S,
       attackCd: 0,
       boss: false,
     };
@@ -1544,9 +1677,12 @@
     state.gold += t.goldPaid || 0;
     state.food += t.foodPaid || 0;
     state.battle.training = null;
+    state.battle.preferType = null;
   }
 
-  function startTraining(typeId) {
+  function startTraining(typeId, opts) {
+    opts = opts || {};
+    const fromAuto = !!opts.fromAuto;
     if (!inBattle() || inCountdown()) return false;
     if (!isUnitUnlocked(typeId)) return false;
     const b = state.battle;
@@ -1558,14 +1694,17 @@
 
     state.gold -= type.cost;
     state.food -= type.foodCost;
+    const duration = trainDuration() * (fromAuto ? AUTO_TRAIN_MULT : 1);
     b.training = {
       typeId: type.id,
       elapsed: 0,
-      duration: trainDuration(),
+      duration,
       goldPaid: type.cost,
       foodPaid: type.foodCost,
+      fromAuto,
     };
     b.trainRetryAt = 0;
+    if (!fromAuto && b.preferType === typeId) b.preferType = null;
     saveGame(true);
     syncSpawnProgress();
     return true;
@@ -1602,10 +1741,35 @@
   }
 
   function tryBuyUnit(typeId, card) {
-    if (startTraining(typeId)) {
+    const b = state.battle;
+    if (startTraining(typeId, { fromAuto: false })) {
+      if (b) b.preferType = null;
       pulseRecruitCard(card, "buy-flash");
       renderHud();
       return true;
+    }
+    if (
+      b &&
+      b.training &&
+      isUnitUnlocked(typeId) &&
+      inBattle() &&
+      !inCountdown() &&
+      countSide("player") < FIELD_SOFT_CAP
+    ) {
+      const type = unitType(typeId);
+      if (
+        type &&
+        state.gold >= type.cost &&
+        state.food >= type.foodCost
+      ) {
+        b.preferType = typeId;
+        pulseRecruitCard(card, "buy-flash");
+        if (el.spawnHint) {
+          el.spawnHint.textContent =
+            `Queued ${type.name} next (manual)…`;
+        }
+        return true;
+      }
     }
     pulseRecruitCard(card, "buy-deny");
     if (el.spawnHint) {
@@ -1624,14 +1788,25 @@
   }
 
   function tryStartNextTraining() {
+    const b = state.battle;
+    if (!b || b.training) return false;
+    if (countSide("player") >= FIELD_SOFT_CAP) return false;
+
+    if (b.preferType) {
+      const prefer = b.preferType;
+      if (startTraining(prefer, { fromAuto: false })) {
+        b.preferType = null;
+        return true;
+      }
+    }
+
     const enabled = enabledSpawnTypes();
     if (enabled.length === 0) return false;
-    if (countSide("player") >= FIELD_SOFT_CAP) return false;
 
     for (let i = 0; i < enabled.length; i++) {
       const idx = (state.spawnCursor + i) % enabled.length;
       const type = enabled[idx];
-      if (startTraining(type.id)) {
+      if (startTraining(type.id, { fromAuto: true })) {
         state.spawnCursor = (idx + 1) % enabled.length;
         return true;
       }
@@ -1706,7 +1881,7 @@
     } else {
       name = stats.label;
     }
-    const homeY = nextLane();
+    const homeY = pickSpawnY("enemy");
     const unit = {
       id: "e" + state.nextUnitId++,
       side: "enemy",
@@ -1721,9 +1896,13 @@
       atkCdMax: stats.atkCd,
       range: stats.range,
       atkStyle: stats.atkStyle,
+      tags: stats.tags,
+      strongVs: stats.strongVs,
+      weakVs: stats.weakVs,
       x: spawnXFor("enemy"),
-      y: homeY,
+      y: gateExitY(homeY),
       homeY,
+      spreadT: SPAWN_SPREAD_S,
       attackCd: 0,
       boss: !!stats.boss,
       mini: !!stats.mini,
@@ -1734,19 +1913,45 @@
   }
 
   function findTarget(unit) {
-    const foes = state.battle.units.filter(
-      (o) =>
-        o.side !== unit.side &&
-        o.hp > 0 &&
-        Math.abs(o.y - unit.y) < LANE_TARGET_Y
+    const living = state.battle.units.filter(
+      (o) => o.side !== unit.side && o.hp > 0
     );
-    if (foes.length === 0) return null;
-    foes.sort((a, b) => {
-      const da = Math.abs(a.x - unit.x) + Math.abs(a.y - unit.y) * 0.35;
-      const db = Math.abs(b.x - unit.x) + Math.abs(b.y - unit.y) * 0.35;
+    if (living.length === 0) return null;
+
+    const laneFoes = living.filter(
+      (o) => Math.abs(o.y - unit.y) < LANE_TARGET_Y
+    );
+    const pool = laneFoes.length ? laneFoes : null;
+
+    if (pool) {
+      pool.sort((a, b) => {
+        const da = Math.abs(a.x - unit.x) + Math.abs(a.y - unit.y) * 0.35;
+        const db = Math.abs(b.x - unit.x) + Math.abs(b.y - unit.y) * 0.35;
+        return da - db;
+      });
+      return pool[0];
+    }
+
+    // Peel toward foes threatening the home keep in a wider Y band.
+    const homeEdge =
+      unit.side === "player" ? BASE_EDGE_PLAYER : BASE_EDGE_ENEMY;
+    const threats = living.filter((o) => {
+      if (Math.abs(o.y - unit.y) >= LANE_KEEP_PEEL_Y) return false;
+      return Math.abs(o.x - homeEdge) + 8 < Math.abs(unit.x - homeEdge);
+    });
+    if (threats.length === 0) return null;
+    threats.sort((a, b) => {
+      const da =
+        Math.abs(a.x - homeEdge) * 1.2 +
+        Math.abs(a.x - unit.x) +
+        Math.abs(a.y - unit.y) * 0.4;
+      const db =
+        Math.abs(b.x - homeEdge) * 1.2 +
+        Math.abs(b.x - unit.x) +
+        Math.abs(b.y - unit.y) * 0.4;
       return da - db;
     });
-    return foes[0];
+    return threats[0];
   }
 
   function enabledSpawnTypes() {
@@ -1844,10 +2049,11 @@
 
   function applyUnitHit(attacker, target) {
     if (!target || target.hp <= 0) return;
+    const counter = counterMult(attacker, target);
     const dmg = dealDamage(attacker, target);
     target.hp -= dmg;
     flashToken(target.id, "hit");
-    spawnFloater(target.x, target.y, dmg, target.hp <= 0);
+    spawnFloater(target.x, target.y, dmg, target.hp <= 0, counter >= COUNTER_STRONG);
     updateTokenEl(target);
     if (target.hp <= 0) {
       markDead(target);
@@ -1900,8 +2106,13 @@
       else unit.x = Math.max(unit.x - step, targetX + stopAt);
     }
     const home = unit.homeY != null ? unit.homeY : unit.y;
-    // Keep some lane identity so melees don't collapse into one file.
-    const desiredY = targetY * 0.5 + home * 0.5;
+    const homeEdge =
+      unit.side === "player" ? BASE_EDGE_PLAYER : BASE_EDGE_ENEMY;
+    const foeCloserToKeep =
+      Math.abs(targetX - homeEdge) < Math.abs(unit.x - homeEdge);
+    // Defend the breach: chase foe Y harder when they are nearer your keep.
+    const yBlend = foeCloserToKeep ? 0.85 : 0.5;
+    const desiredY = targetY * yBlend + home * (1 - yBlend);
     const dy = desiredY - unit.y;
     if (Math.abs(dy) > 1) {
       unit.y = clampFieldY(
@@ -1940,6 +2151,7 @@
     b.countdownMax = 0;
     b.enemySpawnAt = 0.6;
     b.training = null;
+    b.preferType = null;
     b.trainRetryAt = 0;
     syncCountdownBar();
     appendLog(
@@ -1985,11 +2197,34 @@
 
     for (const unit of living) {
       unit.attackCd = Math.max(0, unit.attackCd - dt);
-      const target = findTarget(unit);
       const dir = unit.side === "player" ? 1 : -1;
       const moveSpeed = unit.spd * UNIT_MOVE_MULT;
       const step = moveSpeed * dt;
       const engage = engageRange(unit);
+
+      if (unit.spreadT > 0) {
+        unit.spreadT = Math.max(0, unit.spreadT - dt);
+        unit.x += dir * step * 0.9;
+        if (unit.side === "player") {
+          unit.x = Math.min(unit.x, BASE_EDGE_ENEMY);
+        } else {
+          unit.x = Math.max(unit.x, BASE_EDGE_PLAYER);
+        }
+        const home = unit.homeY != null ? unit.homeY : unit.y;
+        const dy = home - unit.y;
+        if (Math.abs(dy) > 0.5) {
+          unit.y = clampFieldY(
+            unit.y + Math.sign(dy) * Math.min(9 * dt, Math.abs(dy))
+          );
+        }
+        const early = findTarget(unit);
+        if (early && Math.abs(early.x - unit.x) <= engage && unit.attackCd <= 0) {
+          strikeUnit(unit, early);
+        }
+        continue;
+      }
+
+      const target = findTarget(unit);
 
       if (target) {
         const dist = Math.abs(target.x - unit.x);
@@ -2010,11 +2245,12 @@
           unit.x += dir * step;
           if (unit.side === "player") unit.x = Math.min(unit.x, baseX);
           else unit.x = Math.max(unit.x, baseX);
+          // Light lane drift only — prioritize marching on the keep.
           const home = unit.homeY != null ? unit.homeY : unit.y;
           const dy = home - unit.y;
-          if (Math.abs(dy) > 0.8) {
+          if (Math.abs(dy) > 2.5) {
             unit.y = clampFieldY(
-              unit.y + Math.sign(dy) * Math.min(3.8 * dt, Math.abs(dy))
+              unit.y + Math.sign(dy) * Math.min(1.6 * dt, Math.abs(dy))
             );
           }
         }
@@ -2042,6 +2278,7 @@
       units: [],
       enemySpawnAt: 0.6,
       training: null,
+      preferType: null,
       trainRetryAt: 0,
       foodStarvedWarned: false,
       countdown: opening ? OPENING_COUNTDOWN_S : 0,
@@ -2100,7 +2337,7 @@
 
   function trainDuration() {
     const lv = state.upgradeLevels.barracks || 0;
-    return Math.max(0.45, BASE_TRAIN_TIME * Math.pow(0.88, lv));
+    return Math.max(MIN_TRAIN_TIME, BASE_TRAIN_TIME * Math.pow(0.88, lv));
   }
 
   function upkeepPerUnit() {
@@ -2460,6 +2697,13 @@
     const upkeep = foodUpkeepRate();
     const upkeepBit =
       playerCount > 0 ? ` · Upkeep ${format(upkeep)} f/s` : "";
+    const typesN = distinctPlayerTypes();
+    const mixBit =
+      typesN >= 3
+        ? " · Mixed army +10% dmg"
+        : typesN >= 2
+          ? " · Mixed army +5% dmg"
+          : "";
 
     if (state.waveTransitioning) {
       return `Wave resolving — next assault shortly${upkeepBit}`;
@@ -2472,7 +2716,7 @@
       return `Battle looping — train troops or enable Auto${upkeepBit}`;
     }
     if (playerCount >= FIELD_SOFT_CAP) {
-      return `Field at capacity (${FIELD_SOFT_CAP}) — wait for space${upkeepBit}`;
+      return `Field at capacity (${FIELD_SOFT_CAP}) — wait for space${upkeepBit}${mixBit}`;
     }
     const unlockable = UNIT_TYPES.filter(
       (t) => unitNeedsUnlock(t) && !isUnitUnlocked(t.id) && unitUnlockWaveReached(t)
@@ -2481,14 +2725,23 @@
       const u = unlockable[0];
       return `Unlock ${u.name} for ${format(u.unlockCost)} g (wave ${u.unlockWave}+)${upkeepBit}`;
     }
-    if (enabled.length === 0) {
-      return `Click a unit to train, or turn Auto on${upkeepBit}`;
-    }
+    const prefer =
+      state.battle && state.battle.preferType
+        ? unitType(state.battle.preferType)
+        : null;
     const training = state.battle && state.battle.training;
     if (training) {
       const type = unitType(training.typeId);
       const left = Math.max(0, training.duration - training.elapsed);
-      return `Training ${type ? type.name : "unit"}… ${left.toFixed(1)}s${upkeepBit}`;
+      const nextBit = prefer ? ` · Next ${prefer.name}` : "";
+      const autoBit = training.fromAuto ? " (Auto)" : "";
+      return `Training ${type ? type.name : "unit"}${autoBit}… ${left.toFixed(1)}s${nextBit}${upkeepBit}${mixBit}`;
+    }
+    if (prefer) {
+      return `Queued ${prefer.name} (manual)${upkeepBit}${mixBit}`;
+    }
+    if (enabled.length === 0) {
+      return `Click a unit to train (faster than Auto), or turn Auto on${upkeepBit}${mixBit}`;
     }
     const canAny = enabled.some(
       (t) => state.gold >= t.cost && state.food >= t.foodCost
@@ -2497,14 +2750,14 @@
       const needGold = enabled.every((t) => state.gold < t.cost);
       const needFood = enabled.every((t) => state.food < t.foodCost);
       if (needGold && needFood) {
-        return `Need more gold and food to spawn${upkeepBit}`;
+        return `Need more gold and food to spawn${upkeepBit}${mixBit}`;
       }
-      if (needGold) return `Need more gold to spawn${upkeepBit}`;
-      if (needFood) return `Need more food to spawn${upkeepBit}`;
-      return `Can't afford enabled units yet${upkeepBit}`;
+      if (needGold) return `Need more gold to spawn${upkeepBit}${mixBit}`;
+      if (needFood) return `Need more food to spawn${upkeepBit}${mixBit}`;
+      return `Can't afford enabled units yet${upkeepBit}${mixBit}`;
     }
     const names = enabled.map((t) => t.name).join(", ");
-    return `Auto: ${names} · Field ${playerCount}${upkeepBit}`;
+    return `Auto: ${names} · Field ${playerCount}${upkeepBit}${mixBit}`;
   }
 
   function renderSpawn() {
@@ -2609,6 +2862,8 @@
             metaEl.textContent = `${stats.maxHp} HP · ${stats.atk} ATK · ${stats.armor} ARM · ${trainDur}s`;
           }
           if (costEl) costEl.innerHTML = formatCost(type);
+          const blurbEl = card.querySelector(".item-blurb");
+          if (blurbEl) blurbEl.textContent = type.blurb || "";
         }
 
         const autoBtn = card.querySelector(".auto-toggle");
@@ -2703,6 +2958,9 @@
         `<span class="item-cost">${costHtml}</span>` +
         `</span>` +
         `<span class="item-meta">${metaLine}</span>` +
+        (unlocked && type.blurb
+          ? `<span class="item-blurb">${type.blurb}</span>`
+          : "") +
         (unlocked
           ? `<span class="spawn-bar${isTraining ? " active" : ""}" aria-hidden="true">` +
             `<span class="spawn-bar-fill" style="width:${pct}%"></span></span>`
