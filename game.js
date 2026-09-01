@@ -46,20 +46,42 @@
   const OPENING_COUNTDOWN_S = 8;
   /** Multiplier applied to unit.spd when marching (lower = slower field pace). */
   const UNIT_MOVE_MULT = 0.9;
+  /** Boss minion summon cadence (seconds). */
+  const BOSS_SUMMON_BASE = 4.5;
+  const BOSS_SUMMON_FLOOR = 3.2;
+  /** Keep spawn slowdown while a living boss is on the field. */
+  const BOSS_KEEP_SPAWN_MULT = 1.75;
+  /** Wave at which bosses summon two minions per pulse. */
+  const BOSS_SUMMON_DOUBLE_WAVE = 15;
   /** Base living player units before Granary. */
   const BASE_ARMY_CAPACITY = 10;
   /** Extra army slots per Granary level. */
   const GRANARY_CAPACITY_PER_LEVEL = 3;
   const SAVE_KEY = "clickstrike-save-v1";
-  const SAVE_VERSION = 3;
+  const SAVE_VERSION = 5;
   const SAVE_THROTTLE_MS = 2000;
+  /** Seconds before a fallen hero returns at the gate. */
+  const HERO_RESPAWN_S = 8;
+  /** Bonesinger bone minions capped on the field. */
+  const BONE_MINION_MAX = 3;
+  const BONE_MINION_KILL_CHANCE = 0.3;
   const MUSIC_VOLUME_KEY = "clickstrike-music-volume";
   const MUSIC_MUTED_KEY = "clickstrike-music-muted";
   const MUSIC_TRACKS = [
     "assets/audio/music/07-human-1.mp3",
     "assets/audio/music/13-arrival-at-kalimdor.mp3",
   ];
-  const FOOD_UPGRADE_IDS = { baskets: true, foragers: true };
+  const FOOD_UPGRADE_IDS = {
+    baskets: true,
+    foragers: true,
+    autoForager: true,
+  };
+  /** Clicks/sec added per Hired Miners / Gather Crew level. */
+  const AUTO_CLICK_CPS_PER_LEVEL = 0.1;
+  /** Max orbiting cursors rendered per resource button. */
+  const MAX_VISIBLE_CURSORS = 8;
+  /** Min seconds between auto-click floaters (pulse still fires). */
+  const AUTO_FLOATER_MIN_INTERVAL = 0.25;
   const MOBILE_MQ = "(max-width: 900px)";
   const MOBILE_PANE_KEY = "clickstrike-mobile-pane";
   /** Kill gold / scavenge soft cap window (ms). */
@@ -70,6 +92,7 @@
       id: "pickaxe",
       name: "Sharper Pick",
       desc: "+1 gold per click",
+      icon: "pick",
       baseCost: 15,
       growth: 1.55,
       apply(state) {
@@ -77,9 +100,19 @@
       },
     },
     {
+      id: "autoMiner",
+      name: "Hired Miners",
+      desc: "+0.1 gold clicks / sec",
+      icon: "miner",
+      baseCost: 25,
+      growth: 1.5,
+      apply() {},
+    },
+    {
       id: "traders",
       name: "Trade Routes",
       desc: "+0.5 gold / sec",
+      icon: "routes",
       baseCost: 40,
       growth: 1.65,
       apply(state) {
@@ -90,6 +123,7 @@
       id: "baskets",
       name: "Gather Baskets",
       desc: "+0.5 food per click",
+      icon: "basket",
       baseCost: 12,
       growth: 1.5,
       food: true,
@@ -98,9 +132,20 @@
       },
     },
     {
+      id: "autoForager",
+      name: "Gather Crew",
+      desc: "+0.1 food clicks / sec",
+      icon: "gather",
+      baseCost: 22,
+      growth: 1.5,
+      food: true,
+      apply() {},
+    },
+    {
       id: "foragers",
       name: "Foraging Camp",
       desc: "+0.8 food / sec",
+      icon: "camp",
       baseCost: 35,
       growth: 1.6,
       food: true,
@@ -112,6 +157,7 @@
       id: "smithy",
       name: "Village Smithy",
       desc: "+2 gold click, +0.25 g/s",
+      icon: "anvil",
       baseCost: 120,
       growth: 1.8,
       apply(state) {
@@ -123,6 +169,7 @@
       id: "granary",
       name: "Granary",
       desc: "+3 army capacity / level",
+      icon: "grain",
       baseCost: 55,
       growth: 1.7,
       apply() {},
@@ -131,6 +178,7 @@
       id: "plunder",
       name: "Plunder Maps",
       desc: "+15% kill gold / level",
+      icon: "map",
       baseCost: 65,
       growth: 1.65,
       apply() {},
@@ -139,6 +187,7 @@
       id: "caravan",
       name: "Caravan Guard",
       desc: "+12% win gold / level",
+      icon: "cart",
       baseCost: 70,
       growth: 1.7,
       apply() {},
@@ -147,6 +196,7 @@
       id: "weapons",
       name: "Forged Tips",
       desc: "+15% unit ATK",
+      icon: "spear",
       baseCost: 50,
       growth: 1.65,
       combat: true,
@@ -156,6 +206,7 @@
       id: "armor",
       name: "Iron Plating",
       desc: "+1 unit armor",
+      icon: "shield",
       baseCost: 60,
       growth: 1.7,
       combat: true,
@@ -165,6 +216,7 @@
       id: "vitality",
       name: "Field Rations",
       desc: "+12% unit max HP",
+      icon: "heart",
       baseCost: 55,
       growth: 1.65,
       combat: true,
@@ -174,8 +226,39 @@
       id: "barracks",
       name: "Drill Yard",
       desc: "−12% recruit time",
+      icon: "drill",
       baseCost: 45,
       growth: 1.6,
+      combat: true,
+      apply() {},
+    },
+    {
+      id: "drums",
+      name: "War Drums",
+      desc: "+6% unit attack speed",
+      icon: "drums",
+      baseCost: 75,
+      growth: 1.7,
+      combat: true,
+      apply() {},
+    },
+    {
+      id: "medicine",
+      name: "Field Medicine",
+      desc: "+20% healer potency",
+      icon: "salve",
+      baseCost: 60,
+      growth: 1.65,
+      combat: true,
+      apply() {},
+    },
+    {
+      id: "siege",
+      name: "Siege Works",
+      desc: "+15% keep damage",
+      icon: "ram",
+      baseCost: 80,
+      growth: 1.75,
       combat: true,
       apply() {},
     },
@@ -246,11 +329,30 @@
       range: 6,
       atkStyle: "melee",
       tags: ["cavalry"],
-      strongVs: ["ranged", "magic"],
+      strongVs: ["ranged", "magic", "support"],
       weakVs: ["infantry"],
-      blurb: "Beats ranged & magic · Soft vs spears",
+      blurb: "Beats ranged, magic & support · Soft vs spears",
       unlockWave: 3,
       unlockCost: 80,
+    },
+    {
+      id: "healer",
+      name: "Healer",
+      cost: 60,
+      foodCost: 55,
+      hp: 18,
+      atk: 6,
+      spd: 3.0,
+      armor: 0,
+      atkCd: 0.9,
+      range: 24,
+      atkStyle: "heal",
+      tags: ["support"],
+      strongVs: [],
+      weakVs: ["cavalry"],
+      blurb: "Mends allies · Soft vs cavalry",
+      unlockWave: 4,
+      unlockCost: 100,
     },
     {
       id: "mage",
@@ -291,6 +393,75 @@
       unlockCost: 120,
     },
   ];
+
+  const HEROES = [
+    {
+      id: "bulwark",
+      name: "Bulwark",
+      role: "Fat tank",
+      blurb: "Holds the line so your archers and mages can shred.",
+      synergy: "+20% damage for ranged & magic allies",
+      hp: 160,
+      atk: 10,
+      spd: 2.2,
+      armor: 6,
+      atkCd: 0.85,
+      range: 6,
+      atkStyle: "melee",
+      tags: ["infantry", "armored"],
+      strongVs: ["ranged"],
+      weakVs: ["magic"],
+    },
+    {
+      id: "bonesinger",
+      name: "Bonesinger",
+      role: "Necro ranged",
+      blurb: "Rains death while melee packs trade and rise again.",
+      synergy: "+15% melee ally damage · kills may raise bones",
+      hp: 55,
+      atk: 16,
+      spd: 3.4,
+      armor: 1,
+      atkCd: 0.7,
+      range: 30,
+      atkStyle: "magic",
+      tags: ["magic"],
+      strongVs: ["armored"],
+      weakVs: ["cavalry"],
+    },
+    {
+      id: "raidcaptain",
+      name: "Raid Captain",
+      role: "Cavalry commander",
+      blurb: "Drives a fast push — riders carve the backline.",
+      synergy: "+12% ally move speed · +20% cavalry damage",
+      hp: 85,
+      atk: 14,
+      spd: 5.8,
+      armor: 2,
+      atkCd: 0.5,
+      range: 6,
+      atkStyle: "melee",
+      tags: ["cavalry"],
+      strongVs: ["ranged", "magic"],
+      weakVs: ["infantry"],
+    },
+  ];
+
+  const BONE_MINION = {
+    id: "boneminion",
+    name: "Bone Minion",
+    hp: 16,
+    atk: 5,
+    spd: 3.6,
+    armor: 0,
+    atkCd: 0.5,
+    range: 6,
+    atkStyle: "melee",
+    tags: ["infantry"],
+    strongVs: [],
+    weakVs: ["ranged"],
+  };
 
   // Shared SVG portraits (field tokens + recruit cards)
   const UNIT_ART = {
@@ -357,6 +528,16 @@
       `<path class="u-accent" d="M17 36v14M12 43h10"/>` +
       `<rect class="u-metal" x="42" y="32" width="5" height="22" rx="1"/>` +
       `<path class="u-point" d="M44.5 28l2.5-4 2.5 4z"/>` +
+      `</svg>`,
+    healer:
+      `<svg class="unit-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
+      `<path class="u-hood" d="M18 28c2-14 10-20 14-20s12 6 14 20l-4 6H22z"/>` +
+      `<circle class="u-skin" cx="32" cy="26" r="7"/>` +
+      `<path class="u-body" d="M22 34h20l3 22H19z"/>` +
+      `<path class="u-accent" d="M28 40h8v16h-8z"/>` +
+      `<circle class="u-gem" cx="32" cy="48" r="3"/>` +
+      `<rect class="u-metal" x="44" y="18" width="3" height="30" rx="1"/>` +
+      `<path class="u-point" d="M41 16h9v3h-3v6h-3v-6h-3z"/>` +
       `</svg>`,
     foe:
       `<svg class="unit-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
@@ -433,6 +614,48 @@
       `<path class="u-accent" d="M26 46h12v4H26z"/>` +
       `<path class="u-metal" d="M22 52h20v4H22z"/>` +
       `</svg>`,
+    bulwark:
+      `<svg class="unit-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
+      `<path class="u-crest" d="M28 2l4-2 4 2v10h-8z"/>` +
+      `<path class="u-helm" d="M14 22c0-12 8-18 18-18s18 6 18 18v8H14z"/>` +
+      `<path class="u-visor" d="M20 26h24v5H20z"/>` +
+      `<circle class="u-skin" cx="32" cy="20" r="5"/>` +
+      `<path class="u-body" d="M14 36h36l3 22H11z"/>` +
+      `<path class="u-shield" d="M6 28h20v28c0 5-5 10-10 10s-10-5-10-10z"/>` +
+      `<path class="u-accent" d="M16 36v16M11 44h10"/>` +
+      `<rect class="u-metal" x="44" y="34" width="6" height="22" rx="1"/>` +
+      `</svg>`,
+    bonesinger:
+      `<svg class="unit-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
+      `<path class="u-hood" d="M16 28c2-18 10-26 16-26s14 8 16 26l-5 8H21z"/>` +
+      `<circle class="u-skin" cx="32" cy="26" r="7"/>` +
+      `<path class="u-eye" d="M27 25h3v2h-3zm7 0h3v2h-3z"/>` +
+      `<path class="u-body" d="M20 36h24l5 22H15z"/>` +
+      `<circle class="u-gem" cx="32" cy="48" r="4"/>` +
+      `<rect class="u-metal" x="46" y="16" width="3" height="32" rx="1"/>` +
+      `<circle class="u-point" cx="47.5" cy="14" r="5"/>` +
+      `<path class="u-accent" d="M26 40h12v3H26z"/>` +
+      `</svg>`,
+    raidcaptain:
+      `<svg class="unit-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
+      `<ellipse class="u-body" cx="34" cy="42" rx="20" ry="11"/>` +
+      `<path class="u-metal" d="M14 40c2-7 7-12 12-12 2 4 2 11 0 15z"/>` +
+      `<circle class="u-skin" cx="28" cy="16" r="7"/>` +
+      `<path class="u-helm" d="M18 16c0-9 5-13 10-13s10 4 10 13v4H18z"/>` +
+      `<path class="u-visor" d="M22 17h12v2H22z"/>` +
+      `<path class="u-crest" d="M26 2l4-2 4 2v8h-8z"/>` +
+      `<path class="u-accent" d="M22 26h14l2 10H20z"/>` +
+      `<path class="u-point" d="M44 18l16 8-16 3z"/>` +
+      `</svg>`,
+    boneminion:
+      `<svg class="unit-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
+      `<circle class="u-skin" cx="32" cy="22" r="10"/>` +
+      `<path class="u-eye" d="M26 20h4v3h-4zm8 0h4v3h-4z"/>` +
+      `<path class="u-body" d="M22 34h20l3 22H19z"/>` +
+      `<path class="u-metal" d="M28 14h8v3h-8z"/>` +
+      `<path class="u-claw" d="M18 48l-6 8h6zm28 0l6 8h-6z"/>` +
+      `<path class="u-accent" d="M28 42h8v3h-8z"/>` +
+      `</svg>`,
   };
 
   function unitArt(typeId, opts) {
@@ -470,7 +693,7 @@
       range: 6,
       atkStyle: "melee",
       tags: ["cavalry"],
-      strongVs: ["ranged", "magic"],
+      strongVs: ["ranged", "magic", "support"],
       weakVs: ["infantry"],
       art: "foe-raider",
     },
@@ -530,7 +753,7 @@
       range: 6,
       atkStyle: "melee",
       tags: ["cavalry"],
-      strongVs: ["ranged", "magic"],
+      strongVs: ["ranged", "magic", "support"],
       weakVs: ["infantry"],
       art: "foe-hound",
     },
@@ -784,6 +1007,10 @@
     foodClickPower: document.getElementById("food-click-power-display"),
     clickBtn: document.getElementById("click-btn"),
     foodClickBtn: document.getElementById("food-click-btn"),
+    goldCursors: document.getElementById("gold-cursors"),
+    foodCursors: document.getElementById("food-cursors"),
+    goldAutoToggle: document.getElementById("gold-auto-toggle"),
+    foodAutoToggle: document.getElementById("food-auto-toggle"),
     upgradeList: document.getElementById("upgrade-list"),
     warChestList: document.getElementById("war-chest-list"),
     upgradeCatTabs: document.querySelectorAll(".upgrade-cat-tab"),
@@ -827,6 +1054,10 @@
     panelResource: document.getElementById("panel-resource"),
     hud: document.getElementById("hud"),
     topbar: document.getElementById("topbar"),
+    heroPick: document.getElementById("hero-pick"),
+    heroPickGrid: document.getElementById("hero-pick-grid"),
+    heroChip: document.getElementById("hero-chip"),
+    heroChipName: document.getElementById("hero-chip-name"),
   };
 
   const state = {
@@ -843,15 +1074,21 @@
     laneCursor: 0,
     spawnCursor: 0,
     autoSpawn: defaultAutoSpawnDraft(),
+    autoClick: defaultAutoClickDraft(),
     unlockedUnits: {},
     waveTransitioning: false,
     upgradeCategory: "economy",
+    heroId: null,
   };
 
   function defaultUpgradeLevelsDraft() {
     const levels = {};
     for (const def of UPGRADES) levels[def.id] = 0;
     return levels;
+  }
+
+  function defaultAutoClickDraft() {
+    return { gold: true, food: true };
   }
 
   function defaultAutoSpawnDraft() {
@@ -862,6 +1099,10 @@
 
   function defaultAutoSpawn() {
     return defaultAutoSpawnDraft();
+  }
+
+  function defaultAutoClick() {
+    return defaultAutoClickDraft();
   }
 
   function defaultUnlockedUnits() {
@@ -881,6 +1122,14 @@
     return typeof n === "number" && Number.isFinite(n) && n >= 0;
   }
 
+  function heroDef(id) {
+    return HEROES.find((h) => h.id === id) || null;
+  }
+
+  function isValidHeroId(id) {
+    return typeof id === "string" && !!heroDef(id);
+  }
+
   function serializeSave() {
     return {
       v: SAVE_VERSION,
@@ -894,7 +1143,9 @@
       wave: state.wave,
       nextUnitId: state.nextUnitId,
       autoSpawn: { ...state.autoSpawn },
+      autoClick: { ...state.autoClick },
       unlockedUnits: { ...state.unlockedUnits },
+      heroId: state.heroId,
     };
   }
 
@@ -923,7 +1174,7 @@
     } catch (_) {
       return false;
     }
-    // Accept v1–v3 saves (migrate forward).
+    // Accept v1–v5 saves (migrate forward).
     if (!data || data.v < 1 || data.v > SAVE_VERSION) return false;
     if (
       !isNonNegNum(data.gold) ||
@@ -952,6 +1203,15 @@
         }
       }
     }
+    const autoClick = defaultAutoClick();
+    if (data.autoClick && typeof data.autoClick === "object") {
+      if (typeof data.autoClick.gold === "boolean") {
+        autoClick.gold = data.autoClick.gold;
+      }
+      if (typeof data.autoClick.food === "boolean") {
+        autoClick.food = data.autoClick.food;
+      }
+    }
     const unlocked = defaultUnlockedUnits();
     if (data.unlockedUnits && typeof data.unlockedUnits === "object") {
       for (const type of UNIT_TYPES) {
@@ -970,7 +1230,9 @@
     state.wave = Math.max(1, Math.floor(data.wave));
     state.nextUnitId = Math.max(1, Math.floor(data.nextUnitId));
     state.autoSpawn = auto;
+    state.autoClick = autoClick;
     state.unlockedUnits = unlocked;
+    state.heroId = isValidHeroId(data.heroId) ? data.heroId : null;
     state.battle = null;
     state.waveTransitioning = false;
     return true;
@@ -1002,8 +1264,10 @@
     state.laneCursor = 0;
     state.spawnCursor = 0;
     state.autoSpawn = defaultAutoSpawn();
+    state.autoClick = defaultAutoClick();
     state.unlockedUnits = defaultUnlockedUnits();
     state.waveTransitioning = false;
+    state.heroId = null;
     el.fieldUnits.innerHTML = "";
   }
 
@@ -1019,7 +1283,78 @@
     resetMetaState();
     lastRecruitSig = "";
     lastRecruitStructureSig = "";
-    appendLog("log-muted", "New game — wave 1 assault begins.");
+    appendLog("log-muted", "New game — choose your hero.");
+    renderHud();
+    beginRun();
+  }
+
+  function beginRun() {
+    if (!state.heroId) {
+      showHeroPick();
+      return;
+    }
+    hideHeroPick();
+    startBattle();
+  }
+
+  function syncHeroChip() {
+    const def = heroDef(state.heroId);
+    if (el.heroChip) {
+      el.heroChip.hidden = !def;
+      el.heroChip.setAttribute("aria-hidden", def ? "false" : "true");
+    }
+    if (el.heroChipName) {
+      el.heroChipName.textContent = def ? def.name : "";
+    }
+  }
+
+  function showHeroPick() {
+    if (!el.heroPick || !el.heroPickGrid) return;
+    el.heroPickGrid.innerHTML = "";
+    for (const hero of HEROES) {
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "hero-pick-card";
+      card.dataset.heroId = hero.id;
+      card.setAttribute("aria-label", `Choose ${hero.name}`);
+      card.innerHTML =
+        `<div class="hero-pick-portrait unit-sil type-${hero.id}" aria-hidden="true">` +
+        unitArt(hero.id) +
+        `</div>` +
+        `<div class="hero-pick-body">` +
+        `<span class="hero-pick-name">${hero.name}</span>` +
+        `<span class="hero-pick-role">${hero.role}</span>` +
+        `<span class="hero-pick-blurb">${hero.blurb}</span>` +
+        `<span class="hero-pick-synergy">${hero.synergy}</span>` +
+        `</div>` +
+        `<span class="hero-pick-choose">Choose</span>`;
+      card.addEventListener("click", () => selectHero(hero.id));
+      el.heroPickGrid.appendChild(card);
+    }
+    el.heroPick.hidden = false;
+    el.heroPick.setAttribute("aria-hidden", "false");
+    document.body.classList.add("hero-pick-open");
+    syncHeroChip();
+  }
+
+  function hideHeroPick() {
+    if (!el.heroPick) return;
+    el.heroPick.hidden = true;
+    el.heroPick.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("hero-pick-open");
+  }
+
+  function selectHero(id) {
+    if (!isValidHeroId(id)) return;
+    state.heroId = id;
+    saveGame(true);
+    hideHeroPick();
+    const def = heroDef(id);
+    appendLog(
+      "log-muted",
+      `${def.name} takes the field — ${def.synergy}.`
+    );
+    syncHeroChip();
     startBattle();
     renderHud();
   }
@@ -1050,6 +1385,22 @@
 
   function upgradeCost(def) {
     return Math.floor(def.baseCost * Math.pow(def.growth, state.upgradeLevels[def.id]));
+  }
+
+  function goldAutoCps() {
+    return (state.upgradeLevels.autoMiner || 0) * AUTO_CLICK_CPS_PER_LEVEL;
+  }
+
+  function foodAutoCps() {
+    return (state.upgradeLevels.autoForager || 0) * AUTO_CLICK_CPS_PER_LEVEL;
+  }
+
+  function goldAutoActive() {
+    return state.autoClick.gold && goldAutoCps() > 0;
+  }
+
+  function foodAutoActive() {
+    return state.autoClick.food && foodAutoCps() > 0;
   }
 
   function unitType(id) {
@@ -1141,6 +1492,24 @@
     return Math.max(1.2, 2.8 - wave * 0.08);
   }
 
+  function bossSummonInterval(wave) {
+    return Math.max(BOSS_SUMMON_FLOOR, BOSS_SUMMON_BASE - wave * 0.04);
+  }
+
+  function livingBosses() {
+    if (!state.battle) return [];
+    return state.battle.units.filter((u) => u.boss && u.hp > 0);
+  }
+
+  function hasLivingBoss() {
+    return livingBosses().length > 0;
+  }
+
+  function keepSpawnInterval(wave) {
+    const base = enemySpawnInterval(wave);
+    return hasLivingBoss() ? base * BOSS_KEEP_SPAWN_MULT : base;
+  }
+
   function enemyBaseStats(wave) {
     // Shared wave curve; archetypes multiply on top.
     return {
@@ -1190,7 +1559,7 @@
     let atkCd = Math.max(0.28, base.atkCd * (arch.atkCd || 1));
 
     if (rank === "boss") {
-      hp = Math.floor(hp * 1.25);
+      hp = Math.floor(hp * 1.7);
       atk = Math.floor(atk * 1.15);
       armor += 1;
       atkCd += 0.05;
@@ -1223,12 +1592,13 @@
     const w = state.upgradeLevels.weapons || 0;
     const a = state.upgradeLevels.armor || 0;
     const v = state.upgradeLevels.vitality || 0;
+    const drums = state.upgradeLevels.drums || 0;
     return {
       maxHp: Math.max(1, Math.round(type.hp * (1 + 0.12 * v))),
       atk: Math.max(1, Math.round(type.atk * (1 + 0.15 * w))),
       armor: type.armor + a,
       spd: type.spd,
-      atkCd: type.atkCd,
+      atkCd: Math.max(0.25, type.atkCd * Math.pow(0.94, drums)),
       range: type.range || MELEE_RANGE,
       atkStyle: type.atkStyle || "melee",
       tags: type.tags ? type.tags.slice() : ["infantry"],
@@ -1258,6 +1628,7 @@
     let n = 0;
     for (const u of state.battle.units) {
       if (u.side !== "player" || u.hp <= 0 || !u.typeId) continue;
+      if (u.hero || u.minion) continue;
       if (seen[u.typeId]) continue;
       seen[u.typeId] = true;
       n += 1;
@@ -1272,10 +1643,39 @@
     return 1;
   }
 
+  function livingHeroUnit() {
+    if (!state.battle) return null;
+    for (const u of state.battle.units) {
+      if (u.side === "player" && u.hero && u.hp > 0) return u;
+    }
+    return null;
+  }
+
+  function heroAuraDamageMult(attacker) {
+    if (!attacker || attacker.side !== "player" || attacker.hero || attacker.minion) {
+      return 1;
+    }
+    if (!livingHeroUnit()) return 1;
+    const id = state.heroId;
+    if (id === "bulwark") {
+      const tags = attacker.tags || [];
+      if (tags.indexOf("ranged") !== -1 || tags.indexOf("magic") !== -1) {
+        return 1.2;
+      }
+    } else if (id === "bonesinger") {
+      if (!isRangedStyle(attacker.atkStyle)) return 1.15;
+    } else if (id === "raidcaptain") {
+      const tags = attacker.tags || [];
+      if (tags.indexOf("cavalry") !== -1) return 1.2;
+    }
+    return 1;
+  }
+
   function dealDamage(attacker, defender) {
     let mult = counterMult(attacker, defender);
     if (attacker && attacker.side === "player") {
       mult *= compositionDamageBonus();
+      mult *= heroAuraDamageMult(attacker);
     }
     return Math.max(1, Math.round(attacker.atk * mult) - (defender.armor || 0));
   }
@@ -1327,6 +1727,20 @@
   function countSide(side) {
     if (!state.battle) return 0;
     return state.battle.units.filter((u) => u.side === side && u.hp > 0).length;
+  }
+
+  function countArmyUnits() {
+    if (!state.battle) return 0;
+    return state.battle.units.filter(
+      (u) => u.side === "player" && u.hp > 0 && !u.hero && !u.minion
+    ).length;
+  }
+
+  function countBoneMinions() {
+    if (!state.battle) return 0;
+    return state.battle.units.filter(
+      (u) => u.side === "player" && u.minion && u.hp > 0
+    ).length;
   }
 
   function clampFieldY(y) {
@@ -1493,6 +1907,8 @@
       u.side === "enemy" ? "enemy" : "player",
       u.boss ? "boss" : "",
       u.mini ? "elite" : "",
+      u.hero ? "hero" : "",
+      u.minion ? "minion" : "",
       "spawning",
     ]
       .filter(Boolean)
@@ -1580,6 +1996,16 @@
     setTimeout(() => d.remove(), 700);
   }
 
+  function spawnHealFloater(x, y, amount) {
+    const d = document.createElement("div");
+    d.className = "dmg-floater heal-gain";
+    d.style.setProperty("--x", x + "%");
+    d.style.setProperty("--y", y + "%");
+    d.textContent = "+" + amount;
+    el.fieldUnits.appendChild(d);
+    setTimeout(() => d.remove(), 700);
+  }
+
   function spawnFoodFloater(x, y, amount) {
     const d = document.createElement("div");
     d.className = "dmg-floater food-gain";
@@ -1654,7 +2080,13 @@
 
   function markDead(u) {
     u.hp = 0;
-    u.removeAt = Date.now() + 400;
+    if (u.hero) {
+      u.respawnAt = Date.now() + HERO_RESPAWN_S * 1000;
+      u.removeAt = Date.now() + 400;
+    } else {
+      u.removeAt = Date.now() + 400;
+      u.respawnAt = 0;
+    }
     const node = getTokenEl(u.id);
     if (node) {
       node.classList.add("downed", "falling");
@@ -1691,7 +2123,7 @@
     if (!inBattle()) return false;
     const type = unitType(typeId);
     if (!type) return false;
-    if (countSide("player") >= armyCapacity()) return false;
+    if (countArmyUnits() >= armyCapacity()) return false;
 
     const stats = playerUnitStats(type);
     const homeY = pickSpawnY("player");
@@ -1717,10 +2149,137 @@
       spreadT: SPAWN_SPREAD_S,
       attackCd: 0,
       boss: false,
+      hero: false,
+      minion: false,
     };
     state.battle.units.push(unit);
     mountToken(unit);
     return true;
+  }
+
+  function createHeroUnit(heroId) {
+    if (!inBattle()) return null;
+    const def = heroDef(heroId || state.heroId);
+    if (!def) return null;
+    const stats = playerUnitStats(def);
+    const homeY = pickSpawnY("player");
+    const unit = {
+      id: "h" + state.nextUnitId++,
+      side: "player",
+      typeId: def.id,
+      name: def.name,
+      hp: stats.maxHp,
+      maxHp: stats.maxHp,
+      atk: stats.atk,
+      armor: stats.armor,
+      spd: stats.spd,
+      atkCdMax: stats.atkCd,
+      range: stats.range,
+      atkStyle: stats.atkStyle,
+      tags: stats.tags,
+      strongVs: stats.strongVs,
+      weakVs: stats.weakVs,
+      x: spawnXFor("player"),
+      y: gateExitY(homeY),
+      homeY,
+      spreadT: SPAWN_SPREAD_S,
+      attackCd: 0,
+      boss: false,
+      hero: true,
+      minion: false,
+      respawnAt: 0,
+    };
+    state.battle.units.push(unit);
+    mountToken(unit);
+    return unit;
+  }
+
+  function ensureHero() {
+    if (!inBattle() || !state.heroId) return;
+    const b = state.battle;
+    const existing = b.units.find((u) => u.hero);
+    if (existing) {
+      if (existing.hp > 0) return;
+      if (existing.respawnAt && Date.now() < existing.respawnAt) return;
+      reviveHero(existing);
+      return;
+    }
+    createHeroUnit(state.heroId);
+  }
+
+  function reviveHero(unit) {
+    if (!unit || !unit.hero || !inBattle()) return;
+    const def = heroDef(unit.typeId) || heroDef(state.heroId);
+    if (!def) return;
+    const stats = playerUnitStats(def);
+    const homeY = pickSpawnY("player");
+    unit.hp = stats.maxHp;
+    unit.maxHp = stats.maxHp;
+    unit.atk = stats.atk;
+    unit.armor = stats.armor;
+    unit.spd = stats.spd;
+    unit.atkCdMax = stats.atkCd;
+    unit.range = stats.range;
+    unit.x = spawnXFor("player");
+    unit.y = gateExitY(homeY);
+    unit.homeY = homeY;
+    unit.spreadT = SPAWN_SPREAD_S;
+    unit.attackCd = 0;
+    unit.removeAt = 0;
+    unit.respawnAt = 0;
+    const node = getTokenEl(unit.id);
+    if (node) {
+      node.classList.remove("downed", "falling");
+      updateTokenEl(unit, node);
+    } else {
+      mountToken(unit);
+    }
+    appendLog("log-muted", `${unit.name} returns to the gate!`);
+  }
+
+  function createBoneMinion() {
+    if (!inBattle()) return false;
+    if (countBoneMinions() >= BONE_MINION_MAX) return false;
+    const type = BONE_MINION;
+    const stats = playerUnitStats(type);
+    const homeY = pickSpawnY("player");
+    const unit = {
+      id: "m" + state.nextUnitId++,
+      side: "player",
+      typeId: type.id,
+      name: type.name,
+      hp: stats.maxHp,
+      maxHp: stats.maxHp,
+      atk: stats.atk,
+      armor: stats.armor,
+      spd: stats.spd,
+      atkCdMax: stats.atkCd,
+      range: stats.range,
+      atkStyle: stats.atkStyle,
+      tags: stats.tags,
+      strongVs: stats.strongVs,
+      weakVs: stats.weakVs,
+      x: spawnXFor("player"),
+      y: gateExitY(homeY),
+      homeY,
+      spreadT: SPAWN_SPREAD_S * 0.6,
+      attackCd: 0,
+      boss: false,
+      hero: false,
+      minion: true,
+    };
+    state.battle.units.push(unit);
+    mountToken(unit);
+    return true;
+  }
+
+  function tryBonesingerRaise(attacker) {
+    if (!attacker || !attacker.hero) return;
+    if (state.heroId !== "bonesinger") return;
+    if (Math.random() >= BONE_MINION_KILL_CHANCE) return;
+    if (createBoneMinion()) {
+      appendLog("log-muted", `${attacker.name} raises a bone minion!`);
+    }
   }
 
   function refundTraining() {
@@ -1742,7 +2301,7 @@
     const type = unitType(typeId);
     if (!type) return false;
     if (state.gold < type.cost || state.food < type.foodCost) return false;
-    if (countSide("player") >= armyCapacity()) return false;
+    if (countArmyUnits() >= armyCapacity()) return false;
 
     state.gold -= type.cost;
     state.food -= type.foodCost;
@@ -1780,7 +2339,7 @@
     }
     if (state.gold < type.cost) return "Need more gold";
     if (state.food < type.foodCost) return "Need more food";
-    if (countSide("player") >= armyCapacity()) return "Army at capacity";
+    if (countArmyUnits() >= armyCapacity()) return "Army at capacity";
     return "Can't train right now";
   }
 
@@ -1806,7 +2365,7 @@
       isUnitUnlocked(typeId) &&
       inBattle() &&
       !inCountdown() &&
-      countSide("player") < armyCapacity()
+      countArmyUnits() < armyCapacity()
     ) {
       const type = unitType(typeId);
       if (
@@ -1842,7 +2401,7 @@
   function tryStartNextTraining() {
     const b = state.battle;
     if (!b || b.training) return false;
-    if (countSide("player") >= armyCapacity()) return false;
+    if (countArmyUnits() >= armyCapacity()) return false;
 
     if (b.preferType) {
       const prefer = b.preferType;
@@ -1908,6 +2467,61 @@
     }
   }
 
+  /**
+   * @param {{ typeId: string, rank?: "normal"|"mini"|"boss", x: number, y: number, homeY: number, name?: string, spreadT?: number }} opts
+   */
+  function createEnemyUnit(opts) {
+    if (!inBattle()) return null;
+    if (countSide("enemy") >= FIELD_SOFT_CAP) return null;
+
+    const b = state.battle;
+    const rank = opts.rank || "normal";
+    const stats = enemyArchetypeStats(state.wave, opts.typeId, rank);
+    const name =
+      opts.name ||
+      (rank === "boss" || rank === "mini"
+        ? waveMeta(state.wave).name
+        : stats.label);
+
+    const unit = {
+      id: "e" + state.nextUnitId++,
+      side: "enemy",
+      typeId: stats.typeId,
+      art: stats.art,
+      name,
+      hp: stats.hp,
+      maxHp: stats.hp,
+      atk: stats.atk,
+      armor: stats.armor,
+      spd: stats.spd,
+      atkCdMax: stats.atkCd,
+      range: stats.range,
+      atkStyle: stats.atkStyle,
+      tags: stats.tags,
+      strongVs: stats.strongVs,
+      weakVs: stats.weakVs,
+      x: opts.x,
+      y: opts.y,
+      homeY: opts.homeY,
+      spreadT: opts.spreadT != null ? opts.spreadT : SPAWN_SPREAD_S,
+      attackCd: 0,
+      boss: !!stats.boss,
+      mini: !!stats.mini,
+    };
+
+    if (rank === "boss") {
+      const cd = bossSummonInterval(state.wave);
+      unit.summonCdMax = cd;
+      // First pulse after a short beat so the boss reads on the field first.
+      unit.summonCd = Math.min(cd, 1.8);
+    }
+
+    b.enemySpawned = (b.enemySpawned || 0) + 1;
+    b.units.push(unit);
+    mountToken(unit);
+    return unit;
+  }
+
   function spawnEnemyUnit() {
     if (!inBattle()) return;
     if (countSide("enemy") >= FIELD_SOFT_CAP) return;
@@ -1926,42 +2540,63 @@
       typeId = pickWeightedEnemyType(meta.mix);
     }
 
-    const stats = enemyArchetypeStats(state.wave, typeId, rank);
-    let name;
-    if (rank === "boss" || rank === "mini") {
-      name = meta.name;
-    } else {
-      name = stats.label;
-    }
     const homeY = pickSpawnY("enemy");
-    const unit = {
-      id: "e" + state.nextUnitId++,
-      side: "enemy",
-      typeId: stats.typeId,
-      art: stats.art,
-      name,
-      hp: stats.hp,
-      maxHp: stats.hp,
-      atk: stats.atk,
-      armor: stats.armor,
-      spd: stats.spd,
-      atkCdMax: stats.atkCd,
-      range: stats.range,
-      atkStyle: stats.atkStyle,
-      tags: stats.tags,
-      strongVs: stats.strongVs,
-      weakVs: stats.weakVs,
+    createEnemyUnit({
+      typeId,
+      rank,
+      name: rank === "boss" || rank === "mini" ? meta.name : undefined,
       x: spawnXFor("enemy"),
       y: gateExitY(homeY),
       homeY,
-      spreadT: SPAWN_SPREAD_S,
-      attackCd: 0,
-      boss: !!stats.boss,
-      mini: !!stats.mini,
-    };
-    b.enemySpawned = (b.enemySpawned || 0) + 1;
-    b.units.push(unit);
-    mountToken(unit);
+    });
+  }
+
+  function spawnBossMinion(boss) {
+    if (!inBattle() || !boss || boss.hp <= 0) return null;
+    if (countSide("enemy") >= FIELD_SOFT_CAP) return null;
+
+    const meta = waveMeta(state.wave);
+    const typeId = pickWeightedEnemyType(meta.mix);
+    const homeY = clampFieldY(boss.y + (Math.random() * 2 - 1) * 8);
+    const x = Math.max(
+      BASE_EDGE_PLAYER + 4,
+      Math.min(BASE_EDGE_ENEMY - 2, boss.x - (4 + Math.random() * 5))
+    );
+    const y = clampFieldY(boss.y + (Math.random() * 2 - 1) * 6);
+
+    return createEnemyUnit({
+      typeId,
+      rank: "normal",
+      x,
+      y,
+      homeY,
+      spreadT: 0.2,
+    });
+  }
+
+  function tickBossSummons(dt) {
+    const b = state.battle;
+    if (!b || !b.active) return;
+
+    const bosses = livingBosses();
+    for (const boss of bosses) {
+      if (boss.summonCd == null) continue;
+      boss.summonCd = Math.max(0, boss.summonCd - dt);
+      if (boss.summonCd > 0) continue;
+
+      const count = state.wave >= BOSS_SUMMON_DOUBLE_WAVE ? 2 : 1;
+      let spawned = 0;
+      for (let i = 0; i < count; i++) {
+        if (spawnBossMinion(boss)) spawned++;
+      }
+
+      boss.summonCd = boss.summonCdMax || bossSummonInterval(state.wave);
+
+      if (spawned > 0 && !b.bossSummonLogged) {
+        b.bossSummonLogged = true;
+        appendLog("log-muted", `${boss.name} summons minions!`);
+      }
+    }
   }
 
   function findTarget(unit) {
@@ -2081,13 +2716,65 @@
     return style === "ranged" || style === "magic";
   }
 
+  function isHealStyle(style) {
+    return style === "heal";
+  }
+
   function engageRange(unit) {
     return unit.range || MELEE_RANGE;
   }
 
+  function healAmount(unit) {
+    const med = state.upgradeLevels.medicine || 0;
+    return Math.max(1, Math.round(unit.atk * (1 + 0.2 * med)));
+  }
+
+  function findHealTarget(healer) {
+    if (!state.battle) return null;
+    let best = null;
+    let bestRatio = 2;
+    for (const u of state.battle.units) {
+      if (u.side !== healer.side || u.hp <= 0 || u.id === healer.id) continue;
+      if (u.hp >= u.maxHp) continue;
+      if (Math.abs(u.y - healer.y) > LANE_TARGET_Y) continue;
+      const ratio = u.hp / Math.max(1, u.maxHp);
+      if (ratio < bestRatio) {
+        bestRatio = ratio;
+        best = u;
+      }
+    }
+    return best;
+  }
+
+  function healerHoldX(healer, living) {
+    let frontX = null;
+    for (const u of living) {
+      if (u.side !== healer.side || u.hp <= 0 || u.id === healer.id) continue;
+      if (isHealStyle(u.atkStyle)) continue;
+      if (frontX == null || u.x > frontX) frontX = u.x;
+    }
+    if (frontX == null) return Math.min(healer.x + 1, BASE_EDGE_ENEMY - 12);
+    return Math.max(PLAYER_SPAWN_X, Math.min(BASE_EDGE_ENEMY - 10, frontX - 8));
+  }
+
+  function healAlly(healer, target) {
+    if (!target || target.hp <= 0 || target.hp >= target.maxHp) return;
+    healer.attackCd = healer.atkCdMax;
+    flashToken(healer.id, "attack");
+    spawnProjectile(healer.x, healer.y, target.x, target.y, "heal");
+    const amt = healAmount(healer);
+    const before = target.hp;
+    target.hp = Math.min(target.maxHp, target.hp + amt);
+    const gained = Math.max(0, Math.round(target.hp - before));
+    if (gained > 0) spawnHealFloater(target.x, target.y, gained);
+    updateTokenEl(target);
+  }
+
   function spawnProjectile(fromX, fromY, toX, toY, style) {
     const d = document.createElement("div");
-    const kind = style === "magic" ? "bolt" : "arrow";
+    let kind = "arrow";
+    if (style === "magic") kind = "bolt";
+    else if (style === "heal") kind = "heal";
     d.className = "projectile " + kind;
     d.style.setProperty("--x0", fromX + "%");
     d.style.setProperty("--y0", fromY + "%");
@@ -2112,6 +2799,7 @@
       appendLog("log-kill", `${attacker.name} fells ${target.name}!`);
       if (attacker.side === "player" && target.side === "enemy") {
         awardKillRewards(target);
+        tryBonesingerRaise(attacker);
       }
     }
   }
@@ -2139,8 +2827,13 @@
     } else {
       lungeToken(unit.id, unit.side);
     }
-    base.hp -= unit.atk;
-    spawnFloater(baseX, unit.y, unit.atk, base.hp <= 0);
+    let dmg = unit.atk;
+    if (unit.side === "player") {
+      const siege = state.upgradeLevels.siege || 0;
+      dmg = Math.max(1, Math.round(unit.atk * (1 + 0.15 * siege)));
+    }
+    base.hp -= dmg;
+    spawnFloater(baseX, unit.y, dmg, base.hp <= 0);
     if (base.hp <= 0) {
       base.hp = 0;
       renderBaseBars();
@@ -2211,6 +2904,7 @@
       `Wave ${state.wave}: ${waveMeta(state.wave).name} — keep the line fed!`
     );
     setStatus("Fighting", "fighting");
+    ensureHero();
     spawnEnemyUnit();
     tryStartNextTraining();
     renderHud();
@@ -2240,17 +2934,26 @@
     b.enemySpawnAt -= dt;
     if (b.enemySpawnAt <= 0) {
       spawnEnemyUnit();
-      b.enemySpawnAt = enemySpawnInterval(state.wave);
+      b.enemySpawnAt = keepSpawnInterval(state.wave);
     }
+
+    tickBossSummons(dt);
 
     tickTraining(dt);
 
+    tickHeroRespawn();
+
     const living = b.units.filter((u) => u.hp > 0);
+    const raidSpeed =
+      state.heroId === "raidcaptain" && livingHeroUnit() ? 1.12 : 1;
 
     for (const unit of living) {
       unit.attackCd = Math.max(0, unit.attackCd - dt);
       const dir = unit.side === "player" ? 1 : -1;
-      const moveSpeed = unit.spd * UNIT_MOVE_MULT;
+      const moveSpeed =
+        unit.spd *
+        UNIT_MOVE_MULT *
+        (unit.side === "player" ? raidSpeed : 1);
       const step = moveSpeed * dt;
       const engage = engageRange(unit);
 
@@ -2269,9 +2972,37 @@
             unit.y + Math.sign(dy) * Math.min(9 * dt, Math.abs(dy))
           );
         }
-        const early = findTarget(unit);
-        if (early && Math.abs(early.x - unit.x) <= engage && unit.attackCd <= 0) {
-          strikeUnit(unit, early);
+        if (!isHealStyle(unit.atkStyle)) {
+          const early = findTarget(unit);
+          if (early && Math.abs(early.x - unit.x) <= engage && unit.attackCd <= 0) {
+            strikeUnit(unit, early);
+          }
+        }
+        continue;
+      }
+
+      if (isHealStyle(unit.atkStyle)) {
+        const ally = findHealTarget(unit);
+        if (ally) {
+          const dist = Math.abs(ally.x - unit.x);
+          if (dist <= engage) {
+            if (unit.attackCd <= 0) healAlly(unit, ally);
+          } else {
+            moveTowardEngage(unit, ally.x, ally.y, engage, step, dt);
+          }
+        } else {
+          const holdX = healerHoldX(unit, living);
+          if (Math.abs(holdX - unit.x) > 0.6) {
+            if (unit.x < holdX) unit.x = Math.min(unit.x + step, holdX);
+            else unit.x = Math.max(unit.x - step, holdX);
+          }
+          const home = unit.homeY != null ? unit.homeY : unit.y;
+          const dy = home - unit.y;
+          if (Math.abs(dy) > 2.5) {
+            unit.y = clampFieldY(
+              unit.y + Math.sign(dy) * Math.min(1.6 * dt, Math.abs(dy))
+            );
+          }
         }
         continue;
       }
@@ -2312,9 +3043,24 @@
     applyUnitSeparation(living, dt);
 
     const now = Date.now();
-    b.units = b.units.filter((u) => u.hp > 0 || (u.removeAt && now < u.removeAt));
+    b.units = b.units.filter((u) => {
+      if (u.hero && (u.hp > 0 || u.respawnAt)) return true;
+      return u.hp > 0 || (u.removeAt && now < u.removeAt);
+    });
     syncFieldPositions();
     renderBaseBars();
+  }
+
+  function tickHeroRespawn() {
+    if (!state.battle || !state.heroId) return;
+    const hero = state.battle.units.find((u) => u.hero);
+    if (!hero) {
+      ensureHero();
+      return;
+    }
+    if (hero.hp > 0) return;
+    if (!hero.respawnAt || Date.now() < hero.respawnAt) return;
+    reviveHero(hero);
   }
 
   function startBattle() {
@@ -2339,6 +3085,7 @@
       killFoodWindow: null,
       elitePending: isEliteWave(state.wave),
       enemySpawned: 0,
+      bossSummonLogged: false,
     };
     state.laneCursor = 0;
     state.waveTransitioning = false;
@@ -2356,6 +3103,7 @@
         `Wave ${state.wave}: ${waveMeta(state.wave).name} — keep the line fed!`
       );
       setStatus("Fighting", "fighting");
+      ensureHero();
       spawnEnemyUnit();
       tryStartNextTraining();
       renderHud();
@@ -2369,6 +3117,10 @@
     state.gold -= cost;
     state.upgradeLevels[id] += 1;
     def.apply(state);
+    if (id === "autoMiner" || id === "autoForager") {
+      syncAutoCursorRings();
+      syncResourceAutoToggles();
+    }
     saveGame(true);
     renderHud();
   }
@@ -2378,10 +3130,40 @@
     if (def.id === "armor") return `+${level} armor`;
     if (def.id === "vitality") return `+${Math.round(12 * level)}% HP`;
     if (def.id === "barracks") return `−${Math.round(100 * (1 - Math.pow(0.88, level)))}% time`;
+    if (def.id === "drums") {
+      return `−${Math.round(100 * (1 - Math.pow(0.94, level)))}% atk cd`;
+    }
+    if (def.id === "medicine") return `+${Math.round(20 * level)}% heal`;
+    if (def.id === "siege") return `+${Math.round(15 * level)}% keep dmg`;
     if (def.id === "granary") return `Army cap ${armyCapacity()}`;
     if (def.id === "plunder") return `+${Math.round(15 * level)}% kill gold`;
     if (def.id === "caravan") return `+${Math.round(12 * level)}% win gold`;
     return def.desc;
+  }
+
+  function economyEffectText(def, level) {
+    if (level <= 0) return "";
+    if (def.id === "pickaxe") return `+${level} gold/click`;
+    if (def.id === "autoMiner") {
+      return `${format(level * AUTO_CLICK_CPS_PER_LEVEL)} clicks/sec`;
+    }
+    if (def.id === "traders") return `+${format(level * 0.5)} g/s`;
+    if (def.id === "baskets") return `+${format(level * 0.5)} food/click`;
+    if (def.id === "autoForager") {
+      return `${format(level * AUTO_CLICK_CPS_PER_LEVEL)} clicks/sec`;
+    }
+    if (def.id === "foragers") return `+${format(level * 0.8)} food/s`;
+    if (def.id === "smithy") {
+      return `+${level * 2} click, +${format(level * 0.25)} g/s`;
+    }
+    if (
+      def.id === "granary" ||
+      def.id === "plunder" ||
+      def.id === "caravan"
+    ) {
+      return combatBonusText(def, level);
+    }
+    return "";
   }
 
   function trainDuration() {
@@ -2512,7 +3294,9 @@
         btn.type = "button";
         btn.dataset.id = def.id;
         btn.className = "shop-btn";
+        if (def.icon) btn.dataset.icon = def.icon;
         btn.innerHTML =
+          `<span class="shop-icon" aria-hidden="true"></span>` +
           `<span class="shop-btn-body">` +
           `<span class="item-name">${def.name}` +
           `<span class="level-badge"></span></span>` +
@@ -2530,13 +3314,13 @@
       if (!btn) continue;
       const cost = upgradeCost(def);
       const level = state.upgradeLevels[def.id];
-      const meta = def.combat
-        ? def.desc + (level > 0 ? ` (${combatBonusText(def, level)})` : "")
-        : def.desc +
-          (level > 0 &&
-          (def.id === "granary" || def.id === "plunder" || def.id === "caravan")
-            ? ` (${combatBonusText(def, level)})`
-            : "");
+      let meta = def.desc;
+      if (def.combat) {
+        if (level > 0) meta = def.desc + ` (${combatBonusText(def, level)})`;
+      } else {
+        const effect = economyEffectText(def, level);
+        if (effect) meta = def.desc + ` (${effect})`;
+      }
       const foodTag = def.food || FOOD_UPGRADE_IDS[def.id];
       btn.classList.toggle("food-upgrade", !!foodTag);
       btn.classList.toggle("affordable", state.gold >= cost);
@@ -2687,7 +3471,10 @@
   }
 
   function foodIncomePerSecond() {
-    return state.foodPerSecond;
+    return (
+      state.foodPerSecond +
+      (foodAutoActive() ? foodAutoCps() * state.foodClickPower : 0)
+    );
   }
 
   function formatCost(type) {
@@ -2779,7 +3566,7 @@
 
   function renderSpawn() {
     const live = inBattle() && !inCountdown();
-    const playerCount = countSide("player");
+    const playerCount = countArmyUnits();
     const training = state.battle && state.battle.training;
     el.spawnHint.textContent = spawnHintText(inBattle(), playerCount);
 
@@ -3031,10 +3818,14 @@
     const meta = waveMeta(state.wave);
     const eMax = enemyBaseMaxHp(state.wave);
     const penalty = lossPenalty(state.wave);
+    const kind = waveKindLabel(state.wave);
+    const kindHint = isBossWave(state.wave)
+      ? `${kind} (summons) · Keep ${eMax} · Yours ${PLAYER_BASE_HP}`
+      : `${kind} · Keep ${eMax} · Yours ${PLAYER_BASE_HP}`;
     el.wavePreview.innerHTML =
       `<div class="wave-preview-main">` +
       `<span class="enemy-name">${meta.name}</span>` +
-      `<span class="wave-subtitle">${waveKindLabel(state.wave)} · Keep ${eMax} · Yours ${PLAYER_BASE_HP}</span>` +
+      `<span class="wave-subtitle">${kindHint}</span>` +
       `</div>` +
       `<div class="wave-stakes">` +
       `<span class="wave-win-hint">Win +${format(winBonus(state.wave))} g</span>` +
@@ -3075,12 +3866,16 @@
 
   function renderHud() {
     el.gold.textContent = format(state.gold);
-    el.gps.textContent = format(state.goldPerSecond);
+    el.gps.textContent = format(
+      state.goldPerSecond +
+        (goldAutoActive() ? goldAutoCps() * state.clickPower : 0)
+    );
     el.food.textContent = format(state.food);
     syncFoodRateDisplay();
     el.wave.textContent = String(state.wave);
-    el.clickPower.textContent = format(state.clickPower);
-    el.foodClickPower.textContent = format(state.foodClickPower);
+    syncHeroChip();
+    syncAutoCursorRings();
+    syncResourceAutoToggles();
     renderWarChest();
     renderUpgrades();
     renderSpawn();
@@ -3089,7 +3884,10 @@
 
   function syncResourceDisplays() {
     el.gold.textContent = format(state.gold);
-    el.gps.textContent = format(state.goldPerSecond);
+    el.gps.textContent = format(
+      state.goldPerSecond +
+        (goldAutoActive() ? goldAutoCps() * state.clickPower : 0)
+    );
     el.food.textContent = format(state.food);
     syncFoodRateDisplay();
     updateUpgradeTabBadge();
@@ -3126,11 +3924,14 @@
     btn.addEventListener("pointercancel", clearIgnore);
   }
 
-  function pulseResourceClick(btn, amount, kind) {
+  function pulseResourceClick(btn, amount, kind, opts) {
+    opts = opts || {};
     btn.classList.remove("click-pulse");
     void btn.offsetWidth;
     btn.classList.add("click-pulse");
     setTimeout(() => btn.classList.remove("click-pulse"), 220);
+
+    if (opts.showFloater === false) return;
 
     const floater = document.createElement("span");
     floater.className = "click-floater " + kind;
@@ -3139,17 +3940,235 @@
     setTimeout(() => floater.remove(), 650);
   }
 
+  let goldAutoAccum = 0;
+  let foodAutoAccum = 0;
+  let goldFloaterCooldown = 0;
+  let foodFloaterCooldown = 0;
+  let goldCursorJabIdx = 0;
+  let foodCursorJabIdx = 0;
+
+  function jabAutoCursor(kind) {
+    const ring = kind === "food" ? el.foodCursors : el.goldCursors;
+    if (!ring) return;
+    const cursors = ring.querySelectorAll(".auto-cursor");
+    if (!cursors.length) return;
+    const idx =
+      kind === "food"
+        ? foodCursorJabIdx % cursors.length
+        : goldCursorJabIdx % cursors.length;
+    if (kind === "food") foodCursorJabIdx += 1;
+    else goldCursorJabIdx += 1;
+    const cursor = cursors[idx];
+    cursor.classList.remove("jab");
+    void cursor.offsetWidth;
+    cursor.classList.add("jab");
+    setTimeout(() => cursor.classList.remove("jab"), 280);
+  }
+
+  function syncAutoCursorRing(ring, level, kind) {
+    if (!ring) return;
+    const count = Math.min(MAX_VISIBLE_CURSORS, Math.max(0, level | 0));
+    const existing = ring.querySelectorAll(".auto-cursor");
+    if (existing.length !== count) {
+      ring.innerHTML = "";
+      for (let i = 0; i < count; i++) {
+        const cursor = document.createElement("span");
+        cursor.className = "auto-cursor auto-cursor-" + kind;
+        const angle = (360 / count) * i - 90;
+        cursor.style.setProperty("--cursor-angle", angle + "deg");
+        cursor.style.animationDelay = (i * 0.12).toFixed(2) + "s";
+        ring.appendChild(cursor);
+      }
+    }
+    ring.hidden = count === 0;
+  }
+
+  function syncAutoCursorRings() {
+    syncAutoCursorRing(
+      el.goldCursors,
+      state.upgradeLevels.autoMiner || 0,
+      "gold"
+    );
+    syncAutoCursorRing(
+      el.foodCursors,
+      state.upgradeLevels.autoForager || 0,
+      "food"
+    );
+    const goldSlot = el.clickBtn && el.clickBtn.closest(".resource-click-slot");
+    const foodSlot =
+      el.foodClickBtn && el.foodClickBtn.closest(".resource-click-slot");
+    if (goldSlot) {
+      goldSlot.classList.toggle("auto-on", goldAutoActive());
+      goldSlot.classList.toggle(
+        "has-cursors",
+        (state.upgradeLevels.autoMiner || 0) > 0
+      );
+    }
+    if (foodSlot) {
+      foodSlot.classList.toggle("auto-on", foodAutoActive());
+      foodSlot.classList.toggle(
+        "has-cursors",
+        (state.upgradeLevels.autoForager || 0) > 0
+      );
+    }
+  }
+
+  function syncResourceAutoToggles() {
+    const goldLv = state.upgradeLevels.autoMiner || 0;
+    const foodLv = state.upgradeLevels.autoForager || 0;
+    if (el.goldAutoToggle) {
+      const show = goldLv > 0;
+      el.goldAutoToggle.hidden = !show;
+      el.goldAutoToggle.classList.toggle("is-on", state.autoClick.gold);
+      el.goldAutoToggle.setAttribute(
+        "aria-pressed",
+        state.autoClick.gold ? "true" : "false"
+      );
+      el.goldAutoToggle.title = state.autoClick.gold
+        ? `Auto mine on (${format(goldAutoCps())}/s)`
+        : "Auto mine off";
+    }
+    if (el.foodAutoToggle) {
+      const show = foodLv > 0;
+      el.foodAutoToggle.hidden = !show;
+      el.foodAutoToggle.classList.toggle("is-on", state.autoClick.food);
+      el.foodAutoToggle.setAttribute(
+        "aria-pressed",
+        state.autoClick.food ? "true" : "false"
+      );
+      el.foodAutoToggle.title = state.autoClick.food
+        ? `Auto forage on (${format(foodAutoCps())}/s)`
+        : "Auto forage off";
+    }
+    updateResourceClickSubs();
+  }
+
+  function updateResourceClickSubs() {
+    if (el.clickPower) {
+      const sub = el.clickBtn && el.clickBtn.querySelector(".click-btn-sub");
+      if (sub && goldAutoActive()) {
+        sub.innerHTML =
+          `+<span id="click-power-display">${format(state.clickPower)}</span>` +
+          ` · auto ${format(goldAutoCps())}/s`;
+        el.clickPower = document.getElementById("click-power-display");
+      } else if (sub) {
+        sub.innerHTML =
+          `+<span id="click-power-display">${format(state.clickPower)}</span> per click`;
+        el.clickPower = document.getElementById("click-power-display");
+      } else {
+        el.clickPower.textContent = format(state.clickPower);
+      }
+    }
+    if (el.foodClickPower) {
+      const sub =
+        el.foodClickBtn && el.foodClickBtn.querySelector(".click-btn-sub");
+      if (sub && foodAutoActive()) {
+        sub.innerHTML =
+          `+<span id="food-click-power-display">${format(state.foodClickPower)}</span>` +
+          ` · auto ${format(foodAutoCps())}/s`;
+        el.foodClickPower = document.getElementById("food-click-power-display");
+      } else if (sub) {
+        sub.innerHTML =
+          `+<span id="food-click-power-display">${format(state.foodClickPower)}</span> food`;
+        el.foodClickPower = document.getElementById("food-click-power-display");
+      } else {
+        el.foodClickPower.textContent = format(state.foodClickPower);
+      }
+    }
+  }
+
+  function toggleAutoClick(kind) {
+    if (kind === "gold") {
+      if ((state.upgradeLevels.autoMiner || 0) <= 0) return;
+      state.autoClick.gold = !state.autoClick.gold;
+      if (!state.autoClick.gold) goldAutoAccum = 0;
+    } else if (kind === "food") {
+      if ((state.upgradeLevels.autoForager || 0) <= 0) return;
+      state.autoClick.food = !state.autoClick.food;
+      if (!state.autoClick.food) foodAutoAccum = 0;
+    } else {
+      return;
+    }
+    saveGame(true);
+    syncAutoCursorRings();
+    syncResourceAutoToggles();
+  }
+
+  function doMineClick(opts) {
+    opts = opts || {};
+    const amount = state.clickPower;
+    state.gold += amount;
+    pulseResourceClick(el.clickBtn, amount, "gold", {
+      showFloater: opts.showFloater !== false,
+    });
+    if (opts.jabCursor) jabAutoCursor("gold");
+  }
+
+  function doForageClick(opts) {
+    opts = opts || {};
+    const amount = state.foodClickPower;
+    state.food += amount;
+    pulseResourceClick(el.foodClickBtn, amount, "food", {
+      showFloater: opts.showFloater !== false,
+    });
+    if (opts.jabCursor) jabAutoCursor("food");
+  }
+
+  function tickAutoClicks(dt) {
+    goldFloaterCooldown = Math.max(0, goldFloaterCooldown - dt);
+    foodFloaterCooldown = Math.max(0, foodFloaterCooldown - dt);
+
+    if (goldAutoActive()) {
+      goldAutoAccum += goldAutoCps() * dt;
+      let fired = 0;
+      while (goldAutoAccum >= 1 && fired < 40) {
+        goldAutoAccum -= 1;
+        fired += 1;
+        const showFloater = goldFloaterCooldown <= 0;
+        if (showFloater) goldFloaterCooldown = AUTO_FLOATER_MIN_INTERVAL;
+        doMineClick({ showFloater, jabCursor: true });
+      }
+    } else {
+      goldAutoAccum = 0;
+    }
+
+    if (foodAutoActive()) {
+      foodAutoAccum += foodAutoCps() * dt;
+      let fired = 0;
+      while (foodAutoAccum >= 1 && fired < 40) {
+        foodAutoAccum -= 1;
+        fired += 1;
+        const showFloater = foodFloaterCooldown <= 0;
+        if (showFloater) foodFloaterCooldown = AUTO_FLOATER_MIN_INTERVAL;
+        doForageClick({ showFloater, jabCursor: true });
+      }
+    } else {
+      foodAutoAccum = 0;
+    }
+  }
+
   bindPress(el.clickBtn, () => {
-    state.gold += state.clickPower;
-    pulseResourceClick(el.clickBtn, state.clickPower, "gold");
+    doMineClick({ showFloater: true });
     renderHud();
   });
 
   bindPress(el.foodClickBtn, () => {
-    state.food += state.foodClickPower;
-    pulseResourceClick(el.foodClickBtn, state.foodClickPower, "food");
+    doForageClick({ showFloater: true });
     renderHud();
   });
+
+  if (el.goldAutoToggle) {
+    el.goldAutoToggle.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      toggleAutoClick("gold");
+    });
+  }
+  if (el.foodAutoToggle) {
+    el.foodAutoToggle.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      toggleAutoClick("food");
+    });
+  }
 
   el.upgradeCatTabs.forEach((tab) => {
     tab.addEventListener("click", () => {
@@ -3191,6 +4210,7 @@
     if (state.foodPerSecond > 0) {
       state.food += state.foodPerSecond * dt;
     }
+    tickAutoClicks(dt);
 
     if (inBattle()) {
       battleTick(dt);
@@ -3506,6 +4526,6 @@
     );
   }
   initMobileChrome();
-  startBattle();
+  beginRun();
   initMusic();
 })();

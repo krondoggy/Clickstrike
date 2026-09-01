@@ -81,6 +81,19 @@
           <span id="wave-display">1</span>
         </span>
       </div>
+      <div
+        id="hero-chip"
+        class="stat-pill resource-hero"
+        title="Your chosen hero"
+        hidden
+        aria-hidden="true"
+      >
+        <span class="stat-icon hero" aria-hidden="true"></span>
+        <span class="stat-body">
+          <span class="stat-label">Hero</span>
+          <span id="hero-chip-name">—</span>
+        </span>
+      </div>
     </div>
     <div class="topbar-actions">
       <button
@@ -253,14 +266,40 @@
     </footer>
 
     <div id="resource-dock" class="resource-click-row">
-      <button id="click-btn" type="button">
-        <span class="click-btn-label">Mine Gold</span>
-        <span class="click-btn-sub">+<span id="click-power-display">1</span> per click</span>
-      </button>
-      <button id="food-click-btn" type="button">
-        <span class="click-btn-label">Forage</span>
-        <span class="click-btn-sub">+<span id="food-click-power-display">1</span> food</span>
-      </button>
+      <div class="resource-click-slot" data-resource="gold">
+        <div class="auto-cursor-ring" id="gold-cursors" aria-hidden="true"></div>
+        <button id="click-btn" type="button">
+          <span class="click-btn-label">Mine Gold</span>
+          <span class="click-btn-sub">+<span id="click-power-display">1</span> per click</span>
+        </button>
+        <button
+          type="button"
+          class="resource-auto-toggle"
+          id="gold-auto-toggle"
+          hidden
+          aria-pressed="true"
+          aria-label="Toggle auto mine"
+        >
+          <span class="auto-toggle-label">Auto</span>
+        </button>
+      </div>
+      <div class="resource-click-slot" data-resource="food">
+        <div class="auto-cursor-ring" id="food-cursors" aria-hidden="true"></div>
+        <button id="food-click-btn" type="button">
+          <span class="click-btn-label">Forage</span>
+          <span class="click-btn-sub">+<span id="food-click-power-display">1</span> food</span>
+        </button>
+        <button
+          type="button"
+          class="resource-auto-toggle"
+          id="food-auto-toggle"
+          hidden
+          aria-pressed="true"
+          aria-label="Toggle auto forage"
+        >
+          <span class="auto-toggle-label">Auto</span>
+        </button>
+      </div>
       <button id="army-dock-btn" type="button" class="army-dock-btn" aria-expanded="false" aria-controls="army-sheet">
         <span class="click-btn-label">Army</span>
         <span class="click-btn-sub">Train troops</span>
@@ -281,6 +320,20 @@
         </div>
         <div id="army-sheet-body" class="army-sheet-body"></div>
       </div>
+    </div>
+  </div>
+
+  <div id="hero-pick" class="hero-pick" hidden aria-hidden="true">
+    <div class="hero-pick-backdrop" aria-hidden="true"></div>
+    <div
+      class="hero-pick-panel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="hero-pick-title"
+    >
+      <h2 id="hero-pick-title">Choose your hero</h2>
+      <p class="hero-pick-sub">Your champion leads every assault. One pick per run.</p>
+      <div id="hero-pick-grid" class="hero-pick-grid"></div>
     </div>
   </div>
 
