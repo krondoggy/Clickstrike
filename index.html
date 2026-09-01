@@ -18,17 +18,41 @@
         <span id="gold-display">0</span>
         <span class="stat-label">Gold</span>
       </div>
-      <div class="stat-pill resource-gps" title="Passive income">
+      <div class="stat-pill resource-gps" title="Gold per second">
         <span class="stat-prefix">+</span>
         <span id="gps-display">0</span>
-        <span class="stat-label">/s</span>
+        <span class="stat-label">g/s</span>
+      </div>
+      <div class="stat-pill resource-food" title="Provisions for troops">
+        <span class="stat-icon food" aria-hidden="true"></span>
+        <span id="food-display">0</span>
+        <span class="stat-label">Food</span>
+      </div>
+      <div class="stat-pill resource-fps" title="Food per second (net of upkeep in battle)">
+        <span id="fps-prefix" class="stat-prefix">+</span>
+        <span id="fps-display">0</span>
+        <span class="stat-label">f/s</span>
       </div>
       <div class="stat-pill resource-wave" title="Current enemy wave">
         <span class="stat-label">Wave</span>
         <span id="wave-display">1</span>
       </div>
+      <label class="stat-pill music-control" title="Music volume" for="music-volume">
+        <span class="stat-label">Music</span>
+        <input
+          id="music-volume"
+          type="range"
+          min="0"
+          max="100"
+          value="35"
+          step="1"
+          aria-label="Music volume"
+        />
+      </label>
     </div>
   </header>
+
+  <audio id="bg-music" preload="auto" playsinline></audio>
 
   <div id="hud">
     <section id="stage" class="panel" aria-label="Battlefield">
@@ -112,14 +136,13 @@
       </div>
 
       <div class="stage-actions">
-        <button id="attack-btn" type="button">Start Battle</button>
-        <div id="cooldown-display" class="hidden"></div>
+        <div id="loop-status" class="loop-status">Wave 1 continuous</div>
       </div>
 
       <div class="log-block">
         <h3>Battle Log</h3>
         <div id="battle-log">
-          <p class="log-muted">Bank gold, then start a battle and spawn troops to destroy the enemy keep.</p>
+          <p class="log-muted">Keep gold and food flowing — troops auto-spawn while the assault loops. Defeat costs gold and food and pushes you back one wave.</p>
         </div>
       </div>
     </section>
@@ -132,10 +155,16 @@
         <div class="panel-ornament panel-ornament-br" aria-hidden="true"></div>
 
         <h2>Treasury</h2>
-        <button id="click-btn" type="button">
-          <span class="click-btn-label">Mine Gold</span>
-          <span class="click-btn-sub">+<span id="click-power-display">1</span> per click</span>
-        </button>
+        <div class="resource-click-row">
+          <button id="click-btn" type="button">
+            <span class="click-btn-label">Mine Gold</span>
+            <span class="click-btn-sub">+<span id="click-power-display">1</span> per click</span>
+          </button>
+          <button id="food-click-btn" type="button">
+            <span class="click-btn-label">Forage</span>
+            <span class="click-btn-sub">+<span id="food-click-power-display">1</span> food</span>
+          </button>
+        </div>
 
         <h3>Upgrades</h3>
         <div id="upgrade-list" class="command-list"></div>
@@ -147,8 +176,8 @@
         <div class="panel-ornament panel-ornament-bl" aria-hidden="true"></div>
         <div class="panel-ornament panel-ornament-br" aria-hidden="true"></div>
 
-        <h2>Spawn</h2>
-        <p id="spawn-hint" class="log-muted">Start a battle to spawn troops onto the field.</p>
+        <h2>Army</h2>
+        <p id="spawn-hint" class="log-muted">Tap a unit to toggle auto-train. Progress bar fills, then the troop deploys.</p>
         <div id="recruit-list" class="command-grid"></div>
       </section>
     </footer>
