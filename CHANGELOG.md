@@ -20,6 +20,7 @@ All notable changes to Clickstrike are documented here.
 
 ### Changed
 
+- **Castle Strike v0.7.4** — buying a unit places it on the spawn grid immediately; Battle tab keeps field + barracks together; tapping the field no longer clears a barracks pick
 - **Castle Strike v0.7.3** — mobile Battle tab includes barracks dock under the field; Shop tab is hire/research only; buying a unit switches to Battle to deploy
 - **Castle Strike v0.7.2** — mobile Battle / Barracks / Shop panes; tooltips dismiss on tap-away and long-press on touch; compact HUD and larger tap targets
 - **Castle Strike v0.7.1** — removed Send Wave (button and Space); waves only deploy when the countdown hits zero

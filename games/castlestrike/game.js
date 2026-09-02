@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const GAME_VERSION = "0.7.3";
+  const GAME_VERSION = "0.7.4";
   const HUD_MS = 100;
   const BATTLE_MS = 50;
   const MOBILE_MQ = "(max-width: 900px)";
@@ -1055,6 +1055,22 @@
         state.bench[t.id] -= 1;
       }
     }
+  }
+
+  function firstEmptyCell() {
+    for (let row = 0; row < GRID_ROWS; row++) {
+      for (let col = 0; col < GRID_COLS; col++) {
+        if (!cellIsOccupied(col, row)) return { col, row };
+      }
+    }
+    return null;
+  }
+
+  function autoPlaceFromBench(typeId) {
+    if (!typeId || !canPlaceUnits()) return false;
+    const cell = firstEmptyCell();
+    if (!cell) return false;
+    return placeOnGrid(typeId, cell.col, cell.row);
   }
 
   function placeOnGrid(typeId, col, row) {
@@ -3460,16 +3476,27 @@
         return;
       }
       playSfx("click");
-      let bought = false;
-      if (card.dataset.shop === "economy") bought = buyEconomy(true);
-      else if (card.dataset.shop === "hero") bought = buyHero(card.dataset.heroId, true);
-      else if (card.dataset.shop === "rez") bought = rezHero();
-      else if (card.dataset.shop === "upgrade") buyUnitUpgrade(card.dataset.type, true);
+      let placedType = null;
+      if (card.dataset.shop === "economy") buyEconomy(true);
+      else if (card.dataset.shop === "hero") {
+        if (buyHero(card.dataset.heroId, true)) placedType = card.dataset.heroId;
+      } else if (card.dataset.shop === "rez") {
+        if (rezHero()) placedType = state.heroId;
+      } else if (card.dataset.shop === "upgrade") buyUnitUpgrade(card.dataset.type, true);
       else if (card.dataset.shop === "towers") buyTowerUpgrade(true);
-      else if (card.dataset.type) bought = buyUnit(card.dataset.type, true);
-      if (bought) goToBattlePaneIfMobile();
+      else if (card.dataset.type) {
+        if (buyUnit(card.dataset.type, true)) placedType = card.dataset.type;
+      }
+      if (placedType) {
+        if (!autoPlaceFromBench(placedType)) {
+          state.selectedBenchType = placedType;
+          state.selectedBoard = null;
+        }
+        goToBattlePaneIfMobile();
+      }
       lastShopSig = "";
       lastBenchSig = "";
+      lastBoardSig = "";
       renderHud();
     });
 
@@ -3581,7 +3608,11 @@
         }
         if (!state || state.over) return;
         if (!state.selectedBenchType && !state.selectedBoard) return;
-        if (e.target.closest(".bench-chip, .board-cell, #board-grid, #bench-section, #mobile-nav")) {
+        if (
+          e.target.closest(
+            ".bench-chip, .board-cell, #board-grid, #bench-section, #board-section, #board, #mobile-nav"
+          )
+        ) {
           return;
         }
         if (e.target.closest(".modal")) return;
