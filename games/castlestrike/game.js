@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const GAME_VERSION = "0.7.5";
+  const GAME_VERSION = "0.7.6";
   const HUD_MS = 100;
   const BATTLE_MS = 50;
   const MOBILE_MQ = "(max-width: 900px)";
@@ -684,8 +684,22 @@
     return side === "player" ? state : state.ai;
   }
 
-  function unitLevelFor(actor, typeId) {
-    return (actor.unitLevels && actor.unitLevels[typeId]) || 0;
+  function unitTrackLevel(actor, typeId, track) {
+    const levels = track === "atk" ? actor.unitAtkLevels : actor.unitHpLevels;
+    return (levels && levels[typeId]) || 0;
+  }
+
+  function unitResearchLevels(actor, typeId) {
+    return {
+      hp: unitTrackLevel(actor, typeId, "hp"),
+      atk: unitTrackLevel(actor, typeId, "atk"),
+    };
+  }
+
+  function unitResearchTag(actor, typeId) {
+    const lv = unitResearchLevels(actor, typeId);
+    if (lv.hp <= 0 && lv.atk <= 0) return "";
+    return "H" + lv.hp + "/A" + lv.atk;
   }
 
   function unitUpgradeCost(typeId, level) {
@@ -700,10 +714,10 @@
     return Math.floor(TOWER_RESEARCH_BASE_COST * Math.pow(TOWER_RESEARCH_GROWTH, level));
   }
 
-  function unitStatsAtLevel(type, level) {
+  function unitStatsAtLevel(type, hpLv, atkLv) {
     return {
-      hp: Math.round(type.hp * (1 + UNIT_RESEARCH_HP_MULT * level)),
-      atk: Math.round(type.atk * (1 + UNIT_RESEARCH_ATK_MULT * level)),
+      hp: Math.round(type.hp * (1 + UNIT_RESEARCH_HP_MULT * hpLv)),
+      atk: Math.round(type.atk * (1 + UNIT_RESEARCH_ATK_MULT * atkLv)),
     };
   }
 
@@ -735,14 +749,15 @@
     const actor = actorForSide(side);
     const type = unitType(typeId);
     if (!type) return;
-    const level = unitLevelFor(actor, typeId);
-    const stats = unitStatsAtLevel(type, level);
+    const lv = unitResearchLevels(actor, typeId);
+    const stats = unitStatsAtLevel(type, lv.hp, lv.atk);
     for (const u of state.battle.units) {
       if (u.side !== side || u.typeId !== typeId || u.hero || u.minion || u.hp <= 0) continue;
       const ratio = u.maxHp > 0 ? u.hp / u.maxHp : 1;
       u.maxHp = stats.hp;
       u.atk = stats.atk;
-      u.researchLevel = level;
+      u.researchHpLevel = lv.hp;
+      u.researchAtkLevel = lv.atk;
       u.hp = Math.min(u.maxHp, Math.max(1, Math.round(u.maxHp * ratio)));
       const node = getTokenEl(u.id);
       if (node) {
@@ -753,13 +768,13 @@
     }
   }
 
-  function canBuyUnitUpgrade(actor, typeId) {
+  function canBuyUnitUpgrade(actor, typeId, track) {
     if (!actor || state.over) return false;
     const type = unitType(typeId);
     if (!type) return false;
     if ((actor.roster[typeId] || 0) < 1) return false;
     if (!isUnitUnlocked(typeId)) return false;
-    const level = unitLevelFor(actor, typeId);
+    const level = unitTrackLevel(actor, typeId, track);
     if (level >= MAX_UNIT_RESEARCH) return false;
     return actor.gold >= unitUpgradeCost(typeId, level);
   }
@@ -771,15 +786,20 @@
     return actor.gold >= towerUpgradeCost(level);
   }
 
-  function buyUnitUpgrade(typeId, forPlayer) {
+  function buyUnitUpgrade(typeId, track, forPlayer) {
     const actor = forPlayer ? state : state.ai;
-    if (!canBuyUnitUpgrade(actor, typeId)) return false;
-    const level = unitLevelFor(actor, typeId);
+    if (!canBuyUnitUpgrade(actor, typeId, track)) return false;
+    const level = unitTrackLevel(actor, typeId, track);
     const cost = unitUpgradeCost(typeId, level);
     actor.gold -= cost;
     if (forPlayer) spendGold(cost);
-    if (!actor.unitLevels) actor.unitLevels = emptyUnitLevels();
-    actor.unitLevels[typeId] = level + 1;
+    if (track === "atk") {
+      if (!actor.unitAtkLevels) actor.unitAtkLevels = emptyUnitLevels();
+      actor.unitAtkLevels[typeId] = level + 1;
+    } else {
+      if (!actor.unitHpLevels) actor.unitHpLevels = emptyUnitLevels();
+      actor.unitHpLevels[typeId] = level + 1;
+    }
     retargetLivingUnitsOfType(forPlayer ? "player" : "enemy", typeId);
     lastShopSig = "";
     return true;
@@ -882,6 +902,23 @@
     buildAiFormation();
   }
 
+  function aiPickUnitUpgrade(typeId) {
+    const ai = state.ai;
+    const tracks = [];
+    for (const track of ["hp", "atk"]) {
+      if (!canBuyUnitUpgrade(ai, typeId, track)) continue;
+      tracks.push({
+        track,
+        cost: unitUpgradeCost(typeId, unitTrackLevel(ai, typeId, track)),
+      });
+    }
+    if (!tracks.length) return null;
+    tracks.sort((a, b) => a.cost - b.cost);
+    const topCost = tracks[0].cost;
+    const cheapest = tracks.filter((t) => t.cost === topCost);
+    return cheapest[Math.floor(Math.random() * cheapest.length)];
+  }
+
   function aiTryResearch() {
     const ai = state.ai;
     const rosterFull = !rosterHasRoom(ai.roster);
@@ -890,17 +927,18 @@
     const heavyTypes = UNIT_TYPES.filter((t) => {
       if ((ai.roster[t.id] || 0) < 2) return false;
       if (!isUnitUnlocked(t.id)) return false;
-      const lvl = unitLevelFor(ai, t.id);
-      if (lvl >= MAX_UNIT_RESEARCH) return false;
-      return ai.gold >= unitUpgradeCost(t.id, lvl) + 15;
+      const pick = aiPickUnitUpgrade(t.id);
+      if (!pick) return false;
+      return ai.gold >= pick.cost + 15;
     });
     if (heavyTypes.length) {
-      heavyTypes.sort(
-        (a, b) =>
-          unitUpgradeCost(a.id, unitLevelFor(ai, a.id)) -
-          unitUpgradeCost(b.id, unitLevelFor(ai, b.id))
-      );
-      if (buyUnitUpgrade(heavyTypes[0].id, false)) return true;
+      heavyTypes.sort((a, b) => {
+        const pa = aiPickUnitUpgrade(a.id);
+        const pb = aiPickUnitUpgrade(b.id);
+        return (pa ? pa.cost : Infinity) - (pb ? pb.cost : Infinity);
+      });
+      const pick = aiPickUnitUpgrade(heavyTypes[0].id);
+      if (pick && buyUnitUpgrade(heavyTypes[0].id, pick.track, false)) return true;
     }
 
     const aiTower = ai.towerLevel || 0;
@@ -917,14 +955,29 @@
     }
 
     if (rosterFull || oneSlotLeft) {
-      const owned = UNIT_TYPES.filter((t) => canBuyUnitUpgrade(ai, t.id));
-      if (owned.length) {
-        owned.sort(
-          (a, b) =>
-            unitUpgradeCost(a.id, unitLevelFor(ai, a.id)) -
-            unitUpgradeCost(b.id, unitLevelFor(ai, b.id))
-        );
-        if (buyUnitUpgrade(owned[0].id, false)) return true;
+      const counter = counterTypeId(dominantTag(state.roster));
+      const options = [];
+      for (const t of UNIT_TYPES) {
+        if ((ai.roster[t.id] || 0) < 1) continue;
+        for (const track of ["hp", "atk"]) {
+          if (!canBuyUnitUpgrade(ai, t.id, track)) continue;
+          options.push({
+            typeId: t.id,
+            track,
+            cost: unitUpgradeCost(t.id, unitTrackLevel(ai, t.id, track)),
+            counter: t.id === counter,
+          });
+        }
+      }
+      if (options.length) {
+        options.sort((a, b) => {
+          if (a.counter !== b.counter) return a.counter ? -1 : 1;
+          return a.cost - b.cost;
+        });
+        const topCost = options[0].cost;
+        const cheapest = options.filter((o) => o.cost === topCost);
+        const pick = cheapest[Math.floor(Math.random() * cheapest.length)];
+        if (buyUnitUpgrade(pick.typeId, pick.track, false)) return true;
       }
       if (canBuyTowerUpgrade(ai) && buyTowerUpgrade(false)) return true;
     }
@@ -1296,7 +1349,8 @@
       gold: START_GOLD,
       economy: 0,
       roster: emptyRoster(),
-      unitLevels: emptyUnitLevels(),
+      unitHpLevels: emptyUnitLevels(),
+      unitAtkLevels: emptyUnitLevels(),
       towerLevel: 0,
       shopTab: "hire",
       bench: emptyRoster(),
@@ -1328,7 +1382,8 @@
         gold: START_GOLD,
         economy: 0,
         roster: emptyRoster(),
-        unitLevels: emptyUnitLevels(),
+        unitHpLevels: emptyUnitLevels(),
+        unitAtkLevels: emptyUnitLevels(),
         towerLevel: 0,
         winStreak: 0,
         castleHp: CASTLE_HP,
@@ -1704,9 +1759,14 @@
   function unitTooltipHtml(def, opts) {
     if (!def) return "";
     opts = opts || {};
-    const level = opts.level || 0;
     const isHero = !!opts.hero;
-    const stats = isHero ? def : unitStatsAtLevel(def, level);
+    let hpLevel = opts.hpLevel || 0;
+    let atkLevel = opts.atkLevel || 0;
+    if (!isHero && opts.level != null && opts.hpLevel == null && opts.atkLevel == null) {
+      hpLevel = opts.level;
+      atkLevel = opts.level;
+    }
+    const stats = isHero ? def : unitStatsAtLevel(def, hpLevel, atkLevel);
     const hp = isHero ? def.hp : stats.hp;
     const atk = isHero ? def.atk : stats.atk;
     let html = `<div class="tt-name">${def.name}</div>`;
@@ -1722,7 +1782,9 @@
       html += `<div class="tt-row"><span class="tt-bad">Weak</span> vs ${def.weakVs.map(tagLabel).join(", ")}</div>`;
     }
     if (def.blurb) html += `<div class="tt-ability">${def.blurb}</div>`;
-    if (level > 0) html += `<div class="tt-row">Research +${level}</div>`;
+    if (!isHero && (hpLevel > 0 || atkLevel > 0)) {
+      html += `<div class="tt-row">Research +HP ${hpLevel} · +ATK ${atkLevel}</div>`;
+    }
     return html;
   }
 
@@ -1950,7 +2012,9 @@
       "|" +
       UNIT_TYPES.map((t) => state.roster[t.id]).join(",") +
       "|" +
-      UNIT_TYPES.map((t) => (state.unitLevels && state.unitLevels[t.id]) || 0).join(",") +
+      UNIT_TYPES.map((t) => unitTrackLevel(state, t.id, "hp")).join(",") +
+      "|" +
+      UNIT_TYPES.map((t) => unitTrackLevel(state, t.id, "atk")).join(",") +
       "|" +
       (state.towerLevel || 0) +
       "|" +
@@ -1991,9 +2055,8 @@
       }
       const cost = unitCost(t.id, state.roster);
       const owned = state.roster[t.id] || 0;
-      const tech = unitLevelFor(state, t.id);
-      const ownedLine =
-        tech > 0 ? `Owned ×${owned} · +${tech}` : `Owned ×${owned}`;
+      const tag = unitResearchTag(state, t.id);
+      const ownedLine = tag ? `Owned ×${owned} · ${tag}` : `Owned ×${owned}`;
       const can =
         prep && rosterHasRoom(state.roster) && state.gold >= cost;
       html +=
@@ -2035,7 +2098,8 @@
   function researchAffordable() {
     if (state.over) return false;
     for (const t of UNIT_TYPES) {
-      if (canBuyUnitUpgrade(state, t.id)) return true;
+      if (canBuyUnitUpgrade(state, t.id, "hp")) return true;
+      if (canBuyUnitUpgrade(state, t.id, "atk")) return true;
     }
     return canBuyTowerUpgrade(state);
   }
@@ -2086,19 +2150,23 @@
     for (const t of UNIT_TYPES) {
       if ((state.roster[t.id] || 0) < 1) continue;
       if (!isUnitUnlocked(t.id)) continue;
-      const lvl = unitLevelFor(state, t.id);
-      const maxed = lvl >= MAX_UNIT_RESEARCH;
-      const cost = unitUpgradeCost(t.id, lvl);
-      const can = prep && !maxed && state.gold >= cost;
       const accent = typeAccentStyle(t.id);
-      html +=
-        `<button type="button" class="shop-card research-card ${can ? "affordable" : ""}" data-shop="upgrade" data-type="${t.id}"${accent} ${can ? "" : "disabled"}>` +
-        `<span class="shop-art">${unitArt(t.id)}</span>` +
-        `<span class="shop-name">${t.name}</span>` +
-        `<span class="shop-cost">${maxed ? "MAX" : format(cost) + "g"}</span>` +
-        `<span class="shop-owned">Lv ${lvl} · +16% HP / +14% ATK</span>` +
-        `<span class="shop-blurb">${t.blurb}</span>` +
-        `</button>`;
+      for (const track of ["hp", "atk"]) {
+        const lvl = unitTrackLevel(state, t.id, track);
+        const maxed = lvl >= MAX_UNIT_RESEARCH;
+        const cost = unitUpgradeCost(t.id, lvl);
+        const can = prep && !maxed && state.gold >= cost;
+        const trackLabel = track === "hp" ? "+HP" : "+ATK";
+        const trackPct = track === "hp" ? "+16% HP" : "+14% ATK";
+        html +=
+          `<button type="button" class="shop-card research-card ${can ? "affordable" : ""}" data-shop="upgrade-${track}" data-type="${t.id}"${accent} ${can ? "" : "disabled"}>` +
+          `<span class="shop-art">${unitArt(t.id)}</span>` +
+          `<span class="shop-name">${t.name} ${trackLabel}</span>` +
+          `<span class="shop-cost">${maxed ? "MAX" : format(cost) + "g"}</span>` +
+          `<span class="shop-owned">Lv ${lvl}/3 · ${trackPct}</span>` +
+          `<span class="shop-blurb">${t.blurb}</span>` +
+          `</button>`;
+      }
     }
     if (!html) {
       html =
@@ -2390,11 +2458,14 @@
     const prefix = side === "player" ? "p" : "e";
     let hp = type.hp;
     let atk = type.atk;
-    let researchLevel = 0;
+    let researchHpLevel = 0;
+    let researchAtkLevel = 0;
     if (!opts.hero && !opts.minion) {
       const actor = actorForSide(side);
-      researchLevel = unitLevelFor(actor, typeId);
-      const stats = unitStatsAtLevel(type, researchLevel);
+      const lv = unitResearchLevels(actor, typeId);
+      researchHpLevel = lv.hp;
+      researchAtkLevel = lv.atk;
+      const stats = unitStatsAtLevel(type, lv.hp, lv.atk);
       hp = stats.hp;
       atk = stats.atk;
     }
@@ -2417,7 +2488,8 @@
       splash: type.splash || 0,
       structureMult: type.structureMult || 1,
       targetPriority: type.targetPriority || null,
-      researchLevel,
+      researchHpLevel,
+      researchAtkLevel,
       col,
       row,
       x: pos.x,
@@ -2572,10 +2644,14 @@
         : "Your castle has fallen. Try a new strategy.";
     }
     if (el.endStats) {
-      const researched = UNIT_TYPES.filter(
-        (t) => unitLevelFor(state, t.id) > 0
-      )
-        .map((t) => `${t.name} +${unitLevelFor(state, t.id)}`)
+      const researched = UNIT_TYPES.filter((t) => {
+        const lv = unitResearchLevels(state, t.id);
+        return lv.hp > 0 || lv.atk > 0;
+      })
+        .map((t) => {
+          const lv = unitResearchLevels(state, t.id);
+          return `${t.name} H${lv.hp}/A${lv.atk}`;
+        })
         .join(", ");
       const stats = state.stats || {};
       el.endStats.innerHTML =
@@ -2767,8 +2843,10 @@
       const type = u && (u.hero ? heroDef(u.typeId) : unitType(u.typeId));
       name = (type && type.name) || (u && u.typeId) || "Unit";
     }
-    if (u && u.researchLevel > 0 && !u.hero && !u.minion) {
-      name += " +" + u.researchLevel;
+    if (u && !u.hero && !u.minion) {
+      const hp = u.researchHpLevel || 0;
+      const atk = u.researchAtkLevel || 0;
+      if (hp > 0 || atk > 0) name += " H" + hp + "/A" + atk;
     }
     return name;
   }
@@ -3474,7 +3552,8 @@
         if (buyHero(card.dataset.heroId, true)) placedType = card.dataset.heroId;
       } else if (card.dataset.shop === "rez") {
         if (rezHero()) placedType = state.heroId;
-      } else if (card.dataset.shop === "upgrade") buyUnitUpgrade(card.dataset.type, true);
+      } else if (card.dataset.shop === "upgrade-hp") buyUnitUpgrade(card.dataset.type, "hp", true);
+      else if (card.dataset.shop === "upgrade-atk") buyUnitUpgrade(card.dataset.type, "atk", true);
       else if (card.dataset.shop === "towers") buyTowerUpgrade(true);
       else if (card.dataset.type) {
         if (buyUnit(card.dataset.type, true)) placedType = card.dataset.type;
@@ -3578,10 +3657,20 @@
       if (card.dataset.shop === "hero" && card.dataset.heroId) {
         return unitTooltipHtml(heroDef(card.dataset.heroId), { hero: true });
       }
+      if (card.dataset.shop === "upgrade-hp" || card.dataset.shop === "upgrade-atk") {
+        const type = unitType(card.dataset.type);
+        if (!type) return "";
+        const lv = unitResearchLevels(state, card.dataset.type);
+        const preview = { hpLevel: lv.hp, atkLevel: lv.atk };
+        if (card.dataset.shop === "upgrade-hp") preview.hpLevel = lv.hp + 1;
+        else preview.atkLevel = lv.atk + 1;
+        return unitTooltipHtml(type, preview);
+      }
       if (card.dataset.type) {
         const type = unitType(card.dataset.type);
         if (!type) return "";
-        return unitTooltipHtml(type, { level: unitLevelFor(state, card.dataset.type) });
+        const lv = unitResearchLevels(state, card.dataset.type);
+        return unitTooltipHtml(type, { hpLevel: lv.hp, atkLevel: lv.atk });
       }
       return "";
     });
@@ -3590,7 +3679,8 @@
       const typeId = chip.dataset.type;
       if (!typeId) return "";
       if (isHeroId(typeId)) return unitTooltipHtml(heroDef(typeId), { hero: true });
-      return unitTooltipHtml(unitType(typeId), { level: 0 });
+      const lv = unitResearchLevels(state, typeId);
+      return unitTooltipHtml(unitType(typeId), { hpLevel: lv.hp, atkLevel: lv.atk });
     });
 
     window.addEventListener("scroll", hideTooltip, { passive: true });
