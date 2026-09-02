@@ -17,7 +17,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
-<body>
+<body data-mobile-pane="battle">
   <div id="app">
     <header id="topbar">
       <div class="topbar-rivet topbar-rivet-tl" aria-hidden="true"></div>
@@ -25,7 +25,7 @@
 
       <div class="topbar-left">
         <a href="../../" class="btn-ghost" title="Back to game hall">Hall</a>
-        <span id="version-label" class="version-tag">v0.7.1</span>
+        <span id="version-label" class="version-tag">v0.7.2</span>
       </div>
 
       <div class="castle-block player">
@@ -96,6 +96,12 @@
     </header>
 
     <main id="game-main">
+      <nav id="mobile-nav" aria-label="Mobile sections">
+        <button type="button" class="mobile-tab is-active" data-pane="battle" aria-pressed="true">Battle</button>
+        <button type="button" class="mobile-tab" data-pane="barracks" aria-pressed="false">Barracks</button>
+        <button type="button" class="mobile-tab" data-pane="shop" aria-pressed="false">Shop</button>
+      </nav>
+
       <div id="round-banner" class="round-banner" hidden aria-live="assertive"></div>
 
       <section id="board-section" class="field-panel" aria-label="Battlefield">
@@ -193,7 +199,7 @@
         <li><strong>Hire</strong> recruits units and Economy; <strong>Research</strong> upgrades types you own (+16% HP / +14% ATK per level, up to 3) and fortifies your towers (+HP, +ATK, +range). Living units and towers get stronger immediately.</li>
         <li><strong>Deploy</strong>: click a barracks unit, then a highlighted spawn tile. Click a placed unit to select it — empty tiles glow to move, occupied tiles swap. Click the barracks (or double-click the unit) to send it back. Esc clears the selection.</li>
         <li>When the 30s timer hits zero, your roster deploys automatically. Combat never pauses — survivors stay and the next countdown starts immediately, until a keep falls.</li>
-        <li><strong>Shortcuts</strong>: H = help · M = mute music · Esc = clear selection. Hover shop/bench cards for full unit stats.</li>
+        <li><strong>Shortcuts</strong>: H = help · M = mute music · Esc = clear selection. Hover shop/bench cards for full unit stats; on a phone, press and hold.</li>
         <li><strong>Win streak</strong>: holding more units on the field than the enemy raises your streak and bonus gold per second (shown in the top bar).</li>
         <li><strong>Roster cap</strong> starts at 2 and grows by 1 each wave (up to 24). Early fights stay small; save gold for better units or economy instead of flooding the field.</li>
         <li><strong>Towers</strong> guard each approach and fire at nearby enemies. Destroy them, then siege the keep.</li>

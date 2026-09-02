@@ -20,6 +20,7 @@ All notable changes to Clickstrike are documented here.
 
 ### Changed
 
+- **Castle Strike v0.7.2** — mobile Battle / Barracks / Shop panes; tooltips dismiss on tap-away and long-press on touch; compact HUD and larger tap targets
 - **Castle Strike v0.7.1** — removed Send Wave (button and Space); waves only deploy when the countdown hits zero
 - **Castle Strike v0.6.2** — slower early economy (10g start, 0.85/s base); premium units unlock by wave (Militia/Spearman only at start; Archer wave 3; Rider/Healer wave 4; Assassin/Grenadier wave 5; Knight/Mage/Guardian wave 6; Catapult wave 7); locked units shown grayed in shop
 - **Castle Strike v0.5.7** — taller battlefield; player towers render above the deploy grid; softer spawn tiles during fights

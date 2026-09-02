@@ -1,9 +1,13 @@
 (() => {
   "use strict";
 
-  const GAME_VERSION = "0.7.1";
+  const GAME_VERSION = "0.7.2";
   const HUD_MS = 100;
   const BATTLE_MS = 50;
+  const MOBILE_MQ = "(max-width: 900px)";
+  const MOBILE_PANE_KEY = "castlestrike-mobile-pane";
+  const HOVER_TOOLTIP_MQ = "(hover: hover) and (pointer: fine)";
+  const LONG_PRESS_MS = 400;
 
   const CASTLE_HP = 140;
   const GRID_COLS = 4;
@@ -1376,6 +1380,7 @@
     shopCatTabs: document.querySelectorAll(".shop-cat-tab"),
     roundBanner: document.getElementById("round-banner"),
     benchHint: document.getElementById("bench-hint"),
+    mobileNav: document.getElementById("mobile-nav"),
     helpBtn: document.getElementById("help-btn"),
     helpModal: document.getElementById("help-modal"),
     helpClose: document.getElementById("help-close"),
@@ -1709,6 +1714,27 @@
   }
 
   let tooltipTarget = null;
+  let longPressTimer = null;
+  let suppressTooltipClick = false;
+
+  function hoverTooltipsEnabled() {
+    try {
+      return window.matchMedia(HOVER_TOOLTIP_MQ).matches;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  function nodeInside(root, node) {
+    return !!(root && node && (root === node || (root.contains && root.contains(node))));
+  }
+
+  function clearLongPress() {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+    }
+  }
 
   function positionTooltip(target) {
     if (!el.gameTooltip || !target) return;
@@ -1732,32 +1758,81 @@
   }
 
   function hideTooltip() {
+    clearLongPress();
     tooltipTarget = null;
     if (el.gameTooltip) el.gameTooltip.hidden = true;
   }
 
+  function hideTooltipIfIn(root) {
+    if (tooltipTarget && root && root.contains(tooltipTarget)) hideTooltip();
+  }
+
   function bindTooltipDelegation(root, selector, getHtml) {
     if (!root) return;
-    root.addEventListener("mouseover", (e) => {
+
+    root.addEventListener("pointerover", (e) => {
+      if (!hoverTooltipsEnabled()) return;
+      if (e.pointerType === "touch") return;
       const card = e.target.closest(selector);
       if (!card) return;
+      if (nodeInside(card, e.relatedTarget)) return;
       const html = getHtml(card);
       if (html) showTooltip(card, html);
     });
-    root.addEventListener("mouseout", (e) => {
+    root.addEventListener("pointerout", (e) => {
+      if (!hoverTooltipsEnabled()) return;
       const card = e.target.closest(selector);
-      if (card && tooltipTarget === card) hideTooltip();
+      if (!card || tooltipTarget !== card) return;
+      if (nodeInside(card, e.relatedTarget)) return;
+      hideTooltip();
     });
-    root.addEventListener("focusin", (e) => {
+
+    root.addEventListener("pointerdown", (e) => {
+      if (hoverTooltipsEnabled() && e.pointerType !== "touch") return;
       const card = e.target.closest(selector);
       if (!card) return;
-      const html = getHtml(card);
-      if (html) showTooltip(card, html);
+      clearLongPress();
+      const pointerId = e.pointerId;
+      const startX = e.clientX;
+      const startY = e.clientY;
+      longPressTimer = setTimeout(() => {
+        longPressTimer = null;
+        if (!card.isConnected) return;
+        const html = getHtml(card);
+        if (!html) return;
+        suppressTooltipClick = true;
+        showTooltip(card, html);
+      }, LONG_PRESS_MS);
+      const cancelOnMove = (mv) => {
+        if (mv.pointerId !== pointerId) return;
+        if (Math.hypot(mv.clientX - startX, mv.clientY - startY) < 12) return;
+        clearLongPress();
+        root.removeEventListener("pointermove", cancelOnMove);
+      };
+      root.addEventListener("pointermove", cancelOnMove);
+      const endPress = (up) => {
+        if (up.pointerId !== pointerId) return;
+        clearLongPress();
+        root.removeEventListener("pointermove", cancelOnMove);
+        root.removeEventListener("pointerup", endPress);
+        root.removeEventListener("pointercancel", endPress);
+      };
+      root.addEventListener("pointerup", endPress);
+      root.addEventListener("pointercancel", endPress);
     });
-    root.addEventListener("focusout", (e) => {
-      const card = e.target.closest(selector);
-      if (card && tooltipTarget === card) hideTooltip();
-    });
+
+    root.addEventListener(
+      "click",
+      (e) => {
+        if (!suppressTooltipClick) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        suppressTooltipClick = false;
+      },
+      true
+    );
+
+    root.addEventListener("scroll", hideTooltip, { passive: true });
   }
 
   function spawnFinaleParticles(won) {
@@ -1889,7 +1964,7 @@
       const accent = typeAccentStyle(t.id);
       if (!unlocked) {
         html +=
-          `<button type="button" class="shop-card is-locked" data-shop="unit" data-type="${t.id}" title="Unlocks at wave ${t.unlockRound}"${accent} disabled>` +
+          `<button type="button" class="shop-card is-locked" data-shop="unit" data-type="${t.id}"${accent} disabled>` +
           `<span class="shop-art">${unitArt(t.id)}</span>` +
           `<span class="shop-name">${t.name}</span>` +
           `<span class="shop-cost">Wave ${t.unlockRound}</span>` +
@@ -1905,7 +1980,7 @@
       const can =
         prep && rosterHasRoom(state.roster) && state.gold >= cost;
       html +=
-        `<button type="button" class="shop-card ${can ? "affordable" : ""}" data-shop="unit" data-type="${t.id}" title="${t.blurb}"${accent} ${can ? "" : "disabled"}>` +
+        `<button type="button" class="shop-card ${can ? "affordable" : ""}" data-shop="unit" data-type="${t.id}"${accent} ${can ? "" : "disabled"}>` +
         `<span class="shop-art">${unitArt(t.id)}</span>` +
         `<span class="shop-name">${t.name}</span>` +
         `<span class="shop-cost">${format(cost)}g</span>` +
@@ -1917,7 +1992,7 @@
       for (const h of HEROES) {
         const can = prep && state.gold >= h.hireGold;
         html +=
-          `<button type="button" class="shop-card hero-card ${can ? "affordable" : ""}" data-shop="hero" data-hero-id="${h.id}" title="${h.blurb}" ${can ? "" : "disabled"}>` +
+          `<button type="button" class="shop-card hero-card ${can ? "affordable" : ""}" data-shop="hero" data-hero-id="${h.id}" ${can ? "" : "disabled"}>` +
           `<span class="shop-art">${unitArt(h.id)}</span>` +
           `<span class="shop-name">${h.name}</span>` +
           `<span class="shop-cost">${format(h.hireGold)}g</span>` +
@@ -1936,6 +2011,7 @@
         `<span class="shop-cost">${format(rez)}g</span>` +
         `</button>`;
     }
+    hideTooltipIfIn(el.shopBar);
     el.shopBar.innerHTML = html;
   }
 
@@ -1999,7 +2075,7 @@
       const can = prep && !maxed && state.gold >= cost;
       const accent = typeAccentStyle(t.id);
       html +=
-        `<button type="button" class="shop-card research-card ${can ? "affordable" : ""}" data-shop="upgrade" data-type="${t.id}" title="${t.blurb}"${accent} ${can ? "" : "disabled"}>` +
+        `<button type="button" class="shop-card research-card ${can ? "affordable" : ""}" data-shop="upgrade" data-type="${t.id}"${accent} ${can ? "" : "disabled"}>` +
         `<span class="shop-art">${unitArt(t.id)}</span>` +
         `<span class="shop-name">${t.name}</span>` +
         `<span class="shop-cost">${maxed ? "MAX" : format(cost) + "g"}</span>` +
@@ -2011,6 +2087,7 @@
       html =
         '<p class="shop-empty">Buy units on Hire, then research them here.</p>';
     }
+    hideTooltipIfIn(el.shopBar);
     el.shopBar.innerHTML = html;
   }
 
@@ -2039,6 +2116,7 @@
     if (sig === lastBenchSig) return;
     lastBenchSig = sig;
     if (state.over) {
+      hideTooltipIfIn(el.benchTray);
       el.benchTray.innerHTML = "";
       return;
     }
@@ -2047,7 +2125,7 @@
       const def = heroDef(state.heroId);
       const sel = state.selectedBenchType === state.heroId ? " is-selected" : "";
       parts.push(
-        `<button type="button" class="bench-chip hero-chip${sel}" data-type="${state.heroId}" data-source="bench" title="${def ? def.blurb : ""}">` +
+        `<button type="button" class="bench-chip hero-chip${sel}" data-type="${state.heroId}" data-source="bench">` +
           `<span class="chip-art">${unitArt(state.heroId)}</span>` +
           `<span class="chip-name">${def ? def.name : "Hero"}</span>` +
           `<span class="chip-count">★</span>` +
@@ -2059,13 +2137,14 @@
       if (n <= 0) continue;
       const sel = state.selectedBenchType === t.id ? " is-selected" : "";
       parts.push(
-        `<button type="button" class="bench-chip${sel}" data-type="${t.id}" data-source="bench" title="${t.blurb}"${typeAccentStyle(t.id)}>` +
+        `<button type="button" class="bench-chip${sel}" data-type="${t.id}" data-source="bench"${typeAccentStyle(t.id)}>` +
           `<span class="chip-art">${unitArt(t.id)}</span>` +
           `<span class="chip-name">${t.name}</span>` +
           `<span class="chip-count">×${n}</span>` +
           `</button>`
       );
     }
+    hideTooltipIfIn(el.benchTray);
     el.benchTray.innerHTML = parts.join("");
   }
 
@@ -3336,6 +3415,8 @@
       } else if (occupantKind(col, row)) {
         state.selectedBoard = { col, row };
         state.selectedBenchType = null;
+      } else {
+        state.selectedBoard = null;
       }
       refreshPlacementUi();
       return;
@@ -3359,6 +3440,7 @@
     el.shopBar?.addEventListener("click", (e) => {
       const card = e.target.closest(".shop-card");
       if (!card || state.over) return;
+      hideTooltip();
       if (card.disabled) {
         playSfx("error");
         shakeGoldPill();
@@ -3381,6 +3463,7 @@
         const next = tab.dataset.shopTab || "hire";
         if (state.shopTab === next) return;
         state.shopTab = next;
+        hideTooltip();
         lastShopSig = "";
         renderHud();
       });
@@ -3390,6 +3473,7 @@
       const chip = e.target.closest(".bench-chip");
       if (!chip) return;
       playSfx("click");
+      hideTooltip();
       const typeId = chip.dataset.type;
       state.selectedBoard = null;
       state.selectedBenchType =
@@ -3423,6 +3507,7 @@
 
     window.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
+        hideTooltip();
         if (!state.selectedBoard && !state.selectedBenchType) return;
         state.selectedBoard = null;
         state.selectedBenchType = null;
@@ -3469,6 +3554,28 @@
       return unitTooltipHtml(unitType(typeId), { level: 0 });
     });
 
+    window.addEventListener("scroll", hideTooltip, { passive: true });
+    document.addEventListener(
+      "pointerdown",
+      (e) => {
+        if (tooltipTarget && !nodeInside(tooltipTarget, e.target)) {
+          hideTooltip();
+        }
+        if (!state || state.over) return;
+        if (!state.selectedBenchType && !state.selectedBoard) return;
+        if (e.target.closest(".bench-chip, .board-cell, #board-grid, #bench-section")) {
+          return;
+        }
+        if (e.target.closest(".modal")) return;
+        state.selectedBenchType = null;
+        state.selectedBoard = null;
+        refreshPlacementUi();
+      },
+      true
+    );
+
+    initMobileChrome();
+
     el.helpBtn?.addEventListener("click", () => {
       playSfx("click");
       el.helpModal.hidden = false;
@@ -3494,6 +3601,43 @@
     el.endModal?.querySelector(".modal-backdrop")?.addEventListener("click", () => {
       if (state.over) startMatch();
     });
+  }
+
+  function initMobileChrome() {
+    const mq = window.matchMedia(MOBILE_MQ);
+    const validPanes = { battle: true, barracks: true, shop: true };
+
+    function setPane(pane) {
+      if (!validPanes[pane]) pane = "battle";
+      document.body.dataset.mobilePane = pane;
+      try {
+        sessionStorage.setItem(MOBILE_PANE_KEY, pane);
+      } catch (_) {}
+      if (!el.mobileNav) return;
+      el.mobileNav.querySelectorAll(".mobile-tab").forEach((tab) => {
+        const on = tab.dataset.pane === pane;
+        tab.classList.toggle("is-active", on);
+        tab.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+      hideTooltip();
+    }
+
+    let saved = "battle";
+    try {
+      saved = sessionStorage.getItem(MOBILE_PANE_KEY) || "battle";
+    } catch (_) {}
+    setPane(saved);
+
+    el.mobileNav?.addEventListener("click", (e) => {
+      const tab = e.target.closest(".mobile-tab");
+      if (!tab) return;
+      playSfx("click");
+      setPane(tab.dataset.pane);
+    });
+
+    const onMq = () => setPane(document.body.dataset.mobilePane || "battle");
+    if (mq.addEventListener) mq.addEventListener("change", onMq);
+    else if (mq.addListener) mq.addListener(onMq);
   }
 
   function initMusic() {
