@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const GAME_VERSION = "0.7.4";
+  const GAME_VERSION = "0.7.5";
   const HUD_MS = 100;
   const BATTLE_MS = 50;
   const MOBILE_MQ = "(max-width: 900px)";
@@ -1057,22 +1057,6 @@
     }
   }
 
-  function firstEmptyCell() {
-    for (let row = 0; row < GRID_ROWS; row++) {
-      for (let col = 0; col < GRID_COLS; col++) {
-        if (!cellIsOccupied(col, row)) return { col, row };
-      }
-    }
-    return null;
-  }
-
-  function autoPlaceFromBench(typeId) {
-    if (!typeId || !canPlaceUnits()) return false;
-    const cell = firstEmptyCell();
-    if (!cell) return false;
-    return placeOnGrid(typeId, cell.col, cell.row);
-  }
-
   function placeOnGrid(typeId, col, row) {
     if (!canPlaceUnits() || !isPlayerCell(col)) return false;
     if (isHeroId(typeId)) {
@@ -1941,6 +1925,10 @@
     if (el.board) {
       el.board.classList.toggle("is-fighting", !!state.fighting);
       el.board.classList.toggle("placement-locked", !canPlaceUnits());
+      el.board.classList.toggle(
+        "is-placing",
+        !!(state.selectedBenchType || state.selectedBoard) && canPlaceUnits()
+      );
     }
     renderCastles();
   }
@@ -2311,7 +2299,11 @@
       el.benchHint.textContent =
         "Click a highlighted tile to move · click the barracks to return";
     } else if (state.selectedBenchType) {
-      el.benchHint.textContent = "Click a highlighted spawn tile to deploy";
+      const def = isHeroId(state.selectedBenchType)
+        ? heroDef(state.selectedBenchType)
+        : unitType(state.selectedBenchType);
+      const name = def && def.name ? def.name : "unit";
+      el.benchHint.textContent = "Tap a glowing spawn tile to place " + name;
     } else {
       el.benchHint.textContent =
         "Select a barracks unit or a placed unit, then click a tile";
@@ -3488,11 +3480,13 @@
         if (buyUnit(card.dataset.type, true)) placedType = card.dataset.type;
       }
       if (placedType) {
-        if (!autoPlaceFromBench(placedType)) {
-          state.selectedBenchType = placedType;
-          state.selectedBoard = null;
-        }
+        state.selectedBenchType = placedType;
+        state.selectedBoard = null;
         goToBattlePaneIfMobile();
+        const def = isHeroId(placedType) ? heroDef(placedType) : unitType(placedType);
+        const name = def && def.name ? def.name : "unit";
+        showBanner("Tap a spawn tile to place " + name, "");
+        hideBannerSoon(1800);
       }
       lastShopSig = "";
       lastBenchSig = "";

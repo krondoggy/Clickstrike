@@ -801,6 +801,11 @@ body.modal-open {
   border-color: rgba(201, 162, 39, 0.18);
   background: rgba(6, 10, 18, 0.08);
 }
+.battlefield.is-fighting.is-placing .spawn-grid {
+  opacity: 1;
+  border-color: rgba(201, 162, 39, 0.65);
+  background: rgba(6, 10, 18, 0.28);
+}
 .battlefield.placement-locked .spawn-grid {
   pointer-events: none;
   opacity: 0.45;
