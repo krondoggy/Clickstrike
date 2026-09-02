@@ -20,6 +20,7 @@ All notable changes to Clickstrike are documented here.
 
 ### Changed
 
+- **Castle Strike v0.7.7** — unit balance pass: archer toned down (DPS, range, cost, volley cadence); minor buffs to militia, mage, grenadier, catapult, rider, assassin
 - **Castle Strike v0.7.6** — unit research split into separate +HP and +ATK tracks per type (3 levels each); choose which stat to stack on the Research tab
 - **Castle Strike v0.7.5** — buying a unit selects it and waits for you to tap a spawn tile; no more auto-drop
 - **Castle Strike v0.7.4** — buying a unit places it on the spawn grid immediately; Battle tab keeps field + barracks together; tapping the field no longer clears a barracks pick

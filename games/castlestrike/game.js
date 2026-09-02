@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const GAME_VERSION = "0.7.6";
+  const GAME_VERSION = "0.7.7";
   const HUD_MS = 100;
   const BATTLE_MS = 50;
   const MOBILE_MQ = "(max-width: 900px)";
@@ -101,7 +101,7 @@
       baseCost: 10,
       costGrowth: 1.32,
       accent: "#90a4ae",
-      hp: 16,
+      hp: 18,
       atk: 3,
       spd: 3.4,
       armor: 0,
@@ -134,19 +134,19 @@
     {
       id: "archer",
       name: "Archer",
-      baseCost: 38,
+      baseCost: 44,
       accent: "#7cb342",
       hp: 14,
-      atk: 11,
-      spd: 4.5,
+      atk: 9,
+      spd: 4,
       armor: 0,
-      atkCd: 0.4,
-      range: 28,
+      atkCd: 0.52,
+      range: 24,
       atkStyle: "ranged",
       tags: ["ranged"],
       strongVs: ["infantry"],
       weakVs: ["cavalry"],
-      blurb: "Volley every 4th shot",
+      blurb: "Volley every 5th shot",
       ability: "volley",
       unlockRound: ARCHER_UNLOCK_ROUND,
     },
@@ -176,7 +176,7 @@
       accent: "#ffb74d",
       hp: 22,
       atk: 9,
-      spd: 5.5,
+      spd: 5.8,
       armor: 0,
       atkCd: 0.45,
       range: 6,
@@ -212,7 +212,7 @@
       name: "Mage",
       baseCost: 78,
       accent: "#ba68c8",
-      hp: 12,
+      hp: 14,
       atk: 18,
       spd: 3.2,
       armor: 0,
@@ -250,8 +250,8 @@
       name: "Assassin",
       baseCost: 64,
       accent: "#ef5350",
-      hp: 16,
-      atk: 12,
+      hp: 18,
+      atk: 11,
       spd: 6.2,
       armor: 0,
       atkCd: 0.42,
@@ -270,7 +270,7 @@
       baseCost: 68,
       accent: "#ff7043",
       hp: 24,
-      atk: 8,
+      atk: 9,
       spd: 2.8,
       armor: 1,
       atkCd: 0.65,
@@ -289,7 +289,7 @@
       baseCost: 96,
       accent: "#8d6e63",
       hp: 20,
-      atk: 7,
+      atk: 8,
       spd: 1.6,
       armor: 0,
       atkCd: 1.1,
@@ -2904,7 +2904,7 @@
     node.classList.toggle("is-aegis", u.aegisT > 0 || u.tauntActive);
     node.classList.toggle(
       "volley-ready",
-      u.ability === "volley" && u.shots > 0 && u.shots % 4 === 3
+      u.ability === "volley" && u.shots > 0 && u.shots % 5 === 4
     );
     updateTokenFacing(u);
   }
@@ -3182,7 +3182,7 @@
       return;
     }
     const volleyId =
-      attacker.ability === "volley" && attacker.shots % 4 === 0 ? attacker.id : null;
+      attacker.ability === "volley" && attacker.shots % 5 === 0 ? attacker.id : null;
     spawnProjectile(attacker.x, attacker.y, target.x, target.y, attacker.atkStyle, attacker.typeId);
     queueProjectile({
       shooterId: attacker.id,
