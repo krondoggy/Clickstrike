@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="description" content="Castle Strike — Direct Strike-style battlefield. Deploy waves, hold the field with survivors, and tear down the enemy keep." />
+  <meta name="theme-color" content="#0a0c12" />
+  <meta property="og:title" content="Castle Strike" />
+  <meta property="og:description" content="Buy, deploy, and march waves across an open battlefield." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://krondoggy.github.io/Clickstrike/games/castlestrike/" />
+  <link rel="canonical" href="https://krondoggy.github.io/Clickstrike/games/castlestrike/" />
+  <title>Castle Strike</title>
+  <link rel="icon" href="../../favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <header id="topbar">
+      <div class="topbar-rivet topbar-rivet-tl" aria-hidden="true"></div>
+      <div class="topbar-rivet topbar-rivet-tr" aria-hidden="true"></div>
+
+      <div class="topbar-left">
+        <a href="../../" class="btn-ghost" title="Back to game hall">Hall</a>
+        <span id="version-label" class="version-tag">v0.7.1</span>
+      </div>
+
+      <div class="castle-block player">
+        <span class="castle-label">Your Keep</span>
+        <div class="castle-hp-bar">
+          <div id="player-castle-fill" class="castle-hp-fill"></div>
+        </div>
+        <span id="player-castle-text" class="castle-hp-text">140</span>
+      </div>
+
+      <div class="topbar-center">
+        <div class="round-badge">Wave <span id="round-display">1</span></div>
+        <div id="phase-status" class="phase-status" role="status" aria-live="polite">
+          <span id="phase-label">First wave</span>
+          <span id="phase-timer" class="phase-timer">30s</span>
+        </div>
+        <div id="streak-pill" class="streak-pill" hidden title="Win streak bonus income">
+          <span class="streak-label">Streak</span>
+          <span id="streak-display">0</span>
+          <span class="streak-bonus">+<span id="streak-gps">0.0</span>/s</span>
+        </div>
+      </div>
+
+      <div class="castle-block enemy">
+        <span class="castle-label">Enemy Keep</span>
+        <div class="castle-hp-bar">
+          <div id="enemy-castle-fill" class="castle-hp-fill enemy"></div>
+        </div>
+        <span id="enemy-castle-text" class="castle-hp-text">140</span>
+      </div>
+
+      <div class="topbar-right">
+        <div class="stat-pill resource-gold" id="gold-pill" title="Your treasury">
+          <span class="stat-icon gold" aria-hidden="true"></span>
+          <span class="stat-body">
+            <span class="stat-row">
+              <span id="gold-display">24</span>
+              <span class="stat-label">Gold</span>
+            </span>
+            <span class="stat-rate" title="Gold per second">
+              <span class="stat-prefix">+</span>
+              <span id="gps-display">2.2</span>
+              <span class="stat-rate-unit">/s</span>
+            </span>
+          </span>
+        </div>
+        <button type="button" id="help-btn" class="btn-ghost">Help</button>
+        <button
+          type="button"
+          id="music-mute-btn"
+          class="btn-ghost music-mute-btn"
+          aria-pressed="false"
+          title="Mute music (M)"
+        >
+          Music
+        </button>
+        <button
+          type="button"
+          id="sfx-mute-btn"
+          class="btn-ghost sfx-mute-btn"
+          aria-pressed="false"
+          title="Mute sound effects"
+        >
+          SFX
+        </button>
+        <button type="button" id="restart-btn" class="btn-ghost">Restart</button>
+      </div>
+    </header>
+
+    <main id="game-main">
+      <div id="round-banner" class="round-banner" hidden aria-live="assertive"></div>
+
+      <section id="board-section" class="field-panel" aria-label="Battlefield">
+        <div class="panel-ornament panel-ornament-tl" aria-hidden="true"></div>
+        <div class="panel-ornament panel-ornament-tr" aria-hidden="true"></div>
+        <div class="panel-ornament panel-ornament-bl" aria-hidden="true"></div>
+        <div class="panel-ornament panel-ornament-br" aria-hidden="true"></div>
+        <div id="board" class="battlefield">
+          <div class="field-sky" aria-hidden="true"></div>
+          <div class="field-hills" aria-hidden="true"></div>
+          <div class="field-ground" aria-hidden="true"></div>
+          <div class="field-road" aria-hidden="true"></div>
+          <div class="field-midline" aria-hidden="true"></div>
+          <div class="field-trees field-trees-n" aria-hidden="true"></div>
+          <div class="field-trees field-trees-s" aria-hidden="true"></div>
+
+          <div class="keep keep-player" id="keep-player">
+            <div class="keep-banner" aria-hidden="true"></div>
+            <div class="keep-art" aria-hidden="true"></div>
+            <div class="keep-hp"><div id="keep-player-fill" class="keep-hp-fill"></div></div>
+            <span class="keep-name">Keep</span>
+          </div>
+          <div class="keep keep-enemy" id="keep-enemy">
+            <div class="keep-banner enemy" aria-hidden="true"></div>
+            <div class="keep-art" aria-hidden="true"></div>
+            <div class="keep-hp"><div id="keep-enemy-fill" class="keep-hp-fill enemy"></div></div>
+            <span class="keep-name">Keep</span>
+          </div>
+
+          <div id="tower-layer" class="tower-layer"></div>
+          <div id="board-grid" class="spawn-grid" aria-label="Deployment zone"></div>
+          <div id="combat-layer" class="combat-layer" aria-hidden="true"></div>
+        </div>
+      </section>
+
+      <section id="bench-section" class="command-panel" aria-label="Unit bench">
+        <div class="panel-ornament panel-ornament-tl" aria-hidden="true"></div>
+        <div class="panel-ornament panel-ornament-tr" aria-hidden="true"></div>
+        <div class="panel-ornament panel-ornament-bl" aria-hidden="true"></div>
+        <div class="panel-ornament panel-ornament-br" aria-hidden="true"></div>
+        <h2 class="section-label">Barracks</h2>
+        <p id="bench-hint" class="section-hint">Select a barracks unit or a placed unit, then click a tile</p>
+        <div id="bench-tray" class="bench-tray"></div>
+      </section>
+
+      <section id="shop-section" class="command-panel" aria-label="Shop">
+        <div class="panel-ornament panel-ornament-tl" aria-hidden="true"></div>
+        <div class="panel-ornament panel-ornament-tr" aria-hidden="true"></div>
+        <div class="panel-ornament panel-ornament-bl" aria-hidden="true"></div>
+        <div class="panel-ornament panel-ornament-br" aria-hidden="true"></div>
+        <h2 class="section-label">Mercenary Camp</h2>
+        <p id="shop-hint" class="section-hint">Army 0/2 · cap grows each wave</p>
+        <div class="shop-cat-tabs" role="tablist" aria-label="Shop categories">
+          <button
+            type="button"
+            class="shop-cat-tab is-active"
+            id="shop-tab-hire"
+            data-shop-tab="hire"
+            role="tab"
+            aria-selected="true"
+            aria-controls="shop-bar"
+          >
+            Hire
+          </button>
+          <button
+            type="button"
+            class="shop-cat-tab"
+            id="shop-tab-research"
+            data-shop-tab="research"
+            role="tab"
+            aria-selected="false"
+            aria-controls="shop-bar"
+          >
+            Research<span class="shop-cat-badge" hidden aria-hidden="true"></span>
+          </button>
+        </div>
+        <div id="shop-bar" class="shop-bar" role="tabpanel" aria-labelledby="shop-tab-hire"></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="help-modal" class="modal" hidden aria-hidden="true">
+    <button type="button" class="modal-backdrop" aria-label="Close help"></button>
+    <div class="modal-panel panel" role="dialog" aria-modal="true" aria-labelledby="help-title">
+      <div class="panel-ornament panel-ornament-tl" aria-hidden="true"></div>
+      <div class="panel-ornament panel-ornament-tr" aria-hidden="true"></div>
+      <div class="panel-ornament panel-ornament-bl" aria-hidden="true"></div>
+      <div class="panel-ornament panel-ornament-br" aria-hidden="true"></div>
+      <div class="modal-header">
+        <h2 id="help-title">How to Play</h2>
+        <button type="button" id="help-close" class="btn-ghost">Close</button>
+      </div>
+      <ul class="help-list">
+        <li><strong>Gold</strong> trickles in all the time. Economy upgrades raise your gold per second. Buy and place the next wave while the field is still fighting.</li>
+        <li><strong>Hire</strong> recruits units and Economy; <strong>Research</strong> upgrades types you own (+16% HP / +14% ATK per level, up to 3) and fortifies your towers (+HP, +ATK, +range). Living units and towers get stronger immediately.</li>
+        <li><strong>Deploy</strong>: click a barracks unit, then a highlighted spawn tile. Click a placed unit to select it — empty tiles glow to move, occupied tiles swap. Click the barracks (or double-click the unit) to send it back. Esc clears the selection.</li>
+        <li>When the 30s timer hits zero, your roster deploys automatically. Combat never pauses — survivors stay and the next countdown starts immediately, until a keep falls.</li>
+        <li><strong>Shortcuts</strong>: H = help · M = mute music · Esc = clear selection. Hover shop/bench cards for full unit stats.</li>
+        <li><strong>Win streak</strong>: holding more units on the field than the enemy raises your streak and bonus gold per second (shown in the top bar).</li>
+        <li><strong>Roster cap</strong> starts at 2 and grows by 1 each wave (up to 24). Early fights stay small; save gold for better units or economy instead of flooding the field.</li>
+        <li><strong>Towers</strong> guard each approach and fire at nearby enemies. Destroy them, then siege the keep.</li>
+        <li>The first keep to fall loses. Units that reach a keep chip its HP directly.</li>
+        <li><strong>Champions</strong> (wave 4+): one hero per match — Bulwark, Bonesinger, or Raid Captain. Pay gold to rez if they fall during the countdown.</li>
+        <li><strong>Abilities</strong>: Brace, Volley, Shield Bash, Charge, Sanctuary, Arcane splash, Guardian Aegis taunt.</li>
+        <li><strong>New roles</strong>: Militia cheap soak · Assassin dives backline · Grenadier splash · Catapult siege.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div id="end-modal" class="modal" hidden aria-hidden="true">
+    <button type="button" class="modal-backdrop" aria-label="Close"></button>
+    <div class="modal-panel modal-panel-sm panel" role="dialog" aria-modal="true" aria-labelledby="end-title">
+      <div class="panel-ornament panel-ornament-tl" aria-hidden="true"></div>
+      <div class="panel-ornament panel-ornament-tr" aria-hidden="true"></div>
+      <div class="panel-ornament panel-ornament-bl" aria-hidden="true"></div>
+      <div class="panel-ornament panel-ornament-br" aria-hidden="true"></div>
+      <h2 id="end-title">Victory</h2>
+      <p id="end-body"></p>
+      <ul id="end-stats" class="help-list"></ul>
+      <div class="modal-actions">
+        <button type="button" id="end-restart" class="btn-fight">Play Again</button>
+        <a href="../../" class="btn-ghost">Hall</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="game-tooltip" class="game-tooltip" hidden role="tooltip"></div>
+  <div id="gold-float-layer" class="gold-float-layer" aria-hidden="true"></div>
+
+  <audio id="bg-music" preload="auto" playsinline></audio>
+
+  <script src="game.js"></script>
+</body>
+</html>

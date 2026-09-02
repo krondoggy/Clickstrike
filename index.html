@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="description" content="Browser idle clicker — mine gold, forage food, auto-train troops, and destroy the enemy keep in a looping assault." />
+  <meta name="description" content="A hall of browser games — start with Clickstrike, then return here for the next campaign." />
   <meta name="theme-color" content="#0a0c12" />
   <meta property="og:title" content="Clickstrike" />
-  <meta property="og:description" content="Mine gold, forage food, auto-train troops, and destroy the enemy keep." />
+  <meta property="og:description" content="A hall of browser games. Mine gold, forage food, and destroy the enemy keep." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://krondoggy.github.io/Clickstrike/" />
   <meta property="og:image" content="https://krondoggy.github.io/Clickstrike/assets/og-image.png" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Clickstrike" />
-  <meta name="twitter:description" content="Mine gold, forage food, auto-train troops, and destroy the enemy keep." />
+  <meta name="twitter:description" content="A hall of browser games. Mine gold, forage food, and destroy the enemy keep." />
   <meta name="twitter:image" content="https://krondoggy.github.io/Clickstrike/assets/og-image.png" />
   <link rel="canonical" href="https://krondoggy.github.io/Clickstrike/" />
   <title>Clickstrike</title>
@@ -20,381 +20,83 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="shared/hub.css" />
 </head>
-<body data-mobile-pane="battle">
-  <header id="topbar">
-    <div class="topbar-rivet topbar-rivet-tl" aria-hidden="true"></div>
-    <div class="topbar-rivet topbar-rivet-tr" aria-hidden="true"></div>
-    <h1 class="visually-hidden">Clickstrike</h1>
-    <div
-      id="battle-strip"
-      class="battle-strip"
-      role="status"
-      aria-live="polite"
-      aria-label="Battle progress"
-    >
-      <div class="battle-strip-side player">
-        <span class="battle-strip-count" id="player-unit-count">0</span>
-        <span class="battle-strip-label">You</span>
-      </div>
-      <div class="battle-strip-meter" title="Keep strength">
-        <div class="battle-strip-track player" aria-hidden="true">
-          <div id="strip-player-fill" class="battle-strip-fill"></div>
-        </div>
-        <div class="battle-strip-vs" aria-hidden="true">vs</div>
-        <div class="battle-strip-track enemy" aria-hidden="true">
-          <div id="strip-enemy-fill" class="battle-strip-fill"></div>
-        </div>
-      </div>
-      <div class="battle-strip-side enemy">
-        <span class="battle-strip-count" id="enemy-unit-count">0</span>
-        <span class="battle-strip-label">Foe</span>
-      </div>
-    </div>
-    <div class="topbar-stats">
-      <div class="stat-pill resource-gold" title="Your treasury">
-        <span class="stat-icon gold" aria-hidden="true"></span>
-        <span class="stat-body">
-          <span class="stat-row">
-            <span id="gold-display">0</span>
-            <span class="stat-label">Gold</span>
-          </span>
-          <span class="stat-rate" title="Gold per second">
-            <span class="stat-prefix">+</span>
-            <span id="gps-display">0</span>
-            <span class="stat-rate-unit">/s</span>
-          </span>
-        </span>
-      </div>
-      <div class="stat-pill resource-food" title="Larder — spend to recruit">
-        <span
-          id="starvation-warning"
-          class="starvation-warning"
-          hidden
-          aria-live="polite"
-        >Starving!</span>
-        <span class="stat-icon food" aria-hidden="true"></span>
-        <span class="stat-body">
-          <span class="stat-row">
-            <span id="food-display">0</span>
-            <span class="stat-label">Food</span>
-          </span>
-          <span class="stat-rate resource-fps" title="Net food per second (income − army upkeep)">
-            <span id="fps-prefix" class="stat-prefix">+</span>
-            <span id="fps-display">0</span>
-            <span class="stat-rate-unit">/s</span>
-          </span>
-        </span>
-      </div>
-      <div class="stat-pill resource-wave" title="Current enemy wave">
-        <span class="stat-icon wave" aria-hidden="true"></span>
-        <span class="stat-body">
-          <span class="stat-label">Wave</span>
-          <span id="wave-display">1</span>
-        </span>
-      </div>
-      <div
-        id="hero-chip"
-        class="stat-pill resource-hero"
-        title="Your chosen hero"
-        hidden
-        aria-hidden="true"
-      >
-        <span class="stat-icon hero" aria-hidden="true"></span>
-        <span class="stat-body">
-          <span class="stat-label">Hero</span>
-          <span id="hero-chip-name">—</span>
-        </span>
-      </div>
-    </div>
-    <div class="topbar-actions">
-      <span id="version-label" class="version-label" aria-label="Game version">v1.0.0</span>
-      <button
-        type="button"
-        id="help-btn"
-        class="help-btn"
-        title="How to play"
-      >
-        Help
-      </button>
-      <button
-        type="button"
-        id="music-mute-btn"
-        class="music-mute-btn"
-        aria-pressed="false"
-        title="Mute music"
-      >
-        Music
-      </button>
-      <button
-        type="button"
-        id="new-game-btn"
-        class="new-game-btn"
-        title="Wipe save and start over"
-      >
-        New Game
-      </button>
-    </div>
-  </header>
+<body class="hub">
+  <div class="hub-wrap">
+    <header class="hub-brand">
+      <svg class="hub-mark" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect width="32" height="32" rx="2" fill="#0a0c12"/>
+        <path fill="#e8c547" d="M8 26V14h3v-3h2V9h6v2h2v3h3v12H8zm5-12h6v2h-6v-2zm-2 4h10v8H11v-8z"/>
+        <path fill="#ffe9a0" d="M14 6h4v3h-4z"/>
+        <path fill="#c9a227" d="M15 3h2v3h-2z"/>
+      </svg>
+      <h1>Clickstrike</h1>
+      <p class="hub-tag">A hall of browser games. Pick a campaign — more will land here.</p>
+    </header>
 
-  <audio id="bg-music" preload="auto" playsinline></audio>
-
-  <div id="hud">
-    <nav id="mobile-nav" aria-label="Mobile sections">
-      <button type="button" class="mobile-tab is-active" data-pane="battle" aria-pressed="true">Battle</button>
-      <button type="button" class="mobile-tab" data-pane="upgrades" aria-pressed="false" aria-label="Upgrades">
-        Upgrades<span class="mobile-tab-badge" hidden aria-hidden="true"></span>
-      </button>
-      <button type="button" class="mobile-tab" data-pane="army" aria-pressed="false">Army</button>
-    </nav>
-
-    <section id="stage" class="panel" aria-label="Battlefield">
-      <div class="panel-ornament panel-ornament-tl" aria-hidden="true"></div>
-      <div class="panel-ornament panel-ornament-tr" aria-hidden="true"></div>
-      <div class="panel-ornament panel-ornament-bl" aria-hidden="true"></div>
-      <div class="panel-ornament panel-ornament-br" aria-hidden="true"></div>
-
-      <div id="battle-arena">
-        <div class="battlefield-chrome">
-          <div id="wave-preview"></div>
-          <div id="loop-status" class="loop-status" role="status">
-            <span id="loop-status-text" class="loop-status-text">Wave 1 continuous</span>
-            <div id="countdown-bar" class="countdown-bar" hidden aria-hidden="true">
-              <div id="countdown-bar-fill" class="countdown-bar-fill"></div>
-            </div>
-          </div>
-        </div>
-
-        <div id="base-hp-row">
-          <div class="base-hp-block player">
-            <span class="base-hp-label">Your Keep</span>
-            <div class="base-hp-track">
-              <div id="player-base-fill" class="base-hp-fill"></div>
-              <span id="player-base-text" class="base-hp-text">120/120</span>
-            </div>
-          </div>
-          <div id="battle-status-label">Ready</div>
-          <div class="base-hp-block enemy">
-            <span class="base-hp-label">Enemy Keep</span>
-            <div class="base-hp-track">
-              <div id="enemy-base-fill" class="base-hp-fill"></div>
-              <span id="enemy-base-text" class="base-hp-text">80/80</span>
-            </div>
-          </div>
-        </div>
-
-        <div id="battlefield">
-          <div id="field-ground" aria-hidden="true"></div>
-          <div id="base-player" class="field-base player" aria-hidden="true">
-            <div class="base-structure keep-ally">
-              <svg class="keep-svg" viewBox="0 0 80 100" xmlns="http://www.w3.org/2000/svg">
-                <rect class="k-wall" x="8" y="42" width="64" height="52" rx="2"/>
-                <rect class="k-door" x="32" y="68" width="16" height="26"/>
-                <rect class="k-gate" x="36" y="72" width="8" height="10"/>
-                <rect class="k-tower" x="4" y="28" width="18" height="66"/>
-                <rect class="k-tower" x="58" y="28" width="18" height="66"/>
-                <path class="k-battlement" d="M4 28h18v-6h-3v4h-4v-4h-4v4h-4v-4h-3zm54 0h18v-6h-3v4h-4v-4h-4v4h-4v-4h-3z"/>
-                <path class="k-battlement" d="M22 42h36v-5h-4v3h-5v-3h-5v3h-5v-3h-5v3h-5v-3h-4v5z"/>
-                <rect class="k-keep" x="26" y="18" width="28" height="30"/>
-                <path class="k-battlement" d="M26 18h28v-6h-4v4h-5v-4h-5v4h-5v-4h-5v4h-4v6z"/>
-                <path class="k-roof" d="M24 18l16-12 16 12z"/>
-                <rect class="k-banner" x="38" y="2" width="4" height="16"/>
-                <path class="k-flag" d="M42 2h14l-4 5 4 5H42z"/>
-                <rect class="k-window" x="34" y="28" width="5" height="7"/>
-                <rect class="k-window" x="41" y="28" width="5" height="7"/>
-                <rect class="k-window" x="8" y="48" width="5" height="6"/>
-                <rect class="k-window" x="67" y="48" width="5" height="6"/>
-              </svg>
-            </div>
-          </div>
-          <div id="base-enemy" class="field-base enemy" aria-hidden="true">
-            <div class="base-structure keep-foe">
-              <svg class="keep-svg" viewBox="0 0 80 100" xmlns="http://www.w3.org/2000/svg">
-                <rect class="k-wall" x="10" y="48" width="60" height="46" rx="1"/>
-                <path class="k-door" d="M30 70h20v24H30z"/>
-                <path class="k-spike" d="M30 70l10-8 10 8z"/>
-                <rect class="k-tower" x="2" y="30" width="16" height="64"/>
-                <rect class="k-tower" x="62" y="30" width="16" height="64"/>
-                <path class="k-horn" d="M2 30l8-14 8 14zm62 0l8-14 8 14z"/>
-                <path class="k-battlement" d="M18 48h44v-5h-5v3h-6v-3h-6v3h-6v-3h-6v3h-6v-3h-5v5z"/>
-                <rect class="k-keep" x="24" y="22" width="32" height="32"/>
-                <path class="k-battlement" d="M24 22h32v-5h-4v3h-6v-3h-6v3h-6v-3h-6v3h-4v5z"/>
-                <path class="k-roof" d="M20 22l20-16 20 16z"/>
-                <circle class="k-gem" cx="40" cy="14" r="4"/>
-                <path class="k-spike" d="M28 22l4-8 4 8zm16 0l4-8 4 8z"/>
-                <rect class="k-window" x="30" y="34" width="6" height="8"/>
-                <rect class="k-window" x="44" y="34" width="6" height="8"/>
-                <rect class="k-window" x="5" y="50" width="5" height="7"/>
-                <rect class="k-window" x="70" y="50" width="5" height="7"/>
-              </svg>
-            </div>
-          </div>
-          <div id="field-units"></div>
-        </div>
-      </div>
-    </section>
-
-    <footer id="console">
-      <section class="panel console-panel" id="panel-resource">
+    <main class="hub-grid" aria-label="Games">
+      <a class="game-card panel" href="games/clickstrike/">
         <div class="panel-ornament panel-ornament-tl" aria-hidden="true"></div>
         <div class="panel-ornament panel-ornament-tr" aria-hidden="true"></div>
         <div class="panel-ornament panel-ornament-bl" aria-hidden="true"></div>
         <div class="panel-ornament panel-ornament-br" aria-hidden="true"></div>
-
-        <h2>Treasury</h2>
-        <h3>War Chest</h3>
-        <div id="war-chest-list" class="command-list"></div>
-        <div class="upgrade-cat-tabs" role="tablist" aria-label="Upgrade categories">
-          <button
-            type="button"
-            class="upgrade-cat-tab is-active"
-            role="tab"
-            id="upgrade-tab-economy"
-            data-upgrade-cat="economy"
-            aria-selected="true"
-            aria-controls="upgrade-list"
-          >
-            Economy<span class="upgrade-cat-badge" hidden aria-hidden="true"></span>
-          </button>
-          <button
-            type="button"
-            class="upgrade-cat-tab"
-            role="tab"
-            id="upgrade-tab-troops"
-            data-upgrade-cat="troops"
-            aria-selected="false"
-            aria-controls="upgrade-list"
-            tabindex="-1"
-          >
-            Troops<span class="upgrade-cat-badge" hidden aria-hidden="true"></span>
-          </button>
+        <div class="game-card-art" aria-hidden="true">
+          <svg class="keep-svg" viewBox="0 0 80 100" xmlns="http://www.w3.org/2000/svg">
+            <rect class="k-wall" x="8" y="42" width="64" height="52" rx="2"/>
+            <rect class="k-door" x="32" y="68" width="16" height="26"/>
+            <rect class="k-gate" x="36" y="72" width="8" height="10"/>
+            <rect class="k-tower" x="4" y="28" width="18" height="66"/>
+            <rect class="k-tower" x="58" y="28" width="18" height="66"/>
+            <path class="k-battlement" d="M4 28h18v-6h-3v4h-4v-4h-4v4h-4v-4h-3zm54 0h18v-6h-3v4h-4v-4h-4v4h-4v-4h-3z"/>
+            <path class="k-battlement" d="M22 42h36v-5h-4v3h-5v-3h-5v3h-5v-3h-5v3h-5v-3h-4v5z"/>
+            <rect class="k-keep" x="26" y="18" width="28" height="30"/>
+            <path class="k-battlement" d="M26 18h28v-6h-4v4h-5v-4h-5v4h-5v-4h-5v4h-4v6z"/>
+            <path class="k-roof" d="M24 18l16-12 16 12z"/>
+            <rect class="k-banner" x="38" y="2" width="4" height="16"/>
+            <path class="k-flag" d="M42 2h14l-4 5 4 5H42z"/>
+            <rect class="k-window" x="34" y="28" width="5" height="7"/>
+            <rect class="k-window" x="41" y="28" width="5" height="7"/>
+            <rect class="k-window" x="8" y="48" width="5" height="6"/>
+            <rect class="k-window" x="67" y="48" width="5" height="6"/>
+          </svg>
         </div>
-        <div id="upgrade-list" class="command-list" role="tabpanel" aria-labelledby="upgrade-tab-economy"></div>
-      </section>
+        <h2>Clickstrike</h2>
+        <p class="game-card-blurb">Mine gold, forage food, auto-train troops, and destroy the enemy keep in a looping assault.</p>
+        <span class="game-card-cta">Play</span>
+      </a>
 
-      <section class="panel console-panel" id="panel-commands">
+      <a class="game-card panel" href="games/castlestrike/">
         <div class="panel-ornament panel-ornament-tl" aria-hidden="true"></div>
         <div class="panel-ornament panel-ornament-tr" aria-hidden="true"></div>
         <div class="panel-ornament panel-ornament-bl" aria-hidden="true"></div>
         <div class="panel-ornament panel-ornament-br" aria-hidden="true"></div>
-
-        <h2>Army</h2>
-        <div id="army-home">
-          <p id="army-upkeep" class="army-upkeep" hidden></p>
-          <p id="spawn-hint" class="log-muted">Click a unit to train (faster than Auto). Toggle Auto on several types for a mixed draft — counters matter.</p>
-          <h3 class="army-subhead">Heroes</h3>
-          <div id="hero-list" class="hero-list"></div>
-          <h3 class="army-subhead">Troops</h3>
-          <div id="recruit-list" class="command-grid"></div>
+        <div class="game-card-art" aria-hidden="true">
+          <svg class="keep-svg" viewBox="0 0 80 100" xmlns="http://www.w3.org/2000/svg">
+            <rect class="k-wall" x="10" y="48" width="60" height="46" rx="1"/>
+            <path class="k-door" d="M30 70h20v24H30z"/>
+            <path class="k-spike" d="M30 70l10-8 10 8z"/>
+            <rect class="k-tower" x="2" y="30" width="16" height="64"/>
+            <rect class="k-tower" x="62" y="30" width="16" height="64"/>
+            <path class="k-horn" d="M2 30l8-14 8 14zm62 0l8-14 8 14z"/>
+            <path class="k-battlement" d="M18 48h44v-5h-5v3h-6v-3h-6v3h-6v-3h-6v3h-6v-3h-5v5z"/>
+            <rect class="k-keep" x="24" y="22" width="32" height="32"/>
+            <path class="k-battlement" d="M24 22h32v-5h-4v3h-6v-3h-6v3h-6v-3h-6v3h-4v5z"/>
+            <path class="k-roof" d="M20 22l20-16 20 16z"/>
+            <circle class="k-gem" cx="40" cy="14" r="4"/>
+            <path class="k-spike" d="M28 22l4-8 4 8zm16 0l4-8 4 8z"/>
+          </svg>
         </div>
-      </section>
-    </footer>
-
-    <div id="resource-dock" class="resource-click-row">
-      <div class="resource-click-slot" data-resource="gold">
-        <div class="auto-cursor-ring" id="gold-cursors" aria-hidden="true"></div>
-        <button id="click-btn" type="button">
-          <span class="click-btn-label">Mine Gold</span>
-          <span class="click-btn-sub">+<span id="click-power-display">1</span> per click</span>
-        </button>
-        <button
-          type="button"
-          class="resource-auto-toggle"
-          id="gold-auto-toggle"
-          hidden
-          aria-pressed="true"
-          aria-label="Toggle auto mine"
-        >
-          <span class="auto-toggle-label">Auto</span>
-        </button>
-      </div>
-      <div class="resource-click-slot" data-resource="food">
-        <div class="auto-cursor-ring" id="food-cursors" aria-hidden="true"></div>
-        <button id="food-click-btn" type="button">
-          <span class="click-btn-label">Forage</span>
-          <span class="click-btn-sub">+<span id="food-click-power-display">1</span> food</span>
-        </button>
-        <button
-          type="button"
-          class="resource-auto-toggle"
-          id="food-auto-toggle"
-          hidden
-          aria-pressed="true"
-          aria-label="Toggle auto forage"
-        >
-          <span class="auto-toggle-label">Auto</span>
-        </button>
-      </div>
-      <button id="army-dock-btn" type="button" class="army-dock-btn" aria-expanded="false" aria-controls="army-sheet">
-        <span class="click-btn-label">Army</span>
-        <span class="click-btn-sub">Train troops</span>
-      </button>
-    </div>
-
-    <div id="army-sheet" class="army-sheet" hidden aria-hidden="true">
-      <button type="button" class="army-sheet-backdrop" aria-label="Close army panel"></button>
-      <div
-        class="army-sheet-panel"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="army-sheet-title"
-      >
-        <div class="army-sheet-header">
-          <h2 id="army-sheet-title">Army</h2>
-          <button type="button" id="army-sheet-close" class="army-sheet-close">Close</button>
-        </div>
-        <div id="army-sheet-body" class="army-sheet-body"></div>
-      </div>
-    </div>
+        <h2>Castle Strike</h2>
+        <p class="game-card-blurb">Direct Strike-style tug-of-war — build a roster, spawn waves, and smash the enemy castle.</p>
+        <span class="game-card-cta">Play</span>
+      </a>
+    </main>
   </div>
 
-  <div id="help-modal" class="game-modal" hidden aria-hidden="true">
-    <button type="button" class="game-modal-backdrop" aria-label="Close help"></button>
-    <div
-      class="game-modal-panel"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="help-modal-title"
-    >
-      <div class="game-modal-header">
-        <h2 id="help-modal-title">How to Play</h2>
-        <button type="button" id="help-modal-close" class="game-modal-close">Close</button>
-      </div>
-      <div class="game-modal-body">
-        <ul class="help-list">
-          <li><strong>Mine Gold</strong> and <strong>Forage</strong> to fund your war. Buy Economy upgrades in Treasury — miners and foragers auto-click at 40% yield.</li>
-          <li>Your <strong>army eats food</strong> every second while fighting. Watch the net food rate in the top bar. Run out and troops weaken, healers stop, and units desert.</li>
-          <li>Wave 1 starts with a countdown. Then battle loops — destroy the enemy keep (right) before yours (left) falls.</li>
-          <li><strong>Army panel:</strong> click a unit to train (faster than Auto). Toggle Auto on several types for a mixed draft. Counters matter — spears beat cavalry, archers beat infantry, and so on.</li>
-          <li><strong>Heroes</strong> are expensive gold + food sinks. When they fall, pay 40% of hire cost to rez. One hero at a time.</li>
-          <li><strong>Win</strong> a wave for gold and advance. <strong>Lose</strong> and you drop gold, food, and a wave. Progress autosaves in your browser.</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-
-  <div id="confirm-modal" class="game-modal" hidden aria-hidden="true">
-    <button type="button" class="game-modal-backdrop" aria-label="Cancel"></button>
-    <div
-      class="game-modal-panel game-modal-panel-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="confirm-modal-title"
-    >
-      <div class="game-modal-header">
-        <h2 id="confirm-modal-title">Confirm</h2>
-      </div>
-      <div class="game-modal-body">
-        <p id="confirm-modal-body"></p>
-      </div>
-      <div class="game-modal-actions">
-        <button type="button" id="confirm-modal-cancel" class="game-modal-btn">Cancel</button>
-        <button type="button" id="confirm-modal-ok" class="game-modal-btn game-modal-btn-primary">Confirm</button>
-      </div>
-    </div>
-  </div>
-
-  <script src="game.js"></script>
+  <footer class="hub-foot">
+    <span>Idle wars in the browser</span>
+    <a href="https://github.com/krondoggy/Clickstrike">Source</a>
+  </footer>
 </body>
 </html>

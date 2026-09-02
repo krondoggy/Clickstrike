@@ -1,12 +1,20 @@
 # Clickstrike
 
-Browser idle clicker / continuous base assault. Mine gold, forage food, train troops, destroy the enemy keep.
+A hall of browser games. The first campaign is an idle clicker / continuous base assault: mine gold, forage food, train troops, destroy the enemy keep.
 
 **Play online:** [https://krondoggy.github.io/Clickstrike/](https://krondoggy.github.io/Clickstrike/)
 
-## Play locally
+The home page lists every game. Clickstrike lives at [games/clickstrike](https://krondoggy.github.io/Clickstrike/games/clickstrike/). **Castle Strike** (Direct Strike-style roster tug-of-war) lives at [games/castlestrike](https://krondoggy.github.io/Clickstrike/games/castlestrike/).
 
-Open `index.html` (or a local static server). No build step.
+## Castle Strike
+
+Inspired by Warcraft III **Direct Strike**. Passive gold economy — buy units into a permanent roster (Militia through Catapult plus core counters), place each wave on the spawn grid while survivors keep fighting, and every ~30 seconds your army marches against an AI building under the same rules. Roster size starts at 2 and grows by 1 each wave, so early waves stay small. From wave 4 hire one **Champion** (Bulwark, Bonesinger, or Raid Captain) with team auras; rez with gold if they fall during the countdown. **Research** owned unit types (+16% HP / +14% ATK per level, up to 3) and upgrade your **towers** (+HP, +ATK, +range) from the Mercenary Camp Research tab — living fighters and standing towers get stronger immediately. Units use signature abilities (Brace, Volley, Charge, Aegis, etc.) and lane-aware combat AI. Destroy the enemy castle before yours falls.
+
+Open `games/castlestrike/index.html` from the hall or directly.
+
+## Clickstrike
+
+Open `index.html` (or a local static server). No build step. From the hall, open a game card — or go straight to `games/clickstrike/index.html`.
 
 1. **Mine Gold** / **Forage** and buy upgrades — the economy is the main game. Hire **miners** and **foragers** in Treasury (Economy): each one auto-clicks once per second at **40% of your manual click yield**. **Mining Drill** / **Forage Tools** make them click faster. Manual clicking stays full strength.
 2. Wave 1 opens with a short **countdown**, then battle **always loops** — your keep (left) vs theirs (right). During countdown you can arm **Auto**, but training and War Chest wait until combat starts.
@@ -50,6 +58,15 @@ Progress autosaves in the browser (`localStorage`). Refresh resumes meta progres
 ## Music
 
 Background tracks: `07-human-1.mp3`, `13-arrival-at-kalimdor.mp3` (included for personal use in this project).
+
+## Site layout
+
+- `index.html` — game hall (home)
+- `shared/theme.css` — colors, fonts, stone/gold panel chrome used by every page
+- `shared/hub.css` — home layout
+- `games/<name>/` — one folder per game (`index.html`, scripts, game CSS)
+
+To add a game: create `games/<name>/`, import `../../shared/theme.css`, and add a card on the home page.
 
 ## Deploy (GitHub Pages)
 

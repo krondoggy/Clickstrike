@@ -3,6 +3,12 @@
 
   const HUD_MS = 100;
   const BATTLE_MS = 50;
+  /** Slower sim/paint on phones so the 20Hz desktop loop does not cook the SoC. */
+  const BATTLE_MS_MOBILE = 80;
+  const HUD_BATTLE_S = 0.15;
+  const HUD_BATTLE_S_MOBILE = 0.22;
+  /** Idle gold/food catch-up when the tab was backgrounded (seconds). */
+  const IDLE_CATCHUP_MAX_S = 8 * 3600;
   /** Soft DOM/perf ceiling; Granary army capacity is the real player limit. */
   const FIELD_SOFT_CAP = 40;
   const PLAYER_BASE_HP = 120;
@@ -70,8 +76,8 @@
   const MUSIC_VOLUME_KEY = "clickstrike-music-volume";
   const MUSIC_MUTED_KEY = "clickstrike-music-muted";
   const MUSIC_TRACKS = [
-    "assets/audio/music/07-human-1.mp3",
-    "assets/audio/music/13-arrival-at-kalimdor.mp3",
+    "../../assets/audio/music/07-human-1.mp3",
+    "../../assets/audio/music/13-arrival-at-kalimdor.mp3",
   ];
   const FOOD_UPGRADE_IDS = {
     baskets: true,
@@ -1171,7 +1177,54 @@
   let lastRecruitSig = "";
   let lastRecruitStructureSig = "";
   let lastHeroSig = "";
+  let lastWavePreviewHtml = "";
+  let lastBaseHudSig = "";
+  let lastResourceHudSig = "";
   let waveTransitionTimer = null;
+  const tokenEls = new Map();
+  const mobileMq =
+    typeof window !== "undefined" ? window.matchMedia(MOBILE_MQ) : null;
+  const reduceMotionMq =
+    typeof window !== "undefined"
+      ? window.matchMedia("(prefers-reduced-motion: reduce)")
+      : null;
+
+  function isMobileView() {
+    return !!(mobileMq && mobileMq.matches);
+  }
+
+  function prefersReduceMotion() {
+    return !!(reduceMotionMq && reduceMotionMq.matches);
+  }
+
+  function fieldVisible() {
+    if (typeof document !== "undefined" && document.hidden) return false;
+    if (
+      isMobileView() &&
+      document.body.dataset.mobilePane &&
+      document.body.dataset.mobilePane !== "battle"
+    ) {
+      return false;
+    }
+    return true;
+  }
+
+  function fieldFxOn() {
+    return fieldVisible() && !prefersReduceMotion();
+  }
+
+  function resourceFxOn() {
+    if (prefersReduceMotion()) return false;
+    if (isMobileView() && document.body.dataset.mobilePane === "battle") {
+      return false;
+    }
+    return true;
+  }
+
+  function clearFieldUnits() {
+    tokenEls.clear();
+    if (el.fieldUnits) el.fieldUnits.innerHTML = "";
+  }
 
   function defaultUpgradeLevels() {
     return defaultUpgradeLevelsDraft();
@@ -1332,7 +1385,7 @@
     state.heroId = null;
     state.heroDown = false;
     starvationDesertionAccum = 0;
-    el.fieldUnits.innerHTML = "";
+    clearFieldUnits();
   }
 
   let confirmResolve = null;
@@ -1446,6 +1499,9 @@
     lastRecruitSig = "";
     lastRecruitStructureSig = "";
     lastHeroSig = "";
+    lastWavePreviewHtml = "";
+    lastBaseHudSig = "";
+    lastResourceHudSig = "";
     appendLog("log-muted", "New game — wave 1 assault begins.");
     renderHud();
     startBattle();
@@ -2127,6 +2183,21 @@
       ? state.battle.enemyBase
       : { hp: ebMax, maxHp: ebMax };
 
+    const playerUnits = countSide("player");
+    const enemyUnits = countSide("enemy");
+    const pHp = Math.ceil(Math.max(0, pb.hp));
+    const eHp = Math.ceil(Math.max(0, eb.hp));
+    const sig = [
+      pHp,
+      pb.maxHp,
+      eHp,
+      eb.maxHp,
+      playerUnits,
+      enemyUnits,
+    ].join("|");
+    if (sig === lastBaseHudSig) return;
+    lastBaseHudSig = sig;
+
     const pPct = (Math.max(0, pb.hp) / pb.maxHp) * 100;
     const ePct = (Math.max(0, eb.hp) / eb.maxHp) * 100;
 
@@ -2145,14 +2216,11 @@
     el.basePlayer.classList.toggle("critical", pb.hp / pb.maxHp <= 0.25);
     el.baseEnemy.classList.toggle("critical", eb.hp / eb.maxHp <= 0.25);
 
-    renderBattleStrip(pb, eb, pPct, ePct, pc, ec);
+    renderBattleStrip(pb, eb, pPct, ePct, pc, ec, playerUnits, enemyUnits, pHp, eHp);
   }
 
-  function renderBattleStrip(pb, eb, pPct, ePct, pc, ec) {
+  function renderBattleStrip(pb, eb, pPct, ePct, pc, ec, playerUnits, enemyUnits, pHp, eHp) {
     if (!el.battleStrip) return;
-
-    const playerUnits = countSide("player");
-    const enemyUnits = countSide("enemy");
 
     if (el.stripPlayerFill) {
       el.stripPlayerFill.style.width = pPct + "%";
@@ -2167,8 +2235,6 @@
     if (el.playerUnitCount) el.playerUnitCount.textContent = String(playerUnits);
     if (el.enemyUnitCount) el.enemyUnitCount.textContent = String(enemyUnits);
 
-    const pHp = Math.ceil(Math.max(0, pb.hp));
-    const eHp = Math.ceil(Math.max(0, eb.hp));
     el.battleStrip.setAttribute(
       "aria-label",
       `Battle: you ${playerUnits} units, keep ${pHp}/${pb.maxHp}; foe ${enemyUnits} units, keep ${eHp}/${eb.maxHp}`
@@ -2176,7 +2242,15 @@
   }
 
   function getTokenEl(id) {
-    return el.fieldUnits.querySelector(`[data-fighter-id="${id}"]`);
+    const cached = tokenEls.get(id);
+    if (cached) {
+      if (cached.isConnected) return cached;
+      tokenEls.delete(id);
+    }
+    if (!el.fieldUnits) return null;
+    const node = el.fieldUnits.querySelector(`[data-fighter-id="${id}"]`);
+    if (node) tokenEls.set(id, node);
+    return node;
   }
 
   function mountToken(u) {
@@ -2185,6 +2259,7 @@
       updateTokenEl(u, existing);
       return existing;
     }
+    if (!fieldVisible()) return null;
     const wrap = document.createElement("div");
     const pct = u.maxHp > 0 ? (Math.max(0, u.hp) / u.maxHp) * 100 : 0;
     let fill = "";
@@ -2225,6 +2300,10 @@
       `<span class="hp-bar-text">${Math.max(0, Math.ceil(u.hp))}/${u.maxHp}</span>` +
       `</div>`;
     el.fieldUnits.appendChild(wrap);
+    tokenEls.set(u.id, wrap);
+    u._lx = u.x;
+    u._ly = u.y;
+    u._lhp = u.hp;
     setTimeout(() => wrap.classList.remove("spawning"), 300);
     return wrap;
   }
@@ -2232,8 +2311,14 @@
   function updateTokenEl(u, node) {
     if (!node) node = getTokenEl(u.id);
     if (!node) return;
-    node.style.setProperty("--x", u.x + "%");
-    node.style.setProperty("--y", u.y + "%");
+    if (u._lx !== u.x || u._ly !== u.y) {
+      u._lx = u.x;
+      u._ly = u.y;
+      node.style.setProperty("--x", u.x + "%");
+      node.style.setProperty("--y", u.y + "%");
+    }
+    if (u._lhp === u.hp) return;
+    u._lhp = u.hp;
     const pct = u.maxHp > 0 ? (Math.max(0, u.hp) / u.maxHp) * 100 : 0;
     const fill = node.querySelector(".hp-bar-fill");
     const text = node.querySelector(".hp-bar-text");
@@ -2249,26 +2334,28 @@
   }
 
   function flashToken(id, kind) {
+    if (!fieldFxOn()) return;
     const node = getTokenEl(id);
     if (!node) return;
     const cls = kind === "attack" ? "flash-attack" : "flash-hit";
-    node.classList.remove("flash-attack", "flash-hit");
-    void node.offsetWidth;
+    if (node.classList.contains(cls)) return;
     node.classList.add(cls);
     setTimeout(() => node.classList.remove(cls), 180);
   }
 
   function lungeToken(id, side) {
+    if (!fieldFxOn() || isMobileView()) return;
     const node = getTokenEl(id);
     if (!node) return;
     const cls = side === "player" ? "lunge-right" : "lunge-left";
-    node.classList.remove("lunge-right", "lunge-left");
-    void node.offsetWidth;
+    if (node.classList.contains(cls)) return;
     node.classList.add(cls);
     setTimeout(() => node.classList.remove(cls), 180);
   }
 
   function spawnFloater(x, y, amount, slain, counterHit) {
+    if (!fieldFxOn()) return;
+    if (isMobileView() && !slain && !counterHit) return;
     const d = document.createElement("div");
     d.className =
       "dmg-floater" +
@@ -2282,6 +2369,7 @@
   }
 
   function spawnGoldFloater(x, y, amount) {
+    if (!fieldFxOn()) return;
     const d = document.createElement("div");
     d.className = "dmg-floater gold-gain";
     d.style.setProperty("--x", x + "%");
@@ -2292,6 +2380,7 @@
   }
 
   function spawnHealFloater(x, y, amount) {
+    if (!fieldFxOn()) return;
     const d = document.createElement("div");
     d.className = "dmg-floater heal-gain";
     d.style.setProperty("--x", x + "%");
@@ -2302,6 +2391,7 @@
   }
 
   function spawnFoodFloater(x, y, amount) {
+    if (!fieldFxOn()) return;
     const d = document.createElement("div");
     d.className = "dmg-floater food-gain";
     d.style.setProperty("--x", x + "%");
@@ -2391,18 +2481,23 @@
 
   function syncFieldPositions() {
     if (!state.battle) {
-      el.fieldUnits.innerHTML = "";
+      clearFieldUnits();
       return;
     }
+    if (!fieldVisible()) return;
     const now = Date.now();
     for (const u of state.battle.units) {
       if (u.hp <= 0 && u.removeAt && now >= u.removeAt) {
         const node = getTokenEl(u.id);
-        if (node) node.remove();
+        if (node) {
+          tokenEls.delete(u.id);
+          node.remove();
+        }
         continue;
       }
-      if (!getTokenEl(u.id)) mountToken(u);
-      else updateTokenEl(u);
+      const node = getTokenEl(u.id);
+      if (!node) mountToken(u);
+      else updateTokenEl(u, node);
     }
   }
 
@@ -2864,46 +2959,44 @@
     }
   }
 
-  function findTarget(unit) {
-    const living = state.battle.units.filter(
-      (o) => o.side !== unit.side && o.hp > 0
-    );
-    if (living.length === 0) return null;
+  function findTarget(unit, foes) {
+    const living =
+      foes ||
+      (state.battle
+        ? state.battle.units.filter((o) => o.side !== unit.side && o.hp > 0)
+        : []);
+    if (!living.length) return null;
 
-    const laneFoes = living.filter(
-      (o) => Math.abs(o.y - unit.y) < LANE_TARGET_Y
-    );
-    const pool = laneFoes.length ? laneFoes : null;
-
-    if (pool) {
-      pool.sort((a, b) => {
-        const da = Math.abs(a.x - unit.x) + Math.abs(a.y - unit.y) * 0.35;
-        const db = Math.abs(b.x - unit.x) + Math.abs(b.y - unit.y) * 0.35;
-        return da - db;
-      });
-      return pool[0];
-    }
-
-    // Peel toward foes threatening the home keep in a wider Y band.
+    let bestLane = null;
+    let bestLaneD = Infinity;
+    let bestThreat = null;
+    let bestThreatD = Infinity;
     const homeEdge =
       unit.side === "player" ? BASE_EDGE_PLAYER : BASE_EDGE_ENEMY;
-    const threats = living.filter((o) => {
-      if (Math.abs(o.y - unit.y) >= LANE_KEEP_PEEL_Y) return false;
-      return Math.abs(o.x - homeEdge) + 8 < Math.abs(unit.x - homeEdge);
-    });
-    if (threats.length === 0) return null;
-    threats.sort((a, b) => {
-      const da =
-        Math.abs(a.x - homeEdge) * 1.2 +
-        Math.abs(a.x - unit.x) +
-        Math.abs(a.y - unit.y) * 0.4;
-      const db =
-        Math.abs(b.x - homeEdge) * 1.2 +
-        Math.abs(b.x - unit.x) +
-        Math.abs(b.y - unit.y) * 0.4;
-      return da - db;
-    });
-    return threats[0];
+    const unitHome = Math.abs(unit.x - homeEdge);
+
+    for (let i = 0; i < living.length; i++) {
+      const o = living[i];
+      const dy = Math.abs(o.y - unit.y);
+      if (dy < LANE_TARGET_Y) {
+        const d = Math.abs(o.x - unit.x) + dy * 0.35;
+        if (d < bestLaneD) {
+          bestLaneD = d;
+          bestLane = o;
+        }
+      }
+      if (dy < LANE_KEEP_PEEL_Y) {
+        const foeHome = Math.abs(o.x - homeEdge);
+        if (foeHome + 8 < unitHome) {
+          const d = foeHome * 1.2 + Math.abs(o.x - unit.x) + dy * 0.4;
+          if (d < bestThreatD) {
+            bestThreatD = d;
+            bestThreat = o;
+          }
+        }
+      }
+    }
+    return bestLane || bestThreat;
   }
 
   function enabledSpawnTypes() {
@@ -2970,7 +3063,7 @@
     if (waveTransitionTimer) clearTimeout(waveTransitionTimer);
     waveTransitionTimer = setTimeout(() => {
       waveTransitionTimer = null;
-      el.fieldUnits.innerHTML = "";
+      clearFieldUnits();
       state.battle = null;
       state.waveTransitioning = false;
       startBattle();
@@ -3037,6 +3130,7 @@
   }
 
   function spawnProjectile(fromX, fromY, toX, toY, style) {
+    if (!fieldFxOn() || isMobileView()) return;
     const d = document.createElement("div");
     let kind = "arrow";
     if (style === "magic") kind = "bolt";
@@ -3208,6 +3302,12 @@
     tickTraining(dt);
 
     const living = b.units.filter((u) => u.hp > 0);
+    const playerLiving = [];
+    const enemyLiving = [];
+    for (let i = 0; i < living.length; i++) {
+      if (living[i].side === "player") playerLiving.push(living[i]);
+      else enemyLiving.push(living[i]);
+    }
     const raidSpeed =
       state.heroId === "raidcaptain" && livingHeroUnit() ? 1.12 : 1;
 
@@ -3237,7 +3337,10 @@
           );
         }
         if (!isHealStyle(unit.atkStyle)) {
-          const early = findTarget(unit);
+          const early = findTarget(
+            unit,
+            unit.side === "player" ? enemyLiving : playerLiving
+          );
           if (early && Math.abs(early.x - unit.x) <= engage && unit.attackCd <= 0) {
             strikeUnit(unit, early);
           }
@@ -3271,7 +3374,10 @@
         continue;
       }
 
-      const target = findTarget(unit);
+      const target = findTarget(
+        unit,
+        unit.side === "player" ? enemyLiving : playerLiving
+      );
 
       if (target) {
         const dist = Math.abs(target.x - unit.x);
@@ -3317,7 +3423,9 @@
 
     const eMax = enemyBaseMaxHp(state.wave);
     const opening = state.wave === 1;
-    el.fieldUnits.innerHTML = "";
+    clearFieldUnits();
+    lastBaseHudSig = "";
+    lastWavePreviewHtml = "";
     state.battle = {
       active: true,
       playerBase: { hp: PLAYER_BASE_HP, maxHp: PLAYER_BASE_HP },
@@ -3758,8 +3866,7 @@
     const sig = sigParts.join("|");
     const existing = el.heroList.querySelectorAll(".hero-card");
     if (existing.length === HEROES.length && sig === lastHeroSig) {
-      // Still refresh affordability / labels cheaply below by rebuilding —
-      // hero count is tiny (3).
+      return;
     }
     lastHeroSig = sig;
 
@@ -4171,7 +4278,7 @@
     const kindHint = isBossWave(state.wave)
       ? `${kind} (summons) · Keep ${eMax} · Yours ${PLAYER_BASE_HP}`
       : `${kind} · Keep ${eMax} · Yours ${PLAYER_BASE_HP}`;
-    el.wavePreview.innerHTML =
+    const previewHtml =
       `<div class="wave-preview-main">` +
       `<span class="enemy-name">${meta.name}</span>` +
       `<span class="wave-subtitle">${kindHint}</span>` +
@@ -4181,6 +4288,10 @@
       `<span class="wave-stakes-sep">·</span>` +
       `<span class="wave-demote-hint">Loss −${format(penalty.gold)} g / −${format(penalty.food)} f · −1 wave</span>` +
       `</div>`;
+    if (previewHtml !== lastWavePreviewHtml) {
+      lastWavePreviewHtml = previewHtml;
+      el.wavePreview.innerHTML = previewHtml;
+    }
 
     if (el.loopStatus) {
       if (state.waveTransitioning) {
@@ -4265,10 +4376,23 @@
   }
 
   function syncResourceDisplays() {
-    el.gold.textContent = format(state.gold);
-    el.gps.textContent = format(goldIncomePerSecond());
-    el.food.textContent = format(state.food);
-    syncFoodRateDisplay();
+    const goldTxt = format(state.gold);
+    const foodTxt = format(state.food);
+    const gpsTxt = format(goldIncomePerSecond());
+    const net = foodNetPerSecond();
+    const fpsTxt = format(Math.abs(net));
+    const starving = isStarving();
+    const upkeep = foodUpkeepPerSecond();
+    const sig = [goldTxt, foodTxt, gpsTxt, fpsTxt, net < 0 ? 1 : 0, starving ? 1 : 0, format(upkeep)].join("|");
+    if (sig === lastResourceHudSig) return;
+    lastResourceHudSig = sig;
+    el.gold.textContent = goldTxt;
+    el.gps.textContent = gpsTxt;
+    el.food.textContent = foodTxt;
+    el.fps.textContent = fpsTxt;
+    el.fpsPrefix.textContent = net >= 0 ? "+" : "−";
+    const rate = el.fps.closest(".resource-fps");
+    if (rate) rate.classList.toggle("is-drain", net < 0);
     syncStarvationHud();
     syncArmyUpkeepDisplay();
     updateUpgradeTabBadge();
@@ -4307,11 +4431,15 @@
 
   function pulseResourceClick(btn, amount, kind, opts) {
     opts = opts || {};
-    btn.classList.remove("click-pulse", "click-press");
-    void btn.offsetWidth;
+    if (!btn) return;
+    if (opts.fx === false || (opts.auto && !resourceFxOn())) {
+      return;
+    }
     const pressCls = opts.press ? "click-press" : "click-pulse";
-    btn.classList.add(pressCls);
-    setTimeout(() => btn.classList.remove(pressCls), opts.press ? 140 : 220);
+    if (!btn.classList.contains(pressCls)) {
+      btn.classList.add(pressCls);
+      setTimeout(() => btn.classList.remove(pressCls), opts.press ? 140 : 220);
+    }
 
     if (opts.showFloater === false) return;
 
@@ -4330,6 +4458,7 @@
   let foodCursorJabIdx = 0;
 
   function jabAutoCursor(kind) {
+    if (!resourceFxOn()) return;
     const ring = kind === "food" ? el.foodCursors : el.goldCursors;
     if (!ring) return;
     const cursors = ring.querySelectorAll(".auto-cursor");
@@ -4341,8 +4470,7 @@
     if (kind === "food") foodCursorJabIdx += 1;
     else goldCursorJabIdx += 1;
     const cursor = cursors[idx];
-    cursor.classList.remove("jab");
-    void cursor.offsetWidth;
+    if (cursor.classList.contains("jab")) return;
     cursor.classList.add("jab");
     setTimeout(() => cursor.classList.remove("jab"), 280);
   }
@@ -4514,18 +4642,19 @@
 
     if (goldAutoActive()) {
       goldAutoAccum += goldAutoCps() * dt;
-      let fired = 0;
-      while (goldAutoAccum >= 1 && fired < 40) {
-        goldAutoAccum -= 1;
-        fired += 1;
-        const showFloater = goldFloaterCooldown <= 0;
-        if (showFloater) goldFloaterCooldown = AUTO_FLOATER_MIN_INTERVAL;
-        doMineClick({
-          showFloater,
-          jabCursor: true,
-          press: true,
-          amount: autoGoldPayout(),
-        });
+      const n = Math.min(40, Math.floor(goldAutoAccum));
+      if (n > 0) {
+        goldAutoAccum -= n;
+        state.gold += autoGoldPayout() * n;
+        if (goldFloaterCooldown <= 0 && resourceFxOn()) {
+          goldFloaterCooldown = AUTO_FLOATER_MIN_INTERVAL;
+          pulseResourceClick(el.clickBtn, autoGoldPayout(), "gold", {
+            showFloater: true,
+            press: true,
+            auto: true,
+          });
+          jabAutoCursor("gold");
+        }
       }
     } else {
       goldAutoAccum = 0;
@@ -4533,18 +4662,19 @@
 
     if (foodAutoActive()) {
       foodAutoAccum += foodAutoCps() * dt;
-      let fired = 0;
-      while (foodAutoAccum >= 1 && fired < 40) {
-        foodAutoAccum -= 1;
-        fired += 1;
-        const showFloater = foodFloaterCooldown <= 0;
-        if (showFloater) foodFloaterCooldown = AUTO_FLOATER_MIN_INTERVAL;
-        doForageClick({
-          showFloater,
-          jabCursor: true,
-          press: true,
-          amount: autoFoodPayout(),
-        });
+      const n = Math.min(40, Math.floor(foodAutoAccum));
+      if (n > 0) {
+        foodAutoAccum -= n;
+        state.food += autoFoodPayout() * n;
+        if (foodFloaterCooldown <= 0 && resourceFxOn()) {
+          foodFloaterCooldown = AUTO_FLOATER_MIN_INTERVAL;
+          pulseResourceClick(el.foodClickBtn, autoFoodPayout(), "food", {
+            showFloater: true,
+            press: true,
+            auto: true,
+          });
+          jabAutoCursor("food");
+        }
       }
     } else {
       foodAutoAccum = 0;
@@ -4597,13 +4727,39 @@
     el.newGameBtn.addEventListener("click", newGame);
   }
 
-  let lastBattle = Date.now();
+  let lastBattle = performance.now();
   let hudAccum = 0;
   let saveAccum = 0;
+  let loopRaf = 0;
+  let hiddenAt = 0;
 
-  setInterval(() => {
-    const now = Date.now();
-    const dt = Math.min(0.1, (now - lastBattle) / 1000);
+  function applyIdleEconomy(seconds) {
+    const dt = Math.min(IDLE_CATCHUP_MAX_S, Math.max(0, seconds));
+    if (dt < 0.05) return;
+    if (state.goldPerSecond > 0) state.gold += state.goldPerSecond * dt;
+    if (state.foodPerSecond > 0) state.food += state.foodPerSecond * dt;
+    if (goldAutoActive()) {
+      state.gold += autoGoldPayout() * goldAutoCps() * dt;
+      goldAutoAccum = 0;
+    }
+    if (foodAutoActive()) {
+      state.food += autoFoodPayout() * foodAutoCps() * dt;
+      foodAutoAccum = 0;
+    }
+  }
+
+  function gameStep(now) {
+    loopRaf = 0;
+    if (document.hidden) return;
+
+    const minMs = isMobileView() ? BATTLE_MS_MOBILE : BATTLE_MS;
+    const elapsed = now - lastBattle;
+    if (elapsed < minMs) {
+      loopRaf = requestAnimationFrame(gameStep);
+      return;
+    }
+
+    const dt = Math.min(0.1, elapsed / 1000);
     lastBattle = now;
 
     hudAccum += dt;
@@ -4617,16 +4773,16 @@
     tickAutoClicks(dt);
     tickFoodUpkeep(dt);
 
+    const hudDue = hudAccum >= (isMobileView() ? HUD_BATTLE_S_MOBILE : HUD_BATTLE_S);
+
     if (inBattle()) {
       battleTick(dt);
-      syncResourceDisplays();
-      if (hudAccum >= 0.15) {
+      if (hudDue) {
         hudAccum = 0;
+        syncResourceDisplays();
         renderWarChest();
         renderSpawn();
         renderBattlePanel();
-      } else {
-        renderBaseBars();
       }
     } else if (hudAccum >= HUD_MS / 1000) {
       hudAccum = 0;
@@ -4637,11 +4793,44 @@
       saveAccum = 0;
       saveGame(false);
     }
-  }, BATTLE_MS);
+
+    loopRaf = requestAnimationFrame(gameStep);
+  }
+
+  function startGameLoop() {
+    if (loopRaf) return;
+    lastBattle = performance.now();
+    loopRaf = requestAnimationFrame(gameStep);
+  }
+
+  function stopGameLoop() {
+    if (loopRaf) cancelAnimationFrame(loopRaf);
+    loopRaf = 0;
+  }
+
+  startGameLoop();
 
   window.addEventListener("beforeunload", () => saveGame(true));
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") saveGame(true);
+    if (document.visibilityState === "hidden") {
+      hiddenAt = Date.now();
+      stopGameLoop();
+      saveGame(true);
+    } else {
+      if (hiddenAt) {
+        applyIdleEconomy((Date.now() - hiddenAt) / 1000);
+        hiddenAt = 0;
+      }
+      startGameLoop();
+      if (inBattle()) {
+        syncResourceDisplays();
+        lastBaseHudSig = "";
+        renderBaseBars();
+        if (fieldVisible()) syncFieldPositions();
+      } else {
+        renderHud();
+      }
+    }
   });
 
   function initMusic() {
@@ -4801,6 +4990,11 @@
         sessionStorage.setItem(MOBILE_PANE_KEY, pane);
       } catch (_) {}
       if (pane === "army") closeArmySheet();
+      if (pane === "battle" && inBattle()) {
+        lastBaseHudSig = "";
+        renderBaseBars();
+        syncFieldPositions();
+      }
       if (!el.mobileNav) return;
       el.mobileNav.querySelectorAll(".mobile-tab").forEach((tab) => {
         const on = tab.dataset.pane === pane;

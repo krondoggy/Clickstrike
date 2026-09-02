@@ -27,8 +27,8 @@ jobs:
       - name: Prepare site
         run: |
           mkdir _site
-          cp index.html game.js style.css favicon.svg 404.html LICENSE CHANGELOG.md .nojekyll _site/
-          cp -r assets _site/
+          cp index.html favicon.svg 404.html LICENSE CHANGELOG.md .nojekyll _site/
+          cp -r assets shared games _site/
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
