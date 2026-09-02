@@ -1712,7 +1712,7 @@ body.modal-open {
 
   #mobile-nav {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: 1fr 1fr;
     gap: 0.3rem;
     position: sticky;
     top: 0;
@@ -1759,13 +1759,7 @@ body.modal-open {
     transform: translateY(1px);
   }
 
-  body[data-mobile-pane="battle"] #bench-section,
   body[data-mobile-pane="battle"] #shop-section {
-    display: none;
-  }
-
-  body[data-mobile-pane="barracks"] #board-section,
-  body[data-mobile-pane="barracks"] #shop-section {
     display: none;
   }
 
@@ -1774,13 +1768,41 @@ body.modal-open {
     display: none;
   }
 
-  body[data-mobile-pane="battle"] #board-section,
-  body[data-mobile-pane="barracks"] #bench-section,
+  body[data-mobile-pane="battle"] #board-section {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  body[data-mobile-pane="battle"] #bench-section {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 0.4rem 0.5rem;
+  }
+
+  body[data-mobile-pane="battle"] #bench-section .section-label {
+    font-size: 0.62rem;
+    margin-bottom: 0.15rem;
+  }
+
+  body[data-mobile-pane="battle"] #bench-hint {
+    font-size: 0.58rem;
+    margin-bottom: 0.25rem;
+  }
+
+  body[data-mobile-pane="battle"] .bench-tray {
+    min-height: 3.5rem;
+  }
+
   body[data-mobile-pane="shop"] #shop-section {
     flex: 1 1 auto;
     min-height: 0;
     display: flex;
     flex-direction: column;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   body[data-mobile-pane="battle"] .battlefield {
@@ -1878,12 +1900,6 @@ body.modal-open {
   .streak-pill {
     font-size: 0.55rem;
     padding: 0.15rem 0.4rem;
-  }
-
-  body[data-mobile-pane="barracks"] #bench-section,
-  body[data-mobile-pane="shop"] #shop-section {
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
   }
 }
 

@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const GAME_VERSION = "0.7.2";
+  const GAME_VERSION = "0.7.3";
   const HUD_MS = 100;
   const BATTLE_MS = 50;
   const MOBILE_MQ = "(max-width: 900px)";
@@ -1404,6 +1404,19 @@
   let lastTowerSig = "";
   const tokenEls = new Map();
   let gridCells = [];
+  let setMobilePane = null;
+
+  function isMobileLayout() {
+    try {
+      return window.matchMedia(MOBILE_MQ).matches;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function goToBattlePaneIfMobile() {
+    if (isMobileLayout() && setMobilePane) setMobilePane("battle");
+  }
 
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -3447,12 +3460,14 @@
         return;
       }
       playSfx("click");
-      if (card.dataset.shop === "economy") buyEconomy(true);
-      else if (card.dataset.shop === "hero") buyHero(card.dataset.heroId, true);
-      else if (card.dataset.shop === "rez") rezHero();
+      let bought = false;
+      if (card.dataset.shop === "economy") bought = buyEconomy(true);
+      else if (card.dataset.shop === "hero") bought = buyHero(card.dataset.heroId, true);
+      else if (card.dataset.shop === "rez") bought = rezHero();
       else if (card.dataset.shop === "upgrade") buyUnitUpgrade(card.dataset.type, true);
       else if (card.dataset.shop === "towers") buyTowerUpgrade(true);
-      else if (card.dataset.type) buyUnit(card.dataset.type, true);
+      else if (card.dataset.type) bought = buyUnit(card.dataset.type, true);
+      if (bought) goToBattlePaneIfMobile();
       lastShopSig = "";
       lastBenchSig = "";
       renderHud();
@@ -3478,6 +3493,9 @@
       state.selectedBoard = null;
       state.selectedBenchType =
         state.selectedBenchType === typeId ? null : typeId;
+      if (state.selectedBenchType && document.body.dataset.mobilePane === "shop") {
+        goToBattlePaneIfMobile();
+      }
       refreshPlacementUi();
     });
 
@@ -3563,7 +3581,7 @@
         }
         if (!state || state.over) return;
         if (!state.selectedBenchType && !state.selectedBoard) return;
-        if (e.target.closest(".bench-chip, .board-cell, #board-grid, #bench-section")) {
+        if (e.target.closest(".bench-chip, .board-cell, #board-grid, #bench-section, #mobile-nav")) {
           return;
         }
         if (e.target.closest(".modal")) return;
@@ -3605,9 +3623,10 @@
 
   function initMobileChrome() {
     const mq = window.matchMedia(MOBILE_MQ);
-    const validPanes = { battle: true, barracks: true, shop: true };
+    const validPanes = { battle: true, shop: true };
 
     function setPane(pane) {
+      if (pane === "barracks") pane = "battle";
       if (!validPanes[pane]) pane = "battle";
       document.body.dataset.mobilePane = pane;
       try {
@@ -3621,6 +3640,8 @@
       });
       hideTooltip();
     }
+
+    setMobilePane = setPane;
 
     let saved = "battle";
     try {
