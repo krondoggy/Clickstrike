@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const GAME_VERSION = "0.7.7";
+  const GAME_VERSION = "0.7.8";
   const HUD_MS = 100;
   const BATTLE_MS = 50;
   const MOBILE_MQ = "(max-width: 900px)";
@@ -9,7 +9,8 @@
   const HOVER_TOOLTIP_MQ = "(hover: hover) and (pointer: fine)";
   const LONG_PRESS_MS = 400;
 
-  const CASTLE_HP = 140;
+  const CASTLE_HP = 1500;
+  const CASTLE_CHIP_MULT = 0.32;
   const GRID_COLS = 4;
   const GRID_ROWS = 5;
   const MELEE_RANGE = 7;
@@ -3320,7 +3321,7 @@
     unit.attackCd = unit.atkCdMax;
     flashToken(unit.id, "attack");
     const mult = (unit.structureMult || 1) * auraDamageMult(unit);
-    const dmg = Math.max(1, Math.round(unit.atk * 0.7 * mult));
+    const dmg = Math.max(1, Math.round(unit.atk * CASTLE_CHIP_MULT * mult));
     if (isRangedStyle(unit.atkStyle)) {
       spawnProjectile(unit.x, unit.y, pos.x, pos.y, unit.atkStyle, unit.typeId);
       queueProjectile({

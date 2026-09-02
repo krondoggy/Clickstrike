@@ -20,6 +20,7 @@ All notable changes to Clickstrike are documented here.
 
 ### Changed
 
+- **Castle Strike v0.7.8** — keeps fortified to 1500 HP with reduced chip damage (0.32× ATK); sieges need a sustained force
 - **Castle Strike v0.7.7** — unit balance pass: archer toned down (DPS, range, cost, volley cadence); minor buffs to militia, mage, grenadier, catapult, rider, assassin
 - **Castle Strike v0.7.6** — unit research split into separate +HP and +ATK tracks per type (3 levels each); choose which stat to stack on the Research tab
 - **Castle Strike v0.7.5** — buying a unit selects it and waits for you to tap a spawn tile; no more auto-drop
