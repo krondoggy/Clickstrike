@@ -47,8 +47,8 @@
   const AEGIS_S = 2.2;
   const SHIELD_BASH_CD = 4.5;
 
-  const PLAYER_SPAWN = { x0: 5, x1: 19, y0: 26, y1: 82 };
-  const ENEMY_SPAWN = { x0: 68, x1: 90, y0: 22, y1: 86 };
+  const PLAYER_SPAWN = { x0: 4, x1: 18, y0: 22, y1: 86 };
+  const ENEMY_SPAWN = { x0: 82, x1: 96, y0: 22, y1: 86 };
   const CASTLE_X_PLAYER = 7;
   const CASTLE_X_ENEMY = 93;
   const CASTLE_Y = 55;
@@ -1015,12 +1015,12 @@
 
   function createTowers() {
     const spec = [
-      { id: "pt1", side: "player", x: 26, y: 30 },
-      { id: "pt2", side: "player", x: 38, y: 55 },
-      { id: "pt3", side: "player", x: 26, y: 74 },
-      { id: "et1", side: "enemy", x: 74, y: 30 },
-      { id: "et2", side: "enemy", x: 62, y: 55 },
-      { id: "et3", side: "enemy", x: 74, y: 74 },
+      { id: "pt1", side: "player", x: 24, y: 30 },
+      { id: "pt2", side: "player", x: 32, y: 55 },
+      { id: "pt3", side: "player", x: 24, y: 74 },
+      { id: "et1", side: "enemy", x: 76, y: 30 },
+      { id: "et2", side: "enemy", x: 68, y: 55 },
+      { id: "et3", side: "enemy", x: 76, y: 74 },
     ];
     return spec.map((t) => ({
       ...t,

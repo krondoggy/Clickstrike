@@ -489,7 +489,7 @@ body.modal-open {
   gap: 0.65rem;
   padding: 0.55rem 0.75rem 0.75rem;
   padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
-  max-width: 1280px;
+  max-width: 1720px;
   width: 100%;
   margin: 0 auto;
 }
@@ -601,8 +601,8 @@ body.modal-open {
   position: relative;
   width: 100%;
   flex: 1 1 auto;
-  min-height: min(72dvh, 680px);
-  height: min(78dvh, 760px);
+  min-height: min(76dvh, 780px);
+  height: min(84dvh, 920px);
   border: 2px solid #2a2010;
   border-radius: 2px;
   overflow: hidden;
@@ -845,10 +845,10 @@ body.modal-open {
 .spawn-grid {
   display: grid;
   position: absolute;
-  left: 5%;
+  left: 4%;
   width: 14%;
-  top: 26%;
-  height: 56%;
+  top: 22%;
+  height: 64%;
   z-index: 8;
   grid-template-columns: repeat(4, 1fr);
   grid-template-rows: repeat(5, 1fr);
@@ -1969,14 +1969,14 @@ body.modal-open {
   body[data-mobile-pane="battle"] .battlefield {
     flex: 1 1 auto;
     height: auto;
-    min-height: 38dvh;
+    min-height: 44dvh;
   }
 
   .spawn-grid {
-    left: 2%;
-    width: 30%;
+    left: 4%;
+    width: 14%;
     top: 22%;
-    height: 62%;
+    height: 64%;
   }
 
   .combat-token .unit-sil {
