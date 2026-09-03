@@ -25,11 +25,14 @@
 
       <div class="topbar-left">
         <a href="../../" class="btn-ghost" title="Back to game hall">Hall</a>
-        <span id="version-label" class="version-tag">v0.7.8</span>
+        <span id="version-label" class="version-tag">v0.8.0</span>
       </div>
 
       <div class="castle-block player">
-        <span class="castle-label">Your Keep</span>
+        <div class="castle-heading">
+          <span class="castle-label">Your Keep</span>
+          <span class="keep-level-chip player" title="Your campaign level">Lv <span id="player-level-display">1</span></span>
+        </div>
         <div class="castle-hp-bar">
           <div id="player-castle-fill" class="castle-hp-fill"></div>
         </div>
@@ -37,6 +40,11 @@
       </div>
 
       <div class="topbar-center">
+        <div class="matchup-badge" title="Campaign matchup">
+          <span class="matchup-side player">You <strong>Lv <span id="matchup-player-level">1</span></strong></span>
+          <span class="matchup-vs" aria-hidden="true">vs</span>
+          <span class="matchup-side enemy">Enemy <strong>Lv <span id="matchup-enemy-level">1</span></strong></span>
+        </div>
         <div class="round-badge">Wave <span id="round-display">1</span></div>
         <div id="phase-status" class="phase-status" role="status" aria-live="polite">
           <span id="phase-label">First wave</span>
@@ -50,7 +58,10 @@
       </div>
 
       <div class="castle-block enemy">
-        <span class="castle-label">Enemy Keep</span>
+        <div class="castle-heading">
+          <span class="castle-label">Enemy Keep</span>
+          <span class="keep-level-chip enemy" title="Enemy campaign level">Lv <span id="enemy-level-display">1</span></span>
+        </div>
         <div class="castle-hp-bar">
           <div id="enemy-castle-fill" class="castle-hp-fill enemy"></div>
         </div>
@@ -194,6 +205,7 @@
         <button type="button" id="help-close" class="btn-ghost">Close</button>
       </div>
       <ul class="help-list">
+        <li><strong>Campaign levels</strong>: each victory unlocks the next level with a stronger AI. Defeat keeps you on the same level so you can retry. Progress is saved in the browser.</li>
         <li><strong>Gold</strong> trickles in all the time. Economy upgrades raise your gold per second. Buy and place the next wave while the field is still fighting.</li>
         <li><strong>Hire</strong> recruits units and Economy; <strong>Research</strong> upgrades types you own with separate <strong>+HP</strong> or <strong>+ATK</strong> tracks (3 levels each: +16% HP or +14% ATK per level) and fortifies your towers (+HP, +ATK, +range). Living units and towers get stronger immediately.</li>
         <li><strong>Deploy</strong>: click a barracks unit, then a highlighted spawn tile. Click a placed unit to select it — empty tiles glow to move, occupied tiles swap. Click the barracks (or double-click the unit) to send it back. Esc clears the selection.</li>
@@ -219,11 +231,13 @@
       <div class="panel-ornament panel-ornament-bl" aria-hidden="true"></div>
       <div class="panel-ornament panel-ornament-br" aria-hidden="true"></div>
       <h2 id="end-title">Victory</h2>
+      <p id="end-level" class="end-level" aria-live="polite"></p>
       <p id="end-body"></p>
       <ul id="end-stats" class="help-list"></ul>
       <div class="modal-actions">
         <button type="button" id="end-restart" class="btn-fight">Play Again</button>
         <a href="../../" class="btn-ghost">Hall</a>
+        <button type="button" id="end-reset-level" class="btn-ghost">Reset progress</button>
       </div>
     </div>
   </div>

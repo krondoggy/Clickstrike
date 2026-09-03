@@ -1,6 +1,6 @@
 # Castle Strike — Unit Reference
 
-**Game version:** 0.7.8  
+**Game version:** 0.8.0  
 **Source of truth:** mirrors [`game.js`](game.js) (`UNIT_TYPES`, `HEROES`, combat constants).  
 When stats change in code, update this file to match.
 
@@ -427,3 +427,19 @@ Units that reach an enemy keep deal chip damage: `max(1, round(atk × 0.32 × st
 | `KITE_MIN_RANGE` | 10 |
 | `CASTLE_HP` | 1500 |
 | `CASTLE_CHIP_MULT` | 0.32 |
+
+---
+
+## Campaign Levels
+
+Each victory advances a persistent campaign level (`castlestrike-level` in localStorage). Defeat keeps the current level. Level 1 is identical to the base game; all bonuses apply only to the AI.
+
+| Bonus | Formula | Notes |
+|-------|---------|-------|
+| AI gold income | `×(1 + 0.12 × (level − 1))` | Scales forever |
+| AI starting gold | `+15 × (level − 1)` | On top of the shared 10g start |
+| AI buy interval | `max(0.8, 1.6 × (1 − 0.05 × (level − 1)))` | Floored at 0.8s |
+| AI keep HP | `round(1500 × (1 + 0.08 × (level − 1)))` | Player keep stays 1500 |
+| AI unit HP/ATK | From level 4+: `×min(1.4, 1 + 0.04 × (level − 3))` | Cap +40% at level 13+ |
+
+Progress can be reset to Level 1 from the end-of-match screen. Best level cleared is tracked in `castlestrike-best-record`.

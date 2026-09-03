@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const GAME_VERSION = "0.7.8";
+  const GAME_VERSION = "0.8.0";
   const HUD_MS = 100;
   const BATTLE_MS = 50;
   const MOBILE_MQ = "(max-width: 900px)";
@@ -90,6 +90,7 @@
   const SFX_MUTED_KEY = "clickstrike-sfx-muted";
   const SFX_VOLUME_KEY = "clickstrike-sfx-volume";
   const BEST_RECORD_KEY = "castlestrike-best-record";
+  const LEVEL_KEY = "castlestrike-level";
   const TIMER_URGENT_S = 5;
   const MUSIC_TRACKS = [
     "../../assets/audio/music/07-human-1.mp3",
@@ -752,11 +753,20 @@
     if (!type) return;
     const lv = unitResearchLevels(actor, typeId);
     const stats = unitStatsAtLevel(type, lv.hp, lv.atk);
+    let hp = stats.hp;
+    let atk = stats.atk;
+    if (side === "enemy") {
+      const mult = (state.levelMods && state.levelMods.unitStatMult) || 1;
+      if (mult !== 1) {
+        hp = Math.max(1, Math.round(hp * mult));
+        atk = Math.max(1, Math.round(atk * mult));
+      }
+    }
     for (const u of state.battle.units) {
       if (u.side !== side || u.typeId !== typeId || u.hero || u.minion || u.hp <= 0) continue;
       const ratio = u.maxHp > 0 ? u.hp / u.maxHp : 1;
-      u.maxHp = stats.hp;
-      u.atk = stats.atk;
+      u.maxHp = hp;
+      u.atk = atk;
       u.researchHpLevel = lv.hp;
       u.researchAtkLevel = lv.atk;
       u.hp = Math.min(u.maxHp, Math.max(1, Math.round(u.maxHp * ratio)));
@@ -857,7 +867,8 @@
 
   function tickEconomy(dt) {
     state.gold += gpsFor(state) * dt;
-    state.ai.gold += gpsFor(state.ai) * dt;
+    const incomeMult = (state.levelMods && state.levelMods.incomeMult) || 1;
+    state.ai.gold += gpsFor(state.ai) * incomeMult * dt;
   }
 
   function aiTryBuy() {
@@ -1345,8 +1356,46 @@
     return String(Math.floor(n));
   }
 
-  function initState() {
+  function loadLevel() {
+    try {
+      const raw = localStorage.getItem(LEVEL_KEY);
+      const n = raw != null ? parseInt(raw, 10) : 1;
+      return Number.isFinite(n) && n >= 1 ? n : 1;
+    } catch (_) {
+      return 1;
+    }
+  }
+
+  function saveLevel(level) {
+    const n = Math.max(1, Math.floor(level) || 1);
+    try {
+      localStorage.setItem(LEVEL_KEY, String(n));
+    } catch (_) {}
+    return n;
+  }
+
+  /** AI-only difficulty mods. Level 1 matches the base game. */
+  function levelMods(level) {
+    const lv = Math.max(1, Math.floor(level) || 1);
+    const above = lv - 1;
+    const unitAbove = Math.max(0, lv - 3);
     return {
+      level: lv,
+      incomeMult: 1 + 0.12 * above,
+      startGoldBonus: 15 * above,
+      buyInterval: Math.max(0.8, AI_BUY_INTERVAL * (1 - 0.05 * above)),
+      keepHpMult: 1 + 0.08 * above,
+      unitStatMult: Math.min(1.4, 1 + 0.04 * unitAbove),
+    };
+  }
+
+  function initState() {
+    const level = loadLevel();
+    const mods = levelMods(level);
+    const aiKeepHp = Math.round(CASTLE_HP * mods.keepHpMult);
+    return {
+      level,
+      levelMods: mods,
       gold: START_GOLD,
       economy: 0,
       roster: emptyRoster(),
@@ -1380,15 +1429,15 @@
         damageDealt: 0,
       },
       ai: {
-        gold: START_GOLD,
+        gold: START_GOLD + mods.startGoldBonus,
         economy: 0,
         roster: emptyRoster(),
         unitHpLevels: emptyUnitLevels(),
         unitAtkLevels: emptyUnitLevels(),
         towerLevel: 0,
         winStreak: 0,
-        castleHp: CASTLE_HP,
-        castleMax: CASTLE_HP,
+        castleHp: aiKeepHp,
+        castleMax: aiKeepHp,
         heroId: null,
         heroDown: false,
         heroBench: false,
@@ -1407,6 +1456,10 @@
   const el = {
     goldDisplay: document.getElementById("gold-display"),
     gpsDisplay: document.getElementById("gps-display"),
+    playerLevelDisplay: document.getElementById("player-level-display"),
+    enemyLevelDisplay: document.getElementById("enemy-level-display"),
+    matchupPlayerLevel: document.getElementById("matchup-player-level"),
+    matchupEnemyLevel: document.getElementById("matchup-enemy-level"),
     roundDisplay: document.getElementById("round-display"),
     phaseLabel: document.getElementById("phase-label"),
     phaseTimer: document.getElementById("phase-timer"),
@@ -1446,9 +1499,11 @@
     restartBtn: document.getElementById("restart-btn"),
     endModal: document.getElementById("end-modal"),
     endTitle: document.getElementById("end-title"),
+    endLevel: document.getElementById("end-level"),
     endBody: document.getElementById("end-body"),
     endStats: document.getElementById("end-stats"),
     endRestart: document.getElementById("end-restart"),
+    endResetLevel: document.getElementById("end-reset-level"),
   };
 
   let state = null;
@@ -1725,9 +1780,14 @@
   function loadBestRecord() {
     try {
       const raw = localStorage.getItem(BEST_RECORD_KEY);
-      return raw ? JSON.parse(raw) : { fastestWin: null, highestWave: 0 };
+      const parsed = raw ? JSON.parse(raw) : null;
+      return {
+        fastestWin: parsed && parsed.fastestWin != null ? parsed.fastestWin : null,
+        highestWave: (parsed && parsed.highestWave) || 0,
+        bestLevel: (parsed && parsed.bestLevel) || 0,
+      };
     } catch (_) {
-      return { fastestWin: null, highestWave: 0 };
+      return { fastestWin: null, highestWave: 0, bestLevel: 0 };
     }
   }
 
@@ -1736,6 +1796,8 @@
     if (won) {
       const t = Math.floor(state.matchTime);
       if (best.fastestWin == null || t < best.fastestWin) best.fastestWin = t;
+      const cleared = state.level || 1;
+      if (cleared > (best.bestLevel || 0)) best.bestLevel = cleared;
     }
     if (state.roundsPlayed > (best.highestWave || 0)) best.highestWave = state.roundsPlayed;
     try {
@@ -1963,6 +2025,11 @@
       const gps = gpsFor(state);
       el.gpsDisplay.textContent = "+" + gps.toFixed(1) + "/s";
     }
+    const levelStr = String(state.level || 1);
+    if (el.playerLevelDisplay) el.playerLevelDisplay.textContent = levelStr;
+    if (el.enemyLevelDisplay) el.enemyLevelDisplay.textContent = levelStr;
+    if (el.matchupPlayerLevel) el.matchupPlayerLevel.textContent = levelStr;
+    if (el.matchupEnemyLevel) el.matchupEnemyLevel.textContent = levelStr;
     if (el.roundDisplay) el.roundDisplay.textContent = String(Math.max(1, state.round));
     if (el.versionLabel) el.versionLabel.textContent = "v" + GAME_VERSION;
     if (el.phaseLabel) {
@@ -2398,8 +2465,11 @@
     lastBoardSig = "";
     if (announce !== false) {
       const held = livingUnits().length;
+      const level = state.level || 1;
+      const isFirstWave = !state.fighting && state.round === 1;
       showBanner(
-        "Wave " +
+        (isFirstWave ? "Level " + level + " match · " : "") +
+          "Wave " +
           state.round +
           " in " +
           WAVE_INTERVAL_S +
@@ -2407,7 +2477,7 @@
           (held ? " · " + held + " still fighting" : ""),
         ""
       );
-      hideBannerSoon(1600);
+      hideBannerSoon(isFirstWave ? 2000 : 1600);
     }
     renderHud();
   }
@@ -2469,6 +2539,13 @@
       const stats = unitStatsAtLevel(type, lv.hp, lv.atk);
       hp = stats.hp;
       atk = stats.atk;
+    }
+    if (side === "enemy") {
+      const mult = (state.levelMods && state.levelMods.unitStatMult) || 1;
+      if (mult !== 1) {
+        hp = Math.max(1, Math.round(hp * mult));
+        atk = Math.max(1, Math.round(atk * mult));
+      }
     }
     const u = {
       id: prefix + state.nextUnitId++,
@@ -2634,15 +2711,33 @@
   function endMatch(won) {
     state.over = true;
     state.won = won;
+    const clearedLevel = state.level || 1;
     const best = saveBestRecord(won);
+    let nextLevel = clearedLevel;
+    if (won) {
+      nextLevel = saveLevel(clearedLevel + 1);
+    }
     playSfx(won ? "victory" : "defeat");
     shakeScreen("lg");
     spawnFinaleParticles(won);
     if (el.endTitle) el.endTitle.textContent = won ? "Victory" : "Defeat";
+    if (el.endLevel) {
+      el.endLevel.classList.toggle("is-win", won);
+      el.endLevel.classList.toggle("is-loss", !won);
+      if (won) {
+        el.endLevel.innerHTML =
+          `<span class="end-level-main">Level ${clearedLevel} cleared</span>` +
+          `<span class="end-level-sub">Level ${nextLevel} unlocked</span>`;
+      } else {
+        el.endLevel.innerHTML =
+          `<span class="end-level-main">Level ${clearedLevel} failed</span>` +
+          `<span class="end-level-sub">Retry this matchup</span>`;
+      }
+    }
     if (el.endBody) {
       el.endBody.textContent = won
-        ? "The enemy castle is destroyed. Well fought."
-        : "Your castle has fallen. Try a new strategy.";
+        ? "The enemy keep falls. A stronger foe awaits."
+        : "Your keep has fallen. Study the matchup and try again.";
     }
     if (el.endStats) {
       const researched = UNIT_TYPES.filter((t) => {
@@ -2656,6 +2751,9 @@
         .join(", ");
       const stats = state.stats || {};
       el.endStats.innerHTML =
+        `<li>Campaign level: <strong>${clearedLevel}</strong>${
+          won ? " → <strong>" + nextLevel + "</strong>" : ""
+        }</li>` +
         `<li>Rounds played: <strong>${state.roundsPlayed}</strong></li>` +
         `<li>Units purchased: <strong>${state.unitsBought}</strong></li>` +
         `<li>Enemy units slain: <strong>${stats.playerKills || 0}</strong></li>` +
@@ -2667,7 +2765,11 @@
           ? `<li>Unit research: <strong>${researched}</strong></li>`
           : "") +
         `<li>Match time: <strong>${Math.floor(state.matchTime)}s</strong></li>` +
-        `<li class="end-best">Best fastest win: <strong>${best.fastestWin != null ? best.fastestWin + "s" : "—"}</strong> · Highest wave: <strong>${best.highestWave || 0}</strong></li>`;
+        `<li class="end-best">Best fastest win: <strong>${
+          best.fastestWin != null ? best.fastestWin + "s" : "—"
+        }</strong> · Highest wave: <strong>${best.highestWave || 0}</strong> · Best level cleared: <strong>${
+          best.bestLevel || 0
+        }</strong></li>`;
     }
     if (el.endModal) {
       el.endModal.hidden = false;
@@ -3732,6 +3834,18 @@
       playSfx("click");
       startMatch();
     });
+    el.endResetLevel?.addEventListener("click", () => {
+      if (
+        !window.confirm(
+          "Reset campaign progress to Level 1? Best records will be kept."
+        )
+      ) {
+        return;
+      }
+      playSfx("click");
+      saveLevel(1);
+      startMatch();
+    });
     el.endModal?.querySelector(".modal-backdrop")?.addEventListener("click", () => {
       if (state.over) startMatch();
     });
@@ -3911,9 +4025,11 @@
       tickEconomy(dt);
       tickWaveTimer(dt);
       accAi += dt;
-      while (accAi >= AI_BUY_INTERVAL) {
+      const buyInterval =
+        (state.levelMods && state.levelMods.buyInterval) || AI_BUY_INTERVAL;
+      while (accAi >= buyInterval) {
         aiTryBuy();
-        accAi -= AI_BUY_INTERVAL;
+        accAi -= buyInterval;
       }
       accBattle += dt;
       while (accBattle >= BATTLE_MS / 1000) {
