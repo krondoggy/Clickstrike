@@ -25,7 +25,7 @@
 
       <div class="topbar-left">
         <a href="../../" class="btn-ghost" title="Back to game hall">Hall</a>
-        <span id="version-label" class="version-tag">v0.8.0</span>
+        <span id="version-label" class="version-tag">v0.9.0</span>
       </div>
 
       <div class="castle-block player">
@@ -50,7 +50,7 @@
           <span id="phase-label">First wave</span>
           <span id="phase-timer" class="phase-timer">30s</span>
         </div>
-        <div id="streak-pill" class="streak-pill" hidden title="Win streak bonus income">
+        <div id="streak-pill" class="streak-pill is-empty" title="Win streak bonus income">
           <span class="streak-label">Streak</span>
           <span id="streak-display">0</span>
           <span class="streak-bonus">+<span id="streak-gps">0.0</span>/s</span>
@@ -207,11 +207,12 @@
       <ul class="help-list">
         <li><strong>Campaign levels</strong>: each victory unlocks the next level with a stronger AI. Defeat keeps you on the same level so you can retry. Progress is saved in the browser.</li>
         <li><strong>Gold</strong> trickles in all the time. Economy upgrades raise your gold per second. Buy and place the next wave while the field is still fighting.</li>
-        <li><strong>Hire</strong> recruits units and Economy; <strong>Research</strong> upgrades types you own with separate <strong>+HP</strong> or <strong>+ATK</strong> tracks (3 levels each: +16% HP or +14% ATK per level) and fortifies your towers (+HP, +ATK, +range). Living units and towers get stronger immediately.</li>
+        <li><strong>Hire</strong> recruits units and Economy; <strong>Research</strong> upgrades your army. Class tracks buff every matching unit (Forged Swords for melee, Bodkin Arrows for ranged, Arcane Focus for magic/heal). Each unit also has specialties like Vitality (HP), Plating (armor), Reach (range), Haste (speed), Blast, or Siegecraft. Towers still get +HP/+ATK/+range. Living units update immediately.</li>
         <li><strong>Deploy</strong>: click a barracks unit, then a highlighted spawn tile. Click a placed unit to select it — empty tiles glow to move, occupied tiles swap. Click the barracks (or double-click the unit) to send it back. Esc clears the selection.</li>
         <li>When the 30s timer hits zero, your roster deploys automatically. Combat never pauses — survivors stay and the next countdown starts immediately, until a keep falls.</li>
         <li><strong>Mobile</strong>: <strong>Shop</strong> to hire, then tap a glowing spawn tile on <strong>Battle</strong> to choose where that unit lives. Barracks under the field holds units you have not placed yet.</li>
-        <li><strong>Shortcuts</strong>: H = help · M = mute music · Esc = clear selection. Hover shop/bench cards for full unit stats; on a phone, press and hold.</li>
+        <li><strong>Inspect</strong>: hover shop, barracks, or field units for full stats and Strong/Weak counters. On a phone, press and hold — the card docks at the bottom. Research cards preview the next level in green.</li>
+        <li><strong>Shortcuts</strong>: H = help · M = mute music · Esc = clear selection.</li>
         <li><strong>Win streak</strong>: holding more units on the field than the enemy raises your streak and bonus gold per second (shown in the top bar).</li>
         <li><strong>Roster cap</strong> starts at 2 and grows by 1 each wave (up to 24). Early fights stay small; save gold for better units or economy instead of flooding the field.</li>
         <li><strong>Towers</strong> guard each approach and fire at nearby enemies. Destroy them, then siege the keep.</li>

@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const GAME_VERSION = "0.8.0";
+  const GAME_VERSION = "0.9.0";
   const HUD_MS = 100;
   const BATTLE_MS = 50;
   const MOBILE_MQ = "(max-width: 900px)";
@@ -14,8 +14,10 @@
   const GRID_COLS = 4;
   const GRID_ROWS = 5;
   const MELEE_RANGE = 7;
-  const COUNTER_STRONG = 1.4;
-  const COUNTER_WEAK = 0.7;
+  const COUNTER_STRONG = 1.55;
+  const COUNTER_WEAK = 0.55;
+  const VOLLEY_INTERVAL = 6;
+  const VOLLEY_BONUS_MULT = 0.55;
   const UNIT_MOVE_MULT = 0.88;
   const FIELD_SOFT_CAP = 48;
   const LANE_TARGET_Y = 24;
@@ -63,13 +65,58 @@
   const MAX_TOWER_RESEARCH = 3;
   const UNIT_RESEARCH_COST_MULT = 2.1;
   const UNIT_RESEARCH_COST_GROWTH = 1.6;
-  const UNIT_RESEARCH_HP_MULT = 0.16;
-  const UNIT_RESEARCH_ATK_MULT = 0.14;
+  const CLASS_RESEARCH_BASE_COST = 40;
+  const CLASS_RESEARCH_GROWTH = 1.55;
   const TOWER_RESEARCH_BASE_COST = 45;
   const TOWER_RESEARCH_GROWTH = 1.55;
   const TOWER_RESEARCH_HP = 20;
   const TOWER_RESEARCH_ATK = 2;
   const TOWER_RESEARCH_RANGE = 3;
+
+  const CLASS_TRACKS = {
+    swords: {
+      id: "swords",
+      name: "Forged Swords",
+      blurb: "+14% melee damage per level",
+      icon: "⚔",
+      matches: (t) => t.atkStyle === "melee",
+      stat: "atk",
+      pct: 0.14,
+    },
+    bows: {
+      id: "bows",
+      name: "Bodkin Arrows",
+      blurb: "+14% ranged damage per level",
+      icon: "🏹",
+      matches: (t) => t.atkStyle === "ranged",
+      stat: "atk",
+      pct: 0.14,
+    },
+    arcane: {
+      id: "arcane",
+      name: "Arcane Focus",
+      blurb: "+14% magic & heal power per level",
+      icon: "✦",
+      matches: (t) => t.atkStyle === "magic" || t.atkStyle === "heal",
+      stat: "atk",
+      pct: 0.14,
+    },
+  };
+
+  const UNIT_TRACK_DEFS = {
+    vitality: { id: "vitality", name: "Vitality", blurb: "+16% max HP", stat: "hp", pct: 0.16 },
+    plating: { id: "plating", name: "Plating", blurb: "+1 armor", stat: "armor", flat: 1 },
+    reach: { id: "reach", name: "Reach", blurb: "+3 attack range", stat: "range", flat: 3 },
+    haste: { id: "haste", name: "Haste", blurb: "+8% move speed", stat: "spd", pct: 0.08 },
+    blast: { id: "blast", name: "Blast", blurb: "+2 splash radius", stat: "splash", flat: 2 },
+    siegecraft: {
+      id: "siegecraft",
+      name: "Siegecraft",
+      blurb: "+0.3 structure damage",
+      stat: "structureMult",
+      flat: 0.3,
+    },
+  };
 
   const START_GOLD = 10;
   const BASE_GPS = 0.85;
@@ -114,6 +161,7 @@
       strongVs: ["support"],
       weakVs: ["ranged"],
       blurb: "Cheap frontline soak · Soft vs ranged",
+      upgrades: ["vitality"],
     },
     {
       id: "spearman",
@@ -132,63 +180,67 @@
       weakVs: ["ranged"],
       blurb: "Brace vs cavalry charge",
       ability: "brace",
+      upgrades: ["vitality", "plating"],
     },
     {
       id: "archer",
       name: "Archer",
-      baseCost: 44,
+      baseCost: 48,
       accent: "#7cb342",
       hp: 14,
-      atk: 9,
+      atk: 7,
       spd: 4,
       armor: 0,
-      atkCd: 0.52,
-      range: 24,
+      atkCd: 0.68,
+      range: 20,
       atkStyle: "ranged",
       tags: ["ranged"],
       strongVs: ["infantry"],
-      weakVs: ["cavalry"],
-      blurb: "Volley every 5th shot",
+      weakVs: ["cavalry", "armored"],
+      blurb: "Shreds light infantry · Soft vs cavalry & armor",
       ability: "volley",
       unlockRound: ARCHER_UNLOCK_ROUND,
+      upgrades: ["vitality", "reach"],
     },
     {
       id: "knight",
       name: "Knight",
       baseCost: 85,
       accent: "#9575cd",
-      hp: 45,
+      hp: 52,
       atk: 13,
       spd: 2.5,
       armor: 3,
       atkCd: 0.7,
       range: 6,
       atkStyle: "melee",
-      tags: ["infantry", "armored"],
+      tags: ["armored"],
       strongVs: ["ranged"],
       weakVs: ["magic"],
-      blurb: "Shield bash stuns",
+      blurb: "Armored wall vs ranged · Soft vs magic",
       ability: "shieldbash",
       unlockRound: KNIGHT_UNLOCK_ROUND,
+      upgrades: ["vitality", "plating"],
     },
     {
       id: "rider",
       name: "Rider",
       baseCost: 52,
       accent: "#ffb74d",
-      hp: 22,
+      hp: 26,
       atk: 9,
       spd: 5.8,
-      armor: 0,
+      armor: 1,
       atkCd: 0.45,
       range: 6,
       atkStyle: "melee",
       tags: ["cavalry"],
       strongVs: ["ranged", "magic", "support"],
-      weakVs: ["infantry"],
-      blurb: "Charge after a sprint",
+      weakVs: ["infantry", "armored"],
+      blurb: "Runs down archers · Soft vs spears & armor",
       ability: "charge",
       unlockRound: RIDER_UNLOCK_ROUND,
+      upgrades: ["vitality", "haste"],
     },
     {
       id: "healer",
@@ -208,6 +260,7 @@
       blurb: "Sanctuary group heal",
       ability: "sanctuary",
       unlockRound: HEALER_UNLOCK_ROUND,
+      upgrades: ["vitality", "reach"],
     },
     {
       id: "mage",
@@ -227,6 +280,7 @@
       blurb: "Arcane splash on impact",
       ability: "arcane",
       unlockRound: MAGE_UNLOCK_ROUND,
+      upgrades: ["vitality", "reach"],
     },
     {
       id: "guardian",
@@ -240,12 +294,13 @@
       atkCd: 0.85,
       range: 6,
       atkStyle: "melee",
-      tags: ["infantry", "armored"],
+      tags: ["armored"],
       strongVs: ["magic"],
       weakVs: ["cavalry"],
       blurb: "Fat anti-mage wall · Soft vs cavalry",
       ability: "aegis",
       unlockRound: GUARDIAN_UNLOCK_ROUND,
+      upgrades: ["vitality", "plating"],
     },
     {
       id: "assassin",
@@ -261,10 +316,11 @@
       atkStyle: "melee",
       tags: ["cavalry"],
       strongVs: ["support", "magic"],
-      weakVs: ["infantry"],
+      weakVs: ["infantry", "armored"],
       targetPriority: "backline",
-      blurb: "Dives for backline · Soft vs spears",
+      blurb: "Dives for backline · Soft vs spears & armor",
       unlockRound: ASSASSIN_UNLOCK_ROUND,
+      upgrades: ["vitality", "haste"],
     },
     {
       id: "grenadier",
@@ -272,7 +328,7 @@
       baseCost: 68,
       accent: "#ff7043",
       hp: 24,
-      atk: 9,
+      atk: 8,
       spd: 2.8,
       armor: 1,
       atkCd: 0.65,
@@ -280,10 +336,11 @@
       atkStyle: "ranged",
       tags: ["ranged"],
       strongVs: ["infantry"],
-      weakVs: ["cavalry"],
+      weakVs: ["cavalry", "armored"],
       splash: 10,
-      blurb: "Splash punishes clumps · Soft vs cavalry",
+      blurb: "Splash punishes clumps · Soft vs cavalry & armor",
       unlockRound: GRENADIER_UNLOCK_ROUND,
+      upgrades: ["vitality", "blast"],
     },
     {
       id: "catapult",
@@ -303,6 +360,7 @@
       structureMult: 2.6,
       blurb: "Melts towers & keeps · Soft vs cavalry",
       unlockRound: CATAPULT_UNLOCK_ROUND,
+      upgrades: ["vitality", "siegecraft"],
     },
   ];
 
@@ -676,9 +734,17 @@
     return r;
   }
 
-  function emptyUnitLevels() {
+  function emptyClassLevels() {
+    return { swords: 0, bows: 0, arcane: 0 };
+  }
+
+  function emptyUnitUpgrades() {
     const r = Object.create(null);
-    for (const t of UNIT_TYPES) r[t.id] = 0;
+    for (const t of UNIT_TYPES) {
+      const tracks = Object.create(null);
+      for (const id of t.upgrades || []) tracks[id] = 0;
+      r[t.id] = tracks;
+    }
     return r;
   }
 
@@ -686,22 +752,40 @@
     return side === "player" ? state : state.ai;
   }
 
-  function unitTrackLevel(actor, typeId, track) {
-    const levels = track === "atk" ? actor.unitAtkLevels : actor.unitHpLevels;
-    return (levels && levels[typeId]) || 0;
+  function classTrackForType(type) {
+    if (!type) return null;
+    for (const key of Object.keys(CLASS_TRACKS)) {
+      if (CLASS_TRACKS[key].matches(type)) return CLASS_TRACKS[key];
+    }
+    return null;
   }
 
-  function unitResearchLevels(actor, typeId) {
-    return {
-      hp: unitTrackLevel(actor, typeId, "hp"),
-      atk: unitTrackLevel(actor, typeId, "atk"),
-    };
+  function classLevel(actor, classId) {
+    return (actor && actor.classLevels && actor.classLevels[classId]) || 0;
+  }
+
+  function unitUpgradeLevel(actor, typeId, trackId) {
+    const map = actor && actor.unitUpgrades && actor.unitUpgrades[typeId];
+    return (map && map[trackId]) || 0;
+  }
+
+  function unitHasResearch(actor, typeId) {
+    const type = unitType(typeId);
+    if (!type) return false;
+    const cls = classTrackForType(type);
+    if (cls && classLevel(actor, cls.id) > 0) return true;
+    for (const trackId of type.upgrades || []) {
+      if (unitUpgradeLevel(actor, typeId, trackId) > 0) return true;
+    }
+    return false;
   }
 
   function unitResearchTag(actor, typeId) {
-    const lv = unitResearchLevels(actor, typeId);
-    if (lv.hp <= 0 && lv.atk <= 0) return "";
-    return "H" + lv.hp + "/A" + lv.atk;
+    return unitHasResearch(actor, typeId) ? "+" : "";
+  }
+
+  function classUpgradeCost(level) {
+    return Math.floor(CLASS_RESEARCH_BASE_COST * Math.pow(CLASS_RESEARCH_GROWTH, level));
   }
 
   function unitUpgradeCost(typeId, level) {
@@ -716,10 +800,66 @@
     return Math.floor(TOWER_RESEARCH_BASE_COST * Math.pow(TOWER_RESEARCH_GROWTH, level));
   }
 
-  function unitStatsAtLevel(type, hpLv, atkLv) {
+  function applyTrackBonus(value, level, def) {
+    if (!level || !def) return value;
+    let out = value;
+    if (def.pct) out = out * (1 + def.pct * level);
+    if (def.flat) out = out + def.flat * level;
+    return out;
+  }
+
+  function resolvedUnitStats(type, actor, preview) {
+    preview = preview || {};
+    const classPreview = preview.classLevels || null;
+    const unitPreview = preview.unitTracks || null;
+    const cls = classTrackForType(type);
+    let classLv = cls ? classLevel(actor, cls.id) : 0;
+    if (cls && classPreview && classPreview[cls.id] != null) {
+      classLv = classPreview[cls.id];
+    }
+
+    let hp = type.hp;
+    let atk = type.atk;
+    let armor = type.armor || 0;
+    let range = type.range || MELEE_RANGE;
+    let spd = type.spd;
+    let splash = type.splash || 0;
+    let structureMult = type.structureMult || 1;
+
+    if (cls) {
+      if (cls.stat === "atk") atk = applyTrackBonus(atk, classLv, cls);
+      else if (cls.stat === "hp") hp = applyTrackBonus(hp, classLv, cls);
+    }
+
+    const unitTracks = Object.create(null);
+    for (const trackId of type.upgrades || []) {
+      let lv = unitUpgradeLevel(actor, type.id, trackId);
+      if (unitPreview && unitPreview[trackId] != null) lv = unitPreview[trackId];
+      unitTracks[trackId] = lv;
+      const def = UNIT_TRACK_DEFS[trackId];
+      if (!def || lv <= 0) continue;
+      if (def.stat === "hp") hp = applyTrackBonus(hp, lv, def);
+      else if (def.stat === "atk") atk = applyTrackBonus(atk, lv, def);
+      else if (def.stat === "armor") armor = applyTrackBonus(armor, lv, def);
+      else if (def.stat === "range") range = applyTrackBonus(range, lv, def);
+      else if (def.stat === "spd") spd = applyTrackBonus(spd, lv, def);
+      else if (def.stat === "splash") splash = applyTrackBonus(splash, lv, def);
+      else if (def.stat === "structureMult") {
+        structureMult = applyTrackBonus(structureMult, lv, def);
+      }
+    }
+
     return {
-      hp: Math.round(type.hp * (1 + UNIT_RESEARCH_HP_MULT * hpLv)),
-      atk: Math.round(type.atk * (1 + UNIT_RESEARCH_ATK_MULT * atkLv)),
+      hp: Math.max(1, Math.round(hp)),
+      atk: Math.max(1, Math.round(atk)),
+      armor: Math.max(0, Math.round(armor)),
+      range: Math.max(1, Math.round(range)),
+      spd: Math.round(spd * 100) / 100,
+      splash: Math.max(0, Math.round(splash)),
+      structureMult: Math.round(structureMult * 100) / 100,
+      classId: cls ? cls.id : null,
+      classLevel: classLv,
+      unitTracks,
     };
   }
 
@@ -747,45 +887,86 @@
     lastTowerSig = "";
   }
 
+  function applyResolvedStatsToUnit(u, stats) {
+    const ratio = u.maxHp > 0 ? u.hp / u.maxHp : 1;
+    u.maxHp = stats.hp;
+    u.atk = stats.atk;
+    u.armor = stats.armor;
+    u.range = stats.range;
+    u.spd = stats.spd;
+    u.splash = stats.splash;
+    u.structureMult = stats.structureMult;
+    u.researchClassLevel = stats.classLevel || 0;
+    u.researchClassId = stats.classId || null;
+    u.researchTracks = Object.assign(Object.create(null), stats.unitTracks || {});
+    u.hp = Math.min(u.maxHp, Math.max(1, Math.round(u.maxHp * ratio)));
+  }
+
   function retargetLivingUnitsOfType(side, typeId) {
     const actor = actorForSide(side);
     const type = unitType(typeId);
     if (!type) return;
-    const lv = unitResearchLevels(actor, typeId);
-    const stats = unitStatsAtLevel(type, lv.hp, lv.atk);
-    let hp = stats.hp;
-    let atk = stats.atk;
+    let stats = resolvedUnitStats(type, actor);
     if (side === "enemy") {
       const mult = (state.levelMods && state.levelMods.unitStatMult) || 1;
       if (mult !== 1) {
-        hp = Math.max(1, Math.round(hp * mult));
-        atk = Math.max(1, Math.round(atk * mult));
+        stats = Object.assign({}, stats, {
+          hp: Math.max(1, Math.round(stats.hp * mult)),
+          atk: Math.max(1, Math.round(stats.atk * mult)),
+        });
       }
     }
     for (const u of state.battle.units) {
       if (u.side !== side || u.typeId !== typeId || u.hero || u.minion || u.hp <= 0) continue;
-      const ratio = u.maxHp > 0 ? u.hp / u.maxHp : 1;
-      u.maxHp = hp;
-      u.atk = atk;
-      u.researchHpLevel = lv.hp;
-      u.researchAtkLevel = lv.atk;
-      u.hp = Math.min(u.maxHp, Math.max(1, Math.round(u.maxHp * ratio)));
+      applyResolvedStatsToUnit(u, stats);
       const node = getTokenEl(u.id);
       if (node) {
         const plate = node.querySelector(".unit-plate");
         if (plate) plate.textContent = unitPlateName(u);
+        node.title = "";
       }
       updateCombatToken(u);
     }
   }
 
-  function canBuyUnitUpgrade(actor, typeId, track) {
+  function retargetLivingUnitsMatchingClass(side, classId) {
+    const def = CLASS_TRACKS[classId];
+    if (!def) return;
+    for (const t of UNIT_TYPES) {
+      if (def.matches(t)) retargetLivingUnitsOfType(side, t.id);
+    }
+  }
+
+  function ownsMatchingClassUnit(actor, classId) {
+    const def = CLASS_TRACKS[classId];
+    if (!def || !actor) return false;
+    for (const t of UNIT_TYPES) {
+      if (!def.matches(t)) continue;
+      if ((actor.roster[t.id] || 0) < 1) continue;
+      if (!isUnitUnlocked(t.id)) continue;
+      return true;
+    }
+    return false;
+  }
+
+  function canBuyClassUpgrade(actor, classId) {
+    if (!actor || state.over) return false;
+    const def = CLASS_TRACKS[classId];
+    if (!def) return false;
+    if (!ownsMatchingClassUnit(actor, classId)) return false;
+    const level = classLevel(actor, classId);
+    if (level >= MAX_UNIT_RESEARCH) return false;
+    return actor.gold >= classUpgradeCost(level);
+  }
+
+  function canBuyUnitUpgrade(actor, typeId, trackId) {
     if (!actor || state.over) return false;
     const type = unitType(typeId);
     if (!type) return false;
+    if ((type.upgrades || []).indexOf(trackId) === -1) return false;
     if ((actor.roster[typeId] || 0) < 1) return false;
     if (!isUnitUnlocked(typeId)) return false;
-    const level = unitTrackLevel(actor, typeId, track);
+    const level = unitUpgradeLevel(actor, typeId, trackId);
     if (level >= MAX_UNIT_RESEARCH) return false;
     return actor.gold >= unitUpgradeCost(typeId, level);
   }
@@ -797,20 +978,30 @@
     return actor.gold >= towerUpgradeCost(level);
   }
 
-  function buyUnitUpgrade(typeId, track, forPlayer) {
+  function buyClassUpgrade(classId, forPlayer) {
     const actor = forPlayer ? state : state.ai;
-    if (!canBuyUnitUpgrade(actor, typeId, track)) return false;
-    const level = unitTrackLevel(actor, typeId, track);
+    if (!canBuyClassUpgrade(actor, classId)) return false;
+    const level = classLevel(actor, classId);
+    const cost = classUpgradeCost(level);
+    actor.gold -= cost;
+    if (forPlayer) spendGold(cost);
+    if (!actor.classLevels) actor.classLevels = emptyClassLevels();
+    actor.classLevels[classId] = level + 1;
+    retargetLivingUnitsMatchingClass(forPlayer ? "player" : "enemy", classId);
+    lastShopSig = "";
+    return true;
+  }
+
+  function buyUnitUpgrade(typeId, trackId, forPlayer) {
+    const actor = forPlayer ? state : state.ai;
+    if (!canBuyUnitUpgrade(actor, typeId, trackId)) return false;
+    const level = unitUpgradeLevel(actor, typeId, trackId);
     const cost = unitUpgradeCost(typeId, level);
     actor.gold -= cost;
     if (forPlayer) spendGold(cost);
-    if (track === "atk") {
-      if (!actor.unitAtkLevels) actor.unitAtkLevels = emptyUnitLevels();
-      actor.unitAtkLevels[typeId] = level + 1;
-    } else {
-      if (!actor.unitHpLevels) actor.unitHpLevels = emptyUnitLevels();
-      actor.unitHpLevels[typeId] = level + 1;
-    }
+    if (!actor.unitUpgrades) actor.unitUpgrades = emptyUnitUpgrades();
+    if (!actor.unitUpgrades[typeId]) actor.unitUpgrades[typeId] = Object.create(null);
+    actor.unitUpgrades[typeId][trackId] = level + 1;
     retargetLivingUnitsOfType(forPlayer ? "player" : "enemy", typeId);
     lastShopSig = "";
     return true;
@@ -914,21 +1105,45 @@
     buildAiFormation();
   }
 
-  function aiPickUnitUpgrade(typeId) {
-    const ai = state.ai;
-    const tracks = [];
-    for (const track of ["hp", "atk"]) {
-      if (!canBuyUnitUpgrade(ai, typeId, track)) continue;
-      tracks.push({
-        track,
-        cost: unitUpgradeCost(typeId, unitTrackLevel(ai, typeId, track)),
+  function aiListUpgradeOptions(ai) {
+    const options = [];
+    for (const classId of Object.keys(CLASS_TRACKS)) {
+      if (!canBuyClassUpgrade(ai, classId)) continue;
+      const level = classLevel(ai, classId);
+      let matchCount = 0;
+      const def = CLASS_TRACKS[classId];
+      for (const t of UNIT_TYPES) {
+        if (def.matches(t) && (ai.roster[t.id] || 0) > 0) matchCount += 1;
+      }
+      options.push({
+        kind: "class",
+        classId,
+        cost: classUpgradeCost(level),
+        matchCount,
+        counter: false,
       });
     }
-    if (!tracks.length) return null;
-    tracks.sort((a, b) => a.cost - b.cost);
-    const topCost = tracks[0].cost;
-    const cheapest = tracks.filter((t) => t.cost === topCost);
-    return cheapest[Math.floor(Math.random() * cheapest.length)];
+    for (const t of UNIT_TYPES) {
+      if ((ai.roster[t.id] || 0) < 1) continue;
+      for (const trackId of t.upgrades || []) {
+        if (!canBuyUnitUpgrade(ai, t.id, trackId)) continue;
+        options.push({
+          kind: "unit",
+          typeId: t.id,
+          trackId,
+          cost: unitUpgradeCost(t.id, unitUpgradeLevel(ai, t.id, trackId)),
+          matchCount: 1,
+          counter: false,
+        });
+      }
+    }
+    return options;
+  }
+
+  function aiBuyUpgradeOption(opt) {
+    if (!opt) return false;
+    if (opt.kind === "class") return buyClassUpgrade(opt.classId, false);
+    return buyUnitUpgrade(opt.typeId, opt.trackId, false);
   }
 
   function aiTryResearch() {
@@ -936,21 +1151,23 @@
     const rosterFull = !rosterHasRoom(ai.roster);
     const oneSlotLeft = rosterTotal(ai.roster) >= rosterCap() - 1;
 
-    const heavyTypes = UNIT_TYPES.filter((t) => {
-      if ((ai.roster[t.id] || 0) < 2) return false;
-      if (!isUnitUnlocked(t.id)) return false;
-      const pick = aiPickUnitUpgrade(t.id);
-      if (!pick) return false;
-      return ai.gold >= pick.cost + 15;
-    });
-    if (heavyTypes.length) {
-      heavyTypes.sort((a, b) => {
-        const pa = aiPickUnitUpgrade(a.id);
-        const pb = aiPickUnitUpgrade(b.id);
-        return (pa ? pa.cost : Infinity) - (pb ? pb.cost : Infinity);
+    const heavyOwned = UNIT_TYPES.filter((t) => (ai.roster[t.id] || 0) >= 2 && isUnitUnlocked(t.id));
+    if (heavyOwned.length) {
+      const options = aiListUpgradeOptions(ai).filter((o) => {
+        if (o.kind === "class") {
+          const def = CLASS_TRACKS[o.classId];
+          return heavyOwned.some((t) => def.matches(t));
+        }
+        return heavyOwned.some((t) => t.id === o.typeId);
       });
-      const pick = aiPickUnitUpgrade(heavyTypes[0].id);
-      if (pick && buyUnitUpgrade(heavyTypes[0].id, pick.track, false)) return true;
+      const affordable = options.filter((o) => ai.gold >= o.cost + 15);
+      if (affordable.length) {
+        affordable.sort((a, b) => {
+          if (b.matchCount !== a.matchCount) return b.matchCount - a.matchCount;
+          return a.cost - b.cost;
+        });
+        if (aiBuyUpgradeOption(affordable[0])) return true;
+      }
     }
 
     const aiTower = ai.towerLevel || 0;
@@ -968,28 +1185,25 @@
 
     if (rosterFull || oneSlotLeft) {
       const counter = counterTypeId(dominantTag(state.roster));
-      const options = [];
-      for (const t of UNIT_TYPES) {
-        if ((ai.roster[t.id] || 0) < 1) continue;
-        for (const track of ["hp", "atk"]) {
-          if (!canBuyUnitUpgrade(ai, t.id, track)) continue;
-          options.push({
-            typeId: t.id,
-            track,
-            cost: unitUpgradeCost(t.id, unitTrackLevel(ai, t.id, track)),
-            counter: t.id === counter,
-          });
+      const options = aiListUpgradeOptions(ai).map((o) => {
+        if (o.kind === "unit") o.counter = o.typeId === counter;
+        else if (o.kind === "class") {
+          const def = CLASS_TRACKS[o.classId];
+          const ct = unitType(counter);
+          o.counter = !!(ct && def.matches(ct));
         }
-      }
+        return o;
+      });
       if (options.length) {
         options.sort((a, b) => {
           if (a.counter !== b.counter) return a.counter ? -1 : 1;
+          if (b.matchCount !== a.matchCount) return b.matchCount - a.matchCount;
           return a.cost - b.cost;
         });
         const topCost = options[0].cost;
         const cheapest = options.filter((o) => o.cost === topCost);
         const pick = cheapest[Math.floor(Math.random() * cheapest.length)];
-        if (buyUnitUpgrade(pick.typeId, pick.track, false)) return true;
+        if (aiBuyUpgradeOption(pick)) return true;
       }
       if (canBuyTowerUpgrade(ai) && buyTowerUpgrade(false)) return true;
     }
@@ -1255,8 +1469,8 @@
   function counterTypeId(tag) {
     if (tag === "cavalry") return "spearman";
     if (tag === "infantry") return "archer";
-    if (tag === "ranged") return "knight";
-    if (tag === "magic" || tag === "support") return "guardian";
+    if (tag === "ranged") return "rider";
+    if (tag === "magic" || tag === "support") return "assassin";
     if (tag === "armored") return "mage";
     if (tag === "siege") return "assassin";
     return "spearman";
@@ -1399,8 +1613,8 @@
       gold: START_GOLD,
       economy: 0,
       roster: emptyRoster(),
-      unitHpLevels: emptyUnitLevels(),
-      unitAtkLevels: emptyUnitLevels(),
+      classLevels: emptyClassLevels(),
+      unitUpgrades: emptyUnitUpgrades(),
       towerLevel: 0,
       shopTab: "hire",
       bench: emptyRoster(),
@@ -1432,8 +1646,8 @@
         gold: START_GOLD + mods.startGoldBonus,
         economy: 0,
         roster: emptyRoster(),
-        unitHpLevels: emptyUnitLevels(),
-        unitAtkLevels: emptyUnitLevels(),
+        classLevels: emptyClassLevels(),
+        unitUpgrades: emptyUnitUpgrades(),
         towerLevel: 0,
         winStreak: 0,
         castleHp: aiKeepHp,
@@ -1819,36 +2033,257 @@
     return map[tag] || tag;
   }
 
-  function unitTooltipHtml(def, opts) {
+  function styleLabel(style) {
+    const map = {
+      melee: "Melee",
+      ranged: "Ranged",
+      magic: "Magic",
+      heal: "Heal",
+    };
+    return map[style] || style || "Melee";
+  }
+
+  function damageLabel(style) {
+    const map = {
+      melee: "Sword",
+      ranged: "Bow",
+      magic: "Spell",
+      heal: "Heal",
+    };
+    return map[style] || "Damage";
+  }
+
+  function formatStatDelta(base, next, decimals) {
+    if (next == null || next === base) return "";
+    const diff = next - base;
+    if (!diff) return "";
+    const shown =
+      decimals != null
+        ? (Math.round(diff * Math.pow(10, decimals)) / Math.pow(10, decimals)).toFixed(decimals)
+        : String(Math.round(diff));
+    const sign = diff > 0 ? "+" : "";
+    return `<span class="tt-delta">${sign}${shown}</span>`;
+  }
+
+  function counterPills(tags, kind) {
+    if (!tags || !tags.length) return "";
+    const cls = kind === "good" ? "tt-pill tt-pill-good" : "tt-pill tt-pill-bad";
+    return tags.map((t) => `<span class="${cls}">${tagLabel(t)}</span>`).join("");
+  }
+
+  function researchFooterHtml(def, stats, previewStats) {
+    if (!def || !stats) return "";
+    const parts = [];
+    if (stats.classId) {
+      const cls = CLASS_TRACKS[stats.classId];
+      const next = previewStats && previewStats.classLevel != null ? previewStats.classLevel : null;
+      const cur = stats.classLevel || 0;
+      if (cls && (cur > 0 || (next != null && next !== cur))) {
+        let line = `${cls.name} ${cur}/${MAX_UNIT_RESEARCH}`;
+        if (next != null && next !== cur) {
+          line += ` <span class="tt-delta">→ ${next}</span>`;
+        }
+        parts.push(line);
+      }
+    }
+    for (const trackId of def.upgrades || []) {
+      const trackDef = UNIT_TRACK_DEFS[trackId];
+      if (!trackDef) continue;
+      const cur = (stats.unitTracks && stats.unitTracks[trackId]) || 0;
+      const next =
+        previewStats && previewStats.unitTracks && previewStats.unitTracks[trackId] != null
+          ? previewStats.unitTracks[trackId]
+          : null;
+      if (cur <= 0 && (next == null || next === cur)) continue;
+      let line = `${trackDef.name} ${cur}/${MAX_UNIT_RESEARCH}`;
+      if (next != null && next !== cur) {
+        line += ` <span class="tt-delta">→ ${next}</span>`;
+      }
+      parts.push(line);
+    }
+    if (!parts.length) return "";
+    return `<div class="tt-research">${parts.join(" · ")}</div>`;
+  }
+
+  function unitInspectHtml(def, opts) {
     if (!def) return "";
     opts = opts || {};
     const isHero = !!opts.hero;
-    let hpLevel = opts.hpLevel || 0;
-    let atkLevel = opts.atkLevel || 0;
-    if (!isHero && opts.level != null && opts.hpLevel == null && opts.atkLevel == null) {
-      hpLevel = opts.level;
-      atkLevel = opts.level;
+    const actor = opts.actor || state;
+    const artKey = opts.artKey || def.id;
+    let stats;
+    let previewStats = null;
+    if (isHero) {
+      stats = {
+        hp: def.hp,
+        atk: def.atk,
+        armor: def.armor || 0,
+        range: def.range || MELEE_RANGE,
+        spd: def.spd,
+        splash: 0,
+        structureMult: 1,
+        classId: null,
+        classLevel: 0,
+        unitTracks: {},
+      };
+    } else {
+      stats = resolvedUnitStats(def, actor, opts.preview);
+      if (opts.preview) {
+        previewStats = stats;
+        const base = resolvedUnitStats(def, actor);
+        stats = base;
+      }
     }
-    const stats = isHero ? def : unitStatsAtLevel(def, hpLevel, atkLevel);
-    const hp = isHero ? def.hp : stats.hp;
-    const atk = isHero ? def.atk : stats.atk;
-    let html = `<div class="tt-name">${def.name}</div>`;
-    html += `<div class="tt-stats">`;
-    html += `<span>HP ${hp}</span><span>ATK ${atk}</span>`;
-    html += `<span>RNG ${def.range || 6}</span><span>SPD ${def.spd}</span>`;
-    if (def.armor) html += `<span>ARM ${def.armor}</span>`;
+    if (opts.liveStats) {
+      stats = Object.assign({}, stats, opts.liveStats);
+    }
+
+    const showStats = previewStats || stats;
+    const rangeText = (r) => (r <= MELEE_RANGE ? "Melee" : String(r));
+    const roleBits = [styleLabel(def.atkStyle)];
+    for (const tag of def.tags || []) roleBits.push(tagLabel(tag));
+
+    let html = `<div class="tt-card">`;
+    html += `<div class="tt-portrait">${unitArt(artKey)}</div>`;
+    html += `<div class="tt-body">`;
+    html += `<div class="tt-name">${def.name}</div>`;
+    html += `<div class="tt-role">${roleBits.join(" · ")}</div>`;
+    html += `<div class="tt-statgrid">`;
+    html += `<div class="tt-stat"><span class="tt-stat-label">HP</span><span class="tt-stat-val">${stats.hp}${formatStatDelta(
+      stats.hp,
+      previewStats && previewStats.hp
+    )}</span></div>`;
+    html += `<div class="tt-stat"><span class="tt-stat-label">${damageLabel(
+      def.atkStyle
+    )}</span><span class="tt-stat-val">${stats.atk}${formatStatDelta(
+      stats.atk,
+      previewStats && previewStats.atk
+    )}</span></div>`;
+    html += `<div class="tt-stat"><span class="tt-stat-label">Armor</span><span class="tt-stat-val">${stats.armor}${formatStatDelta(
+      stats.armor,
+      previewStats && previewStats.armor
+    )}</span></div>`;
+    html += `<div class="tt-stat"><span class="tt-stat-label">Range</span><span class="tt-stat-val">${rangeText(
+      stats.range
+    )}${
+      previewStats && previewStats.range !== stats.range
+        ? `<span class="tt-delta">→ ${rangeText(previewStats.range)}</span>`
+        : ""
+    }</span></div>`;
+    html += `<div class="tt-stat"><span class="tt-stat-label">Speed</span><span class="tt-stat-val">${stats.spd}${formatStatDelta(
+      stats.spd,
+      previewStats && previewStats.spd,
+      2
+    )}</span></div>`;
+    html += `<div class="tt-stat"><span class="tt-stat-label">Atk CD</span><span class="tt-stat-val">${def.atkCd}s</span></div>`;
+    if (showStats.splash > 0 || (def.splash || 0) > 0) {
+      html += `<div class="tt-stat"><span class="tt-stat-label">Splash</span><span class="tt-stat-val">${stats.splash}${formatStatDelta(
+        stats.splash,
+        previewStats && previewStats.splash
+      )}</span></div>`;
+    }
+    if ((def.structureMult || 1) > 1 || showStats.structureMult > 1) {
+      html += `<div class="tt-stat"><span class="tt-stat-label">Siege</span><span class="tt-stat-val">×${stats.structureMult}${formatStatDelta(
+        stats.structureMult,
+        previewStats && previewStats.structureMult,
+        2
+      )}</span></div>`;
+    }
+    if (!isHero && def.baseCost != null && opts.showCost) {
+      html += `<div class="tt-stat"><span class="tt-stat-label">Hire</span><span class="tt-stat-val">${def.baseCost}g+</span></div>`;
+    }
+    if (isHero && def.hireGold != null) {
+      html += `<div class="tt-stat"><span class="tt-stat-label">Hire</span><span class="tt-stat-val">${def.hireGold}g</span></div>`;
+    }
     html += `</div>`;
+
     if (def.strongVs && def.strongVs.length) {
-      html += `<div class="tt-row"><span class="tt-good">Strong</span> vs ${def.strongVs.map(tagLabel).join(", ")}</div>`;
+      html += `<div class="tt-counters"><span class="tt-counter-label tt-good">Strong</span>${counterPills(
+        def.strongVs,
+        "good"
+      )}</div>`;
     }
     if (def.weakVs && def.weakVs.length) {
-      html += `<div class="tt-row"><span class="tt-bad">Weak</span> vs ${def.weakVs.map(tagLabel).join(", ")}</div>`;
+      html += `<div class="tt-counters"><span class="tt-counter-label tt-bad">Weak</span>${counterPills(
+        def.weakVs,
+        "bad"
+      )}</div>`;
     }
     if (def.blurb) html += `<div class="tt-ability">${def.blurb}</div>`;
-    if (!isHero && (hpLevel > 0 || atkLevel > 0)) {
-      html += `<div class="tt-row">Research +HP ${hpLevel} · +ATK ${atkLevel}</div>`;
-    }
+    if (!isHero) html += researchFooterHtml(def, stats, previewStats);
+    html += `</div></div>`;
     return html;
+  }
+
+  function simpleInspectHtml(name, rows, ability) {
+    let html = `<div class="tt-card tt-card-simple"><div class="tt-body">`;
+    html += `<div class="tt-name">${name}</div>`;
+    if (rows && rows.length) {
+      html += `<div class="tt-statgrid">`;
+      for (const row of rows) {
+        html += `<div class="tt-stat"><span class="tt-stat-label">${row.label}</span><span class="tt-stat-val">${row.value}</span></div>`;
+      }
+      html += `</div>`;
+    }
+    if (ability) html += `<div class="tt-ability">${ability}</div>`;
+    html += `</div></div>`;
+    return html;
+  }
+
+  function combatUnitInspectHtml(u) {
+    if (!u) return "";
+    if (u.hero) {
+      const def = heroDef(u.typeId);
+      if (!def) return "";
+      const live = Object.assign({}, def, {
+        hp: u.maxHp,
+        atk: u.atk,
+        armor: u.armor,
+        range: u.range,
+        spd: u.spd,
+      });
+      return unitInspectHtml(live, {
+        hero: true,
+        artKey: u.side === "enemy" ? ENEMY_ART[u.typeId] || u.typeId : u.typeId,
+      });
+    }
+    if (u.minion) {
+      return unitInspectHtml(
+        {
+          id: BONE_MINION.id,
+          name: BONE_MINION.name,
+          hp: u.maxHp || BONE_MINION.hp,
+          atk: u.atk || BONE_MINION.atk,
+          spd: u.spd || BONE_MINION.spd,
+          armor: u.armor || BONE_MINION.armor,
+          atkCd: BONE_MINION.atkCd,
+          range: u.range || BONE_MINION.range,
+          atkStyle: BONE_MINION.atkStyle,
+          tags: BONE_MINION.tags,
+          strongVs: BONE_MINION.strongVs,
+          weakVs: BONE_MINION.weakVs,
+          blurb: "Bonesinger summon",
+          upgrades: [],
+        },
+        { hero: true, artKey: u.side === "enemy" ? "foe" : BONE_MINION.id }
+      );
+    }
+    const type = unitType(u.typeId);
+    if (!type) return "";
+    const actor = actorForSide(u.side);
+    return unitInspectHtml(type, {
+      actor,
+      artKey: u.side === "enemy" ? ENEMY_ART[u.typeId] || "foe" : type.id,
+      liveStats: {
+        hp: u.maxHp,
+        atk: u.atk,
+        armor: u.armor,
+        range: u.range,
+        spd: u.spd,
+        splash: u.splash || 0,
+        structureMult: u.structureMult || 1,
+      },
+    });
   }
 
   let tooltipTarget = null;
@@ -1860,6 +2295,18 @@
       return window.matchMedia(HOVER_TOOLTIP_MQ).matches;
     } catch (_) {
       return true;
+    }
+  }
+
+  function dockTooltipsEnabled() {
+    try {
+      return (
+        window.matchMedia(MOBILE_MQ).matches ||
+        window.matchMedia("(pointer: coarse)").matches ||
+        !hoverTooltipsEnabled()
+      );
+    } catch (_) {
+      return false;
     }
   }
 
@@ -1876,8 +2323,15 @@
 
   function positionTooltip(target) {
     if (!el.gameTooltip || !target) return;
-    const rect = target.getBoundingClientRect();
     const tt = el.gameTooltip;
+    if (dockTooltipsEnabled()) {
+      tt.classList.add("is-docked");
+      tt.style.left = "";
+      tt.style.top = "";
+      return;
+    }
+    tt.classList.remove("is-docked");
+    const rect = target.getBoundingClientRect();
     const margin = 8;
     let left = rect.left + rect.width / 2 - tt.offsetWidth / 2;
     let top = rect.top - tt.offsetHeight - margin;
@@ -1898,7 +2352,11 @@
   function hideTooltip() {
     clearLongPress();
     tooltipTarget = null;
-    if (el.gameTooltip) el.gameTooltip.hidden = true;
+    suppressTooltipClick = false;
+    if (el.gameTooltip) {
+      el.gameTooltip.hidden = true;
+      el.gameTooltip.classList.remove("is-docked");
+    }
   }
 
   function hideTooltipIfIn(root) {
@@ -2048,7 +2506,8 @@
     }
     if (el.streakPill) {
       const streak = state.winStreak || 0;
-      el.streakPill.hidden = streak <= 0;
+      el.streakPill.hidden = false;
+      el.streakPill.classList.toggle("is-empty", streak <= 0);
       if (el.streakDisplay) el.streakDisplay.textContent = String(streak);
       if (el.streakGps) el.streakGps.textContent = (streak * STREAK_GPS).toFixed(1);
     }
@@ -2061,6 +2520,22 @@
       );
     }
     renderCastles();
+  }
+
+  function shopDisabledAttr(can) {
+    return can ? "" : ' aria-disabled="true"';
+  }
+
+  function researchSig(actor) {
+    const classPart = Object.keys(CLASS_TRACKS)
+      .map((id) => classLevel(actor, id))
+      .join(",");
+    const unitPart = UNIT_TYPES.map((t) =>
+      (t.upgrades || [])
+        .map((trackId) => unitUpgradeLevel(actor, t.id, trackId))
+        .join(".")
+    ).join(",");
+    return classPart + "|" + unitPart;
   }
 
   function renderShop() {
@@ -2080,9 +2555,7 @@
       "|" +
       UNIT_TYPES.map((t) => state.roster[t.id]).join(",") +
       "|" +
-      UNIT_TYPES.map((t) => unitTrackLevel(state, t.id, "hp")).join(",") +
-      "|" +
-      UNIT_TYPES.map((t) => unitTrackLevel(state, t.id, "atk")).join(",") +
+      researchSig(state) +
       "|" +
       (state.towerLevel || 0) +
       "|" +
@@ -2102,7 +2575,9 @@
     const canEcon =
       prep && (state.economy || 0) < MAX_ECONOMY && state.gold >= econCost;
     let html =
-      `<button type="button" class="shop-card economy-card ${canEcon ? "affordable" : ""}" data-shop="economy" ${canEcon ? "" : "disabled"}>` +
+      `<button type="button" class="shop-card economy-card ${canEcon ? "affordable" : ""}" data-shop="economy"${shopDisabledAttr(
+        canEcon
+      )}>` +
       `<span class="shop-art">⚙</span>` +
       `<span class="shop-name">Economy</span>` +
       `<span class="shop-cost">${format(econCost)}g</span>` +
@@ -2113,7 +2588,7 @@
       const accent = typeAccentStyle(t.id);
       if (!unlocked) {
         html +=
-          `<button type="button" class="shop-card is-locked" data-shop="unit" data-type="${t.id}"${accent} disabled>` +
+          `<button type="button" class="shop-card is-locked" data-shop="unit" data-type="${t.id}"${accent} aria-disabled="true">` +
           `<span class="shop-art">${unitArt(t.id)}</span>` +
           `<span class="shop-name">${t.name}</span>` +
           `<span class="shop-cost">Wave ${t.unlockRound}</span>` +
@@ -2128,7 +2603,9 @@
       const can =
         prep && rosterHasRoom(state.roster) && state.gold >= cost;
       html +=
-        `<button type="button" class="shop-card ${can ? "affordable" : ""}" data-shop="unit" data-type="${t.id}"${accent} ${can ? "" : "disabled"}>` +
+        `<button type="button" class="shop-card ${can ? "affordable" : ""}" data-shop="unit" data-type="${t.id}"${accent}${shopDisabledAttr(
+          can
+        )}>` +
         `<span class="shop-art">${unitArt(t.id)}</span>` +
         `<span class="shop-name">${t.name}</span>` +
         `<span class="shop-cost">${format(cost)}g</span>` +
@@ -2140,7 +2617,9 @@
       for (const h of HEROES) {
         const can = prep && state.gold >= h.hireGold;
         html +=
-          `<button type="button" class="shop-card hero-card ${can ? "affordable" : ""}" data-shop="hero" data-hero-id="${h.id}" ${can ? "" : "disabled"}>` +
+          `<button type="button" class="shop-card hero-card ${can ? "affordable" : ""}" data-shop="hero" data-hero-id="${h.id}"${shopDisabledAttr(
+            can
+          )}>` +
           `<span class="shop-art">${unitArt(h.id)}</span>` +
           `<span class="shop-name">${h.name}</span>` +
           `<span class="shop-cost">${format(h.hireGold)}g</span>` +
@@ -2153,7 +2632,9 @@
       const canRez = prep && state.gold >= rez;
       const def = heroDef(state.heroId);
       html +=
-        `<button type="button" class="shop-card hero-rez ${canRez ? "affordable" : ""}" data-shop="rez" ${canRez ? "" : "disabled"}>` +
+        `<button type="button" class="shop-card hero-rez ${canRez ? "affordable" : ""}" data-shop="rez"${shopDisabledAttr(
+          canRez
+        )}>` +
         `<span class="shop-art">${unitArt(state.heroId)}</span>` +
         `<span class="shop-name">Rez ${def ? def.name : "Hero"}</span>` +
         `<span class="shop-cost">${format(rez)}g</span>` +
@@ -2165,9 +2646,13 @@
 
   function researchAffordable() {
     if (state.over) return false;
+    for (const classId of Object.keys(CLASS_TRACKS)) {
+      if (canBuyClassUpgrade(state, classId)) return true;
+    }
     for (const t of UNIT_TYPES) {
-      if (canBuyUnitUpgrade(state, t.id, "hp")) return true;
-      if (canBuyUnitUpgrade(state, t.id, "atk")) return true;
+      for (const trackId of t.upgrades || []) {
+        if (canBuyUnitUpgrade(state, t.id, trackId)) return true;
+      }
     }
     return canBuyTowerUpgrade(state);
   }
@@ -2208,30 +2693,56 @@
     const towerCost = towerUpgradeCost(towerLvl);
     const canTower = prep && !towerMaxed && state.gold >= towerCost;
     html +=
-      `<button type="button" class="shop-card tower-card ${canTower ? "affordable" : ""}" data-shop="towers" ${canTower ? "" : "disabled"}>` +
+      `<button type="button" class="shop-card tower-card ${canTower ? "affordable" : ""}" data-shop="towers"${shopDisabledAttr(
+        canTower
+      )}>` +
       `<span class="shop-art">🏰</span>` +
       `<span class="shop-name">Towers</span>` +
       `<span class="shop-cost">${towerMaxed ? "MAX" : format(towerCost) + "g"}</span>` +
       `<span class="shop-owned">Lv ${towerLvl} · +${TOWER_RESEARCH_HP} HP / +${TOWER_RESEARCH_ATK} ATK</span>` +
       `<span class="shop-blurb">+${TOWER_RESEARCH_RANGE} range per level</span>` +
       `</button>`;
+
+    for (const classId of Object.keys(CLASS_TRACKS)) {
+      if (!ownsMatchingClassUnit(state, classId)) continue;
+      const def = CLASS_TRACKS[classId];
+      const lvl = classLevel(state, classId);
+      const maxed = lvl >= MAX_UNIT_RESEARCH;
+      const cost = classUpgradeCost(lvl);
+      const can = prep && !maxed && state.gold >= cost;
+      html +=
+        `<button type="button" class="shop-card research-card class-card ${can ? "affordable" : ""}" data-shop="upgrade-class" data-class="${classId}"${shopDisabledAttr(
+          can
+        )}>` +
+        `<span class="shop-art">${def.icon}</span>` +
+        `<span class="shop-name">${def.name}</span>` +
+        `<span class="shop-cost">${maxed ? "MAX" : format(cost) + "g"}</span>` +
+        `<span class="shop-owned">Lv ${lvl}/${MAX_UNIT_RESEARCH} · +${Math.round(
+          def.pct * 100
+        )}% dmg</span>` +
+        `<span class="shop-blurb">${def.blurb}</span>` +
+        `</button>`;
+    }
+
     for (const t of UNIT_TYPES) {
       if ((state.roster[t.id] || 0) < 1) continue;
       if (!isUnitUnlocked(t.id)) continue;
       const accent = typeAccentStyle(t.id);
-      for (const track of ["hp", "atk"]) {
-        const lvl = unitTrackLevel(state, t.id, track);
+      for (const trackId of t.upgrades || []) {
+        const trackDef = UNIT_TRACK_DEFS[trackId];
+        if (!trackDef) continue;
+        const lvl = unitUpgradeLevel(state, t.id, trackId);
         const maxed = lvl >= MAX_UNIT_RESEARCH;
         const cost = unitUpgradeCost(t.id, lvl);
         const can = prep && !maxed && state.gold >= cost;
-        const trackLabel = track === "hp" ? "+HP" : "+ATK";
-        const trackPct = track === "hp" ? "+16% HP" : "+14% ATK";
         html +=
-          `<button type="button" class="shop-card research-card ${can ? "affordable" : ""}" data-shop="upgrade-${track}" data-type="${t.id}"${accent} ${can ? "" : "disabled"}>` +
+          `<button type="button" class="shop-card research-card ${can ? "affordable" : ""}" data-shop="upgrade-unit" data-type="${t.id}" data-track="${trackId}"${accent}${shopDisabledAttr(
+            can
+          )}>` +
           `<span class="shop-art">${unitArt(t.id)}</span>` +
-          `<span class="shop-name">${t.name} ${trackLabel}</span>` +
+          `<span class="shop-name">${t.name} ${trackDef.name}</span>` +
           `<span class="shop-cost">${maxed ? "MAX" : format(cost) + "g"}</span>` +
-          `<span class="shop-owned">Lv ${lvl}/3 · ${trackPct}</span>` +
+          `<span class="shop-owned">Lv ${lvl}/${MAX_UNIT_RESEARCH} · ${trackDef.blurb}</span>` +
           `<span class="shop-blurb">${t.blurb}</span>` +
           `</button>`;
       }
@@ -2529,16 +3040,27 @@
     const prefix = side === "player" ? "p" : "e";
     let hp = type.hp;
     let atk = type.atk;
-    let researchHpLevel = 0;
-    let researchAtkLevel = 0;
+    let armor = type.armor || 0;
+    let range = type.range || MELEE_RANGE;
+    let spd = type.spd;
+    let splash = type.splash || 0;
+    let structureMult = type.structureMult || 1;
+    let researchClassLevel = 0;
+    let researchClassId = null;
+    let researchTracks = Object.create(null);
     if (!opts.hero && !opts.minion) {
       const actor = actorForSide(side);
-      const lv = unitResearchLevels(actor, typeId);
-      researchHpLevel = lv.hp;
-      researchAtkLevel = lv.atk;
-      const stats = unitStatsAtLevel(type, lv.hp, lv.atk);
+      const stats = resolvedUnitStats(type, actor);
       hp = stats.hp;
       atk = stats.atk;
+      armor = stats.armor;
+      range = stats.range;
+      spd = stats.spd;
+      splash = stats.splash;
+      structureMult = stats.structureMult;
+      researchClassLevel = stats.classLevel || 0;
+      researchClassId = stats.classId || null;
+      researchTracks = Object.assign(Object.create(null), stats.unitTracks || {});
     }
     if (side === "enemy") {
       const mult = (state.levelMods && state.levelMods.unitStatMult) || 1;
@@ -2555,19 +3077,20 @@
       hp,
       maxHp: hp,
       atk,
-      armor: type.armor || 0,
-      spd: type.spd,
+      armor,
+      spd,
       atkCdMax: type.atkCd,
-      range: type.range || MELEE_RANGE,
+      range,
       atkStyle: type.atkStyle || "melee",
       tags: (type.tags || []).slice(),
       strongVs: (type.strongVs || []).slice(),
       weakVs: (type.weakVs || []).slice(),
-      splash: type.splash || 0,
-      structureMult: type.structureMult || 1,
+      splash,
+      structureMult,
       targetPriority: type.targetPriority || null,
-      researchHpLevel,
-      researchAtkLevel,
+      researchClassLevel,
+      researchClassId,
+      researchTracks,
       col,
       row,
       x: pos.x,
@@ -2740,15 +3263,20 @@
         : "Your keep has fallen. Study the matchup and try again.";
     }
     if (el.endStats) {
-      const researched = UNIT_TYPES.filter((t) => {
-        const lv = unitResearchLevels(state, t.id);
-        return lv.hp > 0 || lv.atk > 0;
-      })
-        .map((t) => {
-          const lv = unitResearchLevels(state, t.id);
-          return `${t.name} H${lv.hp}/A${lv.atk}`;
-        })
-        .join(", ");
+      const researchedParts = [];
+      for (const classId of Object.keys(CLASS_TRACKS)) {
+        const lv = classLevel(state, classId);
+        if (lv > 0) researchedParts.push(`${CLASS_TRACKS[classId].name} ${lv}`);
+      }
+      for (const t of UNIT_TYPES) {
+        const bits = [];
+        for (const trackId of t.upgrades || []) {
+          const lv = unitUpgradeLevel(state, t.id, trackId);
+          if (lv > 0) bits.push(`${UNIT_TRACK_DEFS[trackId].name}${lv}`);
+        }
+        if (bits.length) researchedParts.push(`${t.name} ${bits.join("/")}`);
+      }
+      const researched = researchedParts.join(", ");
       const stats = state.stats || {};
       el.endStats.innerHTML =
         `<li>Campaign level: <strong>${clearedLevel}</strong>${
@@ -2947,9 +3475,16 @@
       name = (type && type.name) || (u && u.typeId) || "Unit";
     }
     if (u && !u.hero && !u.minion) {
-      const hp = u.researchHpLevel || 0;
-      const atk = u.researchAtkLevel || 0;
-      if (hp > 0 || atk > 0) name += " H" + hp + "/A" + atk;
+      const hasClass = (u.researchClassLevel || 0) > 0;
+      let hasUnit = false;
+      const tracks = u.researchTracks || {};
+      for (const key of Object.keys(tracks)) {
+        if (tracks[key] > 0) {
+          hasUnit = true;
+          break;
+        }
+      }
+      if (hasClass || hasUnit) name += " +";
     }
     return name;
   }
@@ -2973,7 +3508,7 @@
       `<div class="unit-sil" aria-hidden="true">${unitArt(artKey)}</div>` +
       `<span class="unit-plate">${plate}</span>` +
       `<div class="hp-mini"><div class="hp-mini-fill" style="width:${pct}%"></div></div>`;
-    wrap.title = plate;
+    wrap.title = "";
     el.combatLayer.appendChild(wrap);
     tokenEls.set(u.id, wrap);
     updateTokenFacing(u);
@@ -3007,7 +3542,7 @@
     node.classList.toggle("is-aegis", u.aegisT > 0 || u.tauntActive);
     node.classList.toggle(
       "volley-ready",
-      u.ability === "volley" && u.shots > 0 && u.shots % 5 === 4
+      u.ability === "volley" && u.shots > 0 && u.shots % VOLLEY_INTERVAL === VOLLEY_INTERVAL - 1
     );
     updateTokenFacing(u);
   }
@@ -3228,7 +3763,7 @@
           best = o;
         }
       }
-      if (best) applyUnitHit(shooter, best, 0.75, { skipSplash: true });
+      if (best) applyUnitHit(shooter, best, VOLLEY_BONUS_MULT, { skipSplash: true });
     }
   }
 
@@ -3285,7 +3820,9 @@
       return;
     }
     const volleyId =
-      attacker.ability === "volley" && attacker.shots % 5 === 0 ? attacker.id : null;
+      attacker.ability === "volley" && attacker.shots % VOLLEY_INTERVAL === 0
+        ? attacker.id
+        : null;
     spawnProjectile(attacker.x, attacker.y, target.x, target.y, attacker.atkStyle, attacker.typeId);
     queueProjectile({
       shooterId: attacker.id,
@@ -3643,7 +4180,7 @@
       const card = e.target.closest(".shop-card");
       if (!card || state.over) return;
       hideTooltip();
-      if (card.disabled) {
+      if (card.getAttribute("aria-disabled") === "true" || card.disabled) {
         playSfx("error");
         shakeGoldPill();
         return;
@@ -3655,9 +4192,11 @@
         if (buyHero(card.dataset.heroId, true)) placedType = card.dataset.heroId;
       } else if (card.dataset.shop === "rez") {
         if (rezHero()) placedType = state.heroId;
-      } else if (card.dataset.shop === "upgrade-hp") buyUnitUpgrade(card.dataset.type, "hp", true);
-      else if (card.dataset.shop === "upgrade-atk") buyUnitUpgrade(card.dataset.type, "atk", true);
-      else if (card.dataset.shop === "towers") buyTowerUpgrade(true);
+      } else if (card.dataset.shop === "upgrade-class") {
+        buyClassUpgrade(card.dataset.class, true);
+      } else if (card.dataset.shop === "upgrade-unit") {
+        buyUnitUpgrade(card.dataset.type, card.dataset.track, true);
+      } else if (card.dataset.shop === "towers") buyTowerUpgrade(true);
       else if (card.dataset.type) {
         if (buyUnit(card.dataset.type, true)) placedType = card.dataset.type;
       }
@@ -3752,28 +4291,59 @@
 
     bindTooltipDelegation(el.shopBar, ".shop-card", (card) => {
       if (card.dataset.shop === "economy") {
-        return `<div class="tt-name">Economy</div><div class="tt-ability">+${ECONOMY_GPS} gold/s per level (max ${MAX_ECONOMY})</div>`;
+        return simpleInspectHtml(
+          "Economy",
+          [
+            { label: "Effect", value: `+${ECONOMY_GPS} gold/s` },
+            { label: "Max", value: String(MAX_ECONOMY) },
+          ],
+          "Raises your continuous gold income."
+        );
       }
       if (card.dataset.shop === "towers") {
-        return `<div class="tt-name">Tower Research</div><div class="tt-stats"><span>+${TOWER_RESEARCH_HP} HP</span><span>+${TOWER_RESEARCH_ATK} ATK</span><span>+${TOWER_RESEARCH_RANGE} RNG</span></div>`;
+        const lvl = state.towerLevel || 0;
+        return simpleInspectHtml(
+          "Tower Research",
+          [
+            { label: "Level", value: `${lvl}/${MAX_TOWER_RESEARCH}` },
+            { label: "HP", value: `+${TOWER_RESEARCH_HP}` },
+            { label: "ATK", value: `+${TOWER_RESEARCH_ATK}` },
+            { label: "Range", value: `+${TOWER_RESEARCH_RANGE}` },
+          ],
+          "Fortifies both of your approach towers."
+        );
       }
       if (card.dataset.shop === "hero" && card.dataset.heroId) {
-        return unitTooltipHtml(heroDef(card.dataset.heroId), { hero: true });
+        return unitInspectHtml(heroDef(card.dataset.heroId), { hero: true });
       }
-      if (card.dataset.shop === "upgrade-hp" || card.dataset.shop === "upgrade-atk") {
+      if (card.dataset.shop === "upgrade-class") {
+        const classId = card.dataset.class;
+        const def = CLASS_TRACKS[classId];
+        if (!def) return "";
+        const sample = UNIT_TYPES.find((t) => def.matches(t) && (state.roster[t.id] || 0) > 0);
+        if (!sample) {
+          return simpleInspectHtml(def.name, [{ label: "Effect", value: def.blurb }]);
+        }
+        const cur = classLevel(state, classId);
+        if (cur >= MAX_UNIT_RESEARCH) return unitInspectHtml(sample);
+        return unitInspectHtml(sample, {
+          preview: { classLevels: { [classId]: cur + 1 } },
+        });
+      }
+      if (card.dataset.shop === "upgrade-unit") {
         const type = unitType(card.dataset.type);
-        if (!type) return "";
-        const lv = unitResearchLevels(state, card.dataset.type);
-        const preview = { hpLevel: lv.hp, atkLevel: lv.atk };
-        if (card.dataset.shop === "upgrade-hp") preview.hpLevel = lv.hp + 1;
-        else preview.atkLevel = lv.atk + 1;
-        return unitTooltipHtml(type, preview);
+        const trackId = card.dataset.track;
+        if (!type || !trackId) return "";
+        const cur = unitUpgradeLevel(state, type.id, trackId);
+        if (cur >= MAX_UNIT_RESEARCH) return unitInspectHtml(type);
+        return unitInspectHtml(type, {
+          preview: { unitTracks: { [trackId]: cur + 1 } },
+        });
       }
       if (card.dataset.type) {
         const type = unitType(card.dataset.type);
         if (!type) return "";
-        const lv = unitResearchLevels(state, card.dataset.type);
-        return unitTooltipHtml(type, { hpLevel: lv.hp, atkLevel: lv.atk });
+        return unitInspectHtml(type, { showCost: true });
       }
       return "";
     });
@@ -3781,9 +4351,16 @@
     bindTooltipDelegation(el.benchTray, ".bench-chip", (chip) => {
       const typeId = chip.dataset.type;
       if (!typeId) return "";
-      if (isHeroId(typeId)) return unitTooltipHtml(heroDef(typeId), { hero: true });
-      const lv = unitResearchLevels(state, typeId);
-      return unitTooltipHtml(unitType(typeId), { hpLevel: lv.hp, atkLevel: lv.atk });
+      if (isHeroId(typeId)) return unitInspectHtml(heroDef(typeId), { hero: true });
+      return unitInspectHtml(unitType(typeId));
+    });
+
+    bindTooltipDelegation(el.combatLayer, ".combat-token", (token) => {
+      const id = token.dataset.fighterId;
+      if (!id) return "";
+      const unit = (state.battle.units || []).find((u) => u.id === id);
+      if (!unit || unit.hp <= 0) return "";
+      return combatUnitInspectHtml(unit);
     });
 
     window.addEventListener("scroll", hideTooltip, { passive: true });

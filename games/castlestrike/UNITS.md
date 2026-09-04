@@ -1,6 +1,6 @@
 # Castle Strike — Unit Reference
 
-**Game version:** 0.8.0  
+**Game version:** 0.9.0  
 **Source of truth:** mirrors [`game.js`](game.js) (`UNIT_TYPES`, `HEROES`, combat constants).  
 When stats change in code, update this file to match.
 
@@ -16,8 +16,8 @@ damage = max(1, round(atk × counterMult × bonusMult × auraMult) − armor × 
 
 | Modifier | Value |
 |----------|-------|
-| Strong counter (`strongVs` tag match) | ×1.4 |
-| Weak counter (`weakVs` tag match) | ×0.7 |
+| Strong counter (`strongVs` tag match) | ×1.55 |
+| Weak counter (`weakVs` tag match) | ×0.55 |
 | Slowed movement | ×0.55 speed |
 
 ### Tags
@@ -30,14 +30,44 @@ damage = max(1, round(atk × counterMult × bonusMult × auraMult) − armor × 
 
 ### Unit research (Shop → Research)
 
-Per owned type, two independent tracks (max **3** each):
+#### Class tracks (max **3** each)
 
-| Track | Per level |
-|-------|-----------|
-| +HP | +16% max HP |
-| +ATK | +14% attack |
+Unlock once you own ≥1 matching unit. Cost: `floor(40 × 1.55^level)`.
 
-Cost per track level: `floor(baseCost × 2.1 × 1.6^level)`. Living fielded units update immediately.
+| Track | Applies to | Per level |
+|-------|------------|-----------|
+| Forged Swords | Melee (`atkStyle === "melee"`) | +14% damage |
+| Bodkin Arrows | Ranged | +14% damage |
+| Arcane Focus | Magic & Heal | +14% damage / heal |
+
+#### Per-unit tracks (max **3** each)
+
+Cost: `floor(baseCost × 2.1 × 1.6^level)`.
+
+| Track | Stat | Per level |
+|-------|------|-----------|
+| Vitality | HP | +16% |
+| Plating | Armor | +1 |
+| Reach | Range | +3 |
+| Haste | Speed | +8% |
+| Blast | Splash | +2 (Grenadier) |
+| Siegecraft | `structureMult` | +0.3 (Catapult) |
+
+| Unit | Tracks |
+|------|--------|
+| Militia | Vitality |
+| Spearman | Vitality, Plating |
+| Archer | Vitality, Reach |
+| Knight | Vitality, Plating |
+| Rider | Vitality, Haste |
+| Healer | Vitality, Reach |
+| Mage | Vitality, Reach |
+| Guardian | Vitality, Plating |
+| Assassin | Vitality, Haste |
+| Grenadier | Vitality, Blast |
+| Catapult | Vitality, Siegecraft |
+
+Living fielded units update immediately. Heroes are not researchable.
 
 ### Ranged behavior
 
@@ -74,6 +104,7 @@ Cost per track level: `floor(baseCost × 2.1 × 1.6^level)`. Living fielded unit
 | **Tags** | infantry |
 | **Strong vs** | support |
 | **Weak vs** | ranged |
+| **Upgrades** | Vitality |
 
 **Ability:** none  
 Cheap frontline soak. Soft into ranged fire.
@@ -95,6 +126,7 @@ Cheap frontline soak. Soft into ranged fire.
 | **Tags** | infantry |
 | **Strong vs** | cavalry |
 | **Weak vs** | ranged |
+| **Upgrades** | Vitality, Plating |
 
 **Ability: Brace**  
 On melee hit vs **cavalry**, if the target has moved more than 2 units since last stop (or is mid-charge):
@@ -108,20 +140,23 @@ On melee hit vs **cavalry**, if the target has moved more than 2 units since las
 
 | Stat | Value |
 |------|-------|
-| **Cost** | 44g |
+| **Cost** | 48g |
 | **Unlock** | Wave 3 |
-| **HP / ATK** | 14 / 9 |
+| **HP / ATK** | 14 / 7 |
 | **Speed** | 4.0 |
 | **Armor** | 0 |
-| **Attack CD** | 0.52s |
-| **Range** | 24 |
+| **Attack CD** | 0.68s |
+| **Range** | 20 |
 | **Style** | ranged |
 | **Tags** | ranged |
 | **Strong vs** | infantry |
-| **Weak vs** | cavalry |
+| **Weak vs** | cavalry, armored |
+| **Upgrades** | Vitality, Reach |
 
 **Ability: Volley**  
-Every **5th** shot also hits the nearest other enemy in range at **×0.75** damage (no splash).
+Every **6th** shot also hits the nearest other enemy in range at **×0.55** damage (no splash).
+
+Shreds light infantry. Soft vs cavalry and armor.
 
 ---
 
@@ -131,15 +166,16 @@ Every **5th** shot also hits the nearest other enemy in range at **×0.75** dama
 |------|-------|
 | **Cost** | 85g |
 | **Unlock** | Wave 6 |
-| **HP / ATK** | 45 / 13 |
+| **HP / ATK** | 52 / 13 |
 | **Speed** | 2.5 |
 | **Armor** | 3 |
 | **Attack CD** | 0.7s |
 | **Range** | 6 (melee) |
 | **Style** | melee |
-| **Tags** | infantry, armored |
+| **Tags** | armored |
 | **Strong vs** | ranged |
 | **Weak vs** | magic |
+| **Upgrades** | Vitality, Plating |
 
 **Ability: Shield Bash**  
 When off cooldown (**4.5s** CD), melee hits also:
@@ -155,22 +191,19 @@ When off cooldown (**4.5s** CD), melee hits also:
 |------|-------|
 | **Cost** | 52g |
 | **Unlock** | Wave 4 |
-| **HP / ATK** | 22 / 9 |
+| **HP / ATK** | 26 / 9 |
 | **Speed** | 5.8 |
-| **Armor** | 0 |
+| **Armor** | 1 |
 | **Attack CD** | 0.45s |
 | **Range** | 6 (melee) |
 | **Style** | melee |
 | **Tags** | cavalry |
 | **Strong vs** | ranged, magic, support |
-| **Weak vs** | infantry |
+| **Weak vs** | infantry, armored |
+| **Upgrades** | Vitality, Haste |
 
 **Ability: Charge**  
-While moving toward a target, accumulate charge distance. After **14** units of movement, next melee hit:
-
-- **×1.35** damage
-- **Stun** target **0.21s** (60% of base stun)
-- Resets charge meter
+After moving **14+** units without stopping, next melee hit deals **×1.35** and briefly stuns.
 
 ---
 
@@ -180,7 +213,7 @@ While moving toward a target, accumulate charge distance. After **14** units of 
 |------|-------|
 | **Cost** | 58g |
 | **Unlock** | Wave 4 |
-| **HP / ATK** | 18 / 6 |
+| **HP / ATK** | 18 / 6 (heal) |
 | **Speed** | 3.0 |
 | **Armor** | 0 |
 | **Attack CD** | 0.9s |
@@ -189,10 +222,10 @@ While moving toward a target, accumulate charge distance. After **14** units of 
 | **Tags** | support |
 | **Strong vs** | — |
 | **Weak vs** | cavalry |
+| **Upgrades** | Vitality, Reach |
 
 **Ability: Sanctuary**  
-Normally heals one ally for **ATK** (6) HP.  
-If **2+ wounded allies** are in range, casts **Sanctuary** instead: heals **all** wounded allies in range for **55% of ATK** (rounded, min 1) each.
+Periodic group heal on nearby allies.
 
 ---
 
@@ -211,10 +244,10 @@ If **2+ wounded allies** are in range, casts **Sanctuary** instead: heals **all*
 | **Tags** | magic |
 | **Strong vs** | armored |
 | **Weak vs** | cavalry |
+| **Upgrades** | Vitality, Reach |
 
 **Ability: Arcane**  
-On hit, splash **radius 10** to nearby enemies for **45% of ATK** (after counters/armor).  
-Magic damage vs **Aegis** (Guardian) is reduced to **×0.65**.
+Splash damage on impact (**×0.45** to nearby foes).
 
 ---
 
@@ -230,15 +263,13 @@ Magic damage vs **Aegis** (Guardian) is reduced to **×0.65**.
 | **Attack CD** | 0.85s |
 | **Range** | 6 (melee) |
 | **Style** | melee |
-| **Tags** | infantry, armored |
+| **Tags** | armored |
 | **Strong vs** | magic |
 | **Weak vs** | cavalry |
+| **Upgrades** | Vitality, Plating |
 
 **Ability: Aegis**  
-When off cooldown, activating on attack:
-
-- **Taunt** active **2.2s** — ranged attackers prefer targeting the Guardian
-- **Aegis** buff **2.2s** — incoming magic damage **×0.65**
+Taunt nearby foes and reduce magic damage taken for **2.2s**.
 
 ---
 
@@ -256,11 +287,10 @@ When off cooldown, activating on attack:
 | **Style** | melee |
 | **Tags** | cavalry |
 | **Strong vs** | support, magic |
-| **Weak vs** | infantry |
-| **Target priority** | backline (ranged, magic, support, siege) |
+| **Weak vs** | infantry, armored |
+| **Upgrades** | Vitality, Haste |
 
-**Ability:** none (role is dive targeting)  
-Fast backline hunter. Soft vs spears and other infantry.
+Dives for backline targets. Soft vs spears & armor.
 
 ---
 
@@ -270,7 +300,7 @@ Fast backline hunter. Soft vs spears and other infantry.
 |------|-------|
 | **Cost** | 68g |
 | **Unlock** | Wave 5 |
-| **HP / ATK** | 24 / 9 |
+| **HP / ATK** | 24 / 8 |
 | **Speed** | 2.8 |
 | **Armor** | 1 |
 | **Attack CD** | 0.65s |
@@ -278,11 +308,11 @@ Fast backline hunter. Soft vs spears and other infantry.
 | **Style** | ranged |
 | **Tags** | ranged |
 | **Strong vs** | infantry |
-| **Weak vs** | cavalry |
-| **Splash radius** | 10 |
+| **Weak vs** | cavalry, armored |
+| **Splash** | 10 |
+| **Upgrades** | Vitality, Blast |
 
-**Ability:** none (splash is passive)  
-Primary hit is full damage; splash hits nearby enemies for **45% of ATK** (after counters/armor).
+Splash punishes clumps. Soft vs cavalry & armor.
 
 ---
 
@@ -302,21 +332,21 @@ Primary hit is full damage; splash hits nearby enemies for **45% of ATK** (after
 | **Strong vs** | — |
 | **Weak vs** | cavalry |
 | **Structure mult** | ×2.6 |
+| **Upgrades** | Vitality, Siegecraft |
 
-**Ability:** none  
-**×2.6** damage multiplier vs **towers and keeps** (uses `structureMult`). Poor duelist; bring for sieging.
+Melts towers & keeps. Soft vs cavalry.
 
 ---
 
-## Champions (heroes)
+## Heroes
 
-One hero per match. Hire on **Hire** tab from **wave 4+**.  
-Rez cost while down: `floor(hireGold × 0.4)`.
+Heroes unlock at wave **4**. One hero per match. Not researchable.
 
-### Bulwark — 180g
+### Bulwark
 
 | Stat | Value |
 |------|-------|
+| **Hire** | 180g |
 | **HP / ATK** | 160 / 10 |
 | **Speed** | 2.2 |
 | **Armor** | 6 |
@@ -326,14 +356,13 @@ Rez cost while down: `floor(hireGold × 0.4)`.
 | **Strong vs** | ranged |
 | **Weak vs** | magic |
 
-**Aura:** allied **ranged** and **magic** units deal **+20%** damage.
+**Aura:** allied **ranged** & **magic** deal **+20%** damage.
 
----
-
-### Bonesinger — 195g
+### Bonesinger
 
 | Stat | Value |
 |------|-------|
+| **Hire** | 195g |
 | **HP / ATK** | 55 / 16 |
 | **Speed** | 3.4 |
 | **Armor** | 1 |
@@ -344,15 +373,13 @@ Rez cost while down: `floor(hireGold × 0.4)`.
 | **Strong vs** | armored |
 | **Weak vs** | cavalry |
 
-**Aura:** allied **melee** units deal **+15%** damage.  
-**Raise bones:** on player kill, **30%** chance to spawn a **Bone Minion** (max **3** on field).
+**Aura:** allied **melee** deal **+15%** damage. Can raise Bone Minions on kills.
 
----
-
-### Raid Captain — 190g
+### Raid Captain
 
 | Stat | Value |
 |------|-------|
+| **Hire** | 190g |
 | **HP / ATK** | 85 / 14 |
 | **Speed** | 5.8 |
 | **Armor** | 2 |
@@ -422,8 +449,8 @@ Units that reach an enemy keep deal chip damage: `max(1, round(atk × 0.32 × st
 | `SHIELD_BASH_CD` | 4.5s |
 | `AEGIS_S` | 2.2s |
 | `SPLASH_DAMAGE_FRAC` | 0.45 |
-| `VOLLEY_BONUS_MULT` | 0.75 |
-| `VOLLEY_INTERVAL` | every 5th shot |
+| `VOLLEY_BONUS_MULT` | 0.55 |
+| `VOLLEY_INTERVAL` | every 6th shot |
 | `KITE_MIN_RANGE` | 10 |
 | `CASTLE_HP` | 1500 |
 | `CASTLE_CHIP_MULT` | 0.32 |
