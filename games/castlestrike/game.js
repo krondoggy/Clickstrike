@@ -1697,6 +1697,7 @@
     towerLayer: document.getElementById("tower-layer"),
     keepPlayerFill: document.getElementById("keep-player-fill"),
     keepEnemyFill: document.getElementById("keep-enemy-fill"),
+    benchSection: document.getElementById("bench-section"),
     benchTray: document.getElementById("bench-tray"),
     shopBar: document.getElementById("shop-bar"),
     shopHint: document.getElementById("shop-hint"),
@@ -2768,6 +2769,18 @@
     }
   }
 
+  function benchHasChips() {
+    if (state.heroId && state.heroBench && !state.heroDown) return true;
+    for (const t of UNIT_TYPES) {
+      if ((state.bench[t.id] || 0) > 0) return true;
+    }
+    return false;
+  }
+
+  function syncBenchEmptyState(isEmpty) {
+    if (el.benchSection) el.benchSection.classList.toggle("is-empty", !!isEmpty);
+  }
+
   function renderBench() {
     if (!el.benchTray) return;
     syncBench();
@@ -2777,11 +2790,15 @@
       (state.heroBench ? state.heroId : "") +
       "|" +
       UNIT_TYPES.map((t) => state.bench[t.id]).join(",");
-    if (sig === lastBenchSig) return;
+    if (sig === lastBenchSig) {
+      syncBenchEmptyState(!benchHasChips() || state.over);
+      return;
+    }
     lastBenchSig = sig;
     if (state.over) {
       hideTooltipIfIn(el.benchTray);
       el.benchTray.innerHTML = "";
+      syncBenchEmptyState(true);
       return;
     }
     const parts = [];
@@ -2810,6 +2827,7 @@
     }
     hideTooltipIfIn(el.benchTray);
     el.benchTray.innerHTML = parts.join("");
+    syncBenchEmptyState(parts.length === 0);
   }
 
   function initBoardGrid() {
@@ -2938,23 +2956,28 @@
 
   function renderPlacementHint() {
     if (!el.benchHint) return;
+    let text = "";
+    let active = true;
     if (state.over) {
-      el.benchHint.textContent = "Match over";
+      text = "Match over";
     } else if (!canPlaceUnits()) {
-      el.benchHint.textContent = "Wave deploying — placement unlocks with the next countdown";
+      text = "Wave deploying — placement unlocks with the next countdown";
     } else if (state.selectedBoard) {
-      el.benchHint.textContent =
+      text =
         "Click a highlighted tile to move · click the barracks to return";
     } else if (state.selectedBenchType) {
       const def = isHeroId(state.selectedBenchType)
         ? heroDef(state.selectedBenchType)
         : unitType(state.selectedBenchType);
       const name = def && def.name ? def.name : "unit";
-      el.benchHint.textContent = "Tap a glowing spawn tile to place " + name;
+      text = "Tap a glowing spawn tile to place " + name;
     } else {
-      el.benchHint.textContent =
-        "Select a barracks unit or a placed unit, then click a tile";
+      text = "Select a barracks unit or a placed unit, then click a tile";
+      active = false;
     }
+    el.benchHint.textContent = text;
+    el.benchHint.hidden = isMobileLayout() && !active;
+    el.benchHint.classList.toggle("is-active", active);
   }
 
   function renderHud() {
@@ -3244,6 +3267,11 @@
     shakeScreen("lg");
     spawnFinaleParticles(won);
     if (el.endTitle) el.endTitle.textContent = won ? "Victory" : "Defeat";
+    if (el.endRestart) {
+      el.endRestart.textContent = won
+        ? "Play Level " + nextLevel
+        : "Retry Level " + clearedLevel;
+    }
     if (el.endLevel) {
       el.endLevel.classList.toggle("is-win", won);
       el.endLevel.classList.toggle("is-loss", !won);
