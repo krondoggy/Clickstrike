@@ -61,6 +61,9 @@ try {
   await page.evaluate(()=>{ castleStrike.game.update=()=>{}; castleStrike.state.paused=false; });
   await page.waitForFunction(()=>document.getElementById('paused-overlay').hidden);
   await page.screenshot({path:'test-results/castle-strike-tactical-desktop.png',fullPage:true});
+  await page.locator('#battle-report-btn').click();
+  assert.ok(await page.locator('#combat-summary').isVisible());
+  await page.screenshot({path:'test-results/castle-strike-tactical-report.png',fullPage:true});
   await page.emulateMedia({reducedMotion:'reduce'});
   await page.waitForFunction(()=>castleStrike.battlefield.reducedMotion);
   await page.setViewportSize({width:390,height:844});

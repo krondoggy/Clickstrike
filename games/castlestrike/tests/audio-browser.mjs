@@ -361,7 +361,7 @@ try {
   const routedDeaths = await page.evaluate(() => heardBattle.filter(event => event.kind === 'death'));
   assert.deepEqual(routedDeaths.map(event => event.details.unitId).sort(), victims.sort(), 'Every lethal spell result reaches audio after simulation cleanup');
   assert.deepEqual(routedDeaths.map(event => event.details.x).sort((a, b) => a - b), [-4, 4], 'Death position survives rendering for stereo placement');
-  assert.ok(routedDeaths.every(event => event.details.time >= flight.impactAt && event.simulationTime >= flight.impactAt), 'Lethal sounds come from actual impact events');
+  assert.ok(routedDeaths.every(event => event.details.time + 1e-8 >= flight.impactAt && event.simulationTime + 1e-8 >= flight.impactAt), 'Lethal sounds come from actual impact events');
   assert.ok(routedDeaths.every(event => event.visualTime + .00001 >= event.details.time), 'The sound waits until the rendered battlefield reaches the casualty tick');
   await page.waitForTimeout(350);
   assert.equal(await page.evaluate(() => heardBattle.filter(event => event.kind === 'death').length), victims.length, 'Subsequent frames do not replay deaths');

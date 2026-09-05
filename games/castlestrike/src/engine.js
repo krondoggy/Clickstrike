@@ -596,6 +596,7 @@ function makeEngine(state) {
     }
     if (abilityHits.length) resolvePackets(abilityHits.splice(0));
     const winding = new Set(state.pendingAttacks.map(a => a.sourceId));
+    const movementIntents = new Map();
     for (const u of living) {
       if (u.hp <= 0 || u.stunTime > EPSILON) continue;
       let target = targets.get(u.id);
@@ -610,21 +611,35 @@ function makeEngine(state) {
         continue;
       }
       const wasStationary = u.action !== 'walk';
+      movementIntents.set(u.id, { wasStationary, target });
       if (u.rootTime <= EPSILON) {
         const moved = moveTactically(u, target, context, dt);
         u.stationaryTime = moved.distanceMoved > .01 ? 0 : u.stationaryTime + dt;
         if (UNIT_MAP[u.unitId].abilityId === 'charge' && !u.chargeUsed && u.attacks === 0) u.chargeDistance += moved.distanceMoved || 0;
       } else { u.stationaryTime += dt; u.action = 'idle'; u.heading = Math.atan2(target.x - u.x, target.z - u.z); }
+    }
+    // Every body reaches its new position before any unit checks weapon range.
+    // Interleaving these phases grants the later team an extra closing step.
+    resolveBodies(living, dt, context);
+    for (const u of living) {
+      const intent = movementIntents.get(u.id);
+      if (!intent || u.hp <= 0 || u.stunTime > EPSILON) continue;
+      let target = intent.target;
+      if (!target || target.hp <= 0) continue;
+      if ((context.reservations.get(target.id) || 0) >= target.hp + (target.shield || 0)) {
+        target = chooseTacticalTarget(u, [...teams[other(u.team)], ...state.structures.filter(s => s.team !== u.team && s.hp > 0)], context) || target;
+      }
+      u.targetId = target.id;
       const reach = getAttackReach(u, target);
       if (distance(u, target) <= reach + EPSILON && state.time + EPSILON >= u.nextAttackAt && hasEngagementSlot(u, target, context)) {
         // Carry fractional cadence forward when continuously engaged. Quantizing
         // every new cooldown separately would slow a 1.15s attack to 1.2s forever.
-        const startedAt = wasStationary && u.action !== 'walk' ? Math.max(previousTime, u.nextAttackAt) : state.time;
+        const startedAt = intent.wasStationary && u.action !== 'walk' ? Math.max(previousTime, u.nextAttackAt) : state.time;
+        u.heading = Math.atan2(target.x - u.x, target.z - u.z);
         attack(u, target, startedAt);
         context.reservations.set(target.id, (context.reservations.get(target.id) || 0) + mitigatedDamage(target, u.damage, UNIT_MAP[u.unitId].attackType, u));
       }
     }
-    resolveBodies(living, dt, context);
     for (const tower of state.structures) {
       if (tower.hp <= 0) continue;
       tower.cooldown = Math.max(0, tower.nextAttackAt - state.time);

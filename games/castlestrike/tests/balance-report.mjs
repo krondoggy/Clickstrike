@@ -33,7 +33,7 @@ const scoreMarginal = fixture => {
   const reference = runPaired(runtime, { left: fixture.reference, right: fixture.enemy, mode: 'screened' }, seeds);
   const fieldMargin = result => result.runsDetail.reduce((sum, run) => sum + (run.leftFieldValue - run.rightFieldValue) / run.leftCost, 0) / result.runs;
   const scoreGain = variant.leftScore - reference.leftScore, valueGain = fieldMargin(variant) - fieldMargin(reference);
-  return { ...fixture, variant, reference, scoreGain, valueGain, useful: variant.leftScore >= 0.7 && (scoreGain >= 0.15 || valueGain >= 0.1) };
+  return { ...fixture, variantArmy: fixture.variant, referenceArmy: fixture.reference, enemyArmy: fixture.enemy, variant, reference, scoreGain, valueGain, useful: variant.leftScore >= 0.7 && (scoreGain >= 0.15 || valueGain >= 0.1) };
 };
 
 for (let i = 0; i < runtime.data.UNITS.length; i++) {

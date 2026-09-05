@@ -5,11 +5,11 @@ const browser = await chromium.launch({ headless: true, ...(process.env.BROWSER_
 const label = process.env.PERF_LABEL || 'current';
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
-  if (label === 'baseline') await page.route('**/games/castlestrike/src/engine.js', route => route.fulfill({ path: `${process.cwd()}/test-results/balance-baseline/engine.js`, contentType: 'text/javascript' }));
+  if (label.startsWith('baseline')) await page.route('**/games/castlestrike/src/engine.js', route => route.fulfill({ path: `${process.cwd()}/test-results/balance-baseline/engine.js`, contentType: 'text/javascript' }));
   await page.goto(`${process.env.BASE_URL || 'http://127.0.0.1:4173'}/games/castlestrike/`);
   await page.waitForFunction(() => !!window.castleStrike?.battlefield.renderer);
   const result = await page.evaluate(async label => {
-    const moduleRoot = label === 'baseline' ? '/test-results/balance-baseline' : '/games/castlestrike/src';
+    const moduleRoot = label.startsWith('baseline') ? '/test-results/balance-baseline' : '/games/castlestrike/src';
     const { createGame } = await import(`${moduleRoot}/engine.js`);
     const { UNITS } = await import(`${moduleRoot}/data.js`);
     const g = createGame(), s = g.state, field = castleStrike.battlefield;
@@ -33,7 +33,20 @@ try {
     }
     const tickSamples=[];
     for (let i=0; i<60; i++) { const t=performance.now(); g.update(.1); tickSamples.push(performance.now()-t); }
-    return { label, units:180, viewport:'1280x900', renderer:renderResults, simulation:{medianMs:quantile(tickSamples,.5),p95Ms:quantile(tickSamples,.95),remainingUnits:s.units.length}, userAgent:navigator.userAgent };
+    const dynamic={}; field.render=render;
+    for(const quality of ['high','low']) {
+      const live=createGame(); Object.assign(live.state,structuredClone(sceneState),{paused:false});
+      field.setQuality(quality);field.motion.state=null;
+      const samples=[];let peakEffects=0,peakStatusMarkers=0;
+      for(let i=0;i<100;i++){
+        const t=performance.now();live.update(1/60);render(live.state,1/60);
+        if(i>=10)samples.push(performance.now()-t);
+        peakEffects=Math.max(peakEffects,field.effects.size);
+        peakStatusMarkers=Math.max(peakStatusMarkers,[...field.statusMarkers.layers.values()].reduce((sum,mesh)=>sum+mesh.count,0));
+      }
+      dynamic[quality]={medianCpuMs:quantile(samples,.5),p95CpuMs:quantile(samples,.95),peakEffects,peakStatusMarkers,remainingUnits:live.state.units.length};
+    }
+    return { label, units:180, viewport:'1280x900', renderer:renderResults, simulation:{medianMs:quantile(tickSamples,.5),p95Ms:quantile(tickSamples,.95),remainingUnits:s.units.length},dynamic,measurement:'CPU simulation and render submission; software WebGL does not measure physical GPU presentation latency.',userAgent:navigator.userAgent };
   }, label);
   await mkdir('test-results', { recursive:true });
   await writeFile(`test-results/combat-performance-${label}.json`, JSON.stringify(result,null,2));

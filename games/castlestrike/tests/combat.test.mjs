@@ -340,3 +340,42 @@ test('hero group healing emits bounded links to allies who actually recovered he
     assert.equal(g.state.effects.some(e => e.semanticKind === 'heal' && e.sourceId === recipient.id), false, 'Passive regeneration does not spam healer links');
   }
 });
+
+test('mirrored melee armies begin contact on the same tick and remain identical through the full encounter', async () => {
+  const { loadBalanceEngine, matchedUnitArmies, runEncounter } = await import('./balance-harness.mjs');
+  const runtime = await loadBalanceEngine();
+  const fixture = matchedUnitArmies(runtime.data, 'footman', 'ghoul');
+  const traces = [];
+  const capture = {
+    ...runtime,
+    createGame(options) {
+      const g = runtime.createGame(options), trace = [];
+      traces.push(trace);
+      const update = g.update.bind(g);
+      g.update = dt => {
+        update(dt);
+        trace.push({ time: g.state.time, units: g.state.units.map(u => ({ id: u.id, x: u.x, z: u.z, hp: u.hp, attacks: u.attacks, targetId: u.targetId, action: u.action, cooldown: u.cooldown, pose: u.attackPose ? { startedAt: u.attackPose.startedAt, releaseAt: u.attackPose.releaseAt, targetId: u.attackPose.targetId } : null })) });
+      };
+      return g;
+    },
+  };
+  const results = [false, true].map(swap => runEncounter(capture, { ...fixture, seed: 100000, swap, layout: 'compact' }));
+  const [normal, mirrored] = traces;
+  assert.equal(mirrored.length, normal.length, 'Switching map sides does not change encounter duration');
+  const mirrorTarget = id => id?.startsWith('player-') ? id.replace('player-', 'enemy-') : id?.startsWith('enemy-') ? id.replace('enemy-', 'player-') : id;
+  for (let tick = 0; tick < normal.length; tick++) {
+    const a = normal[tick], b = mirrored[tick];
+    assert.equal(b.units.length, a.units.length, `Same casualties at ${a.time}s`);
+    for (const unit of a.units) {
+      const reflection = b.units.find(u => u.id === unit.id);
+      assert.ok(reflection, `${unit.id} survives on both sides at ${a.time}s`);
+      assert.ok(Math.abs(unit.x + reflection.x) < .000001 && Math.abs(unit.z - reflection.z) < .000001, `Mirrored movement for ${unit.id} at ${a.time}s`);
+      assert.ok(Math.abs(unit.hp - reflection.hp) < .000001 && Math.abs(unit.cooldown - reflection.cooldown) < .000001, `Mirrored damage/cadence for ${unit.id} at ${a.time}s`);
+      assert.equal(reflection.attacks, unit.attacks);
+      assert.equal(reflection.action, unit.action);
+      assert.equal(mirrorTarget(reflection.targetId), unit.targetId);
+      assert.deepEqual(reflection.pose && { ...reflection.pose, targetId: mirrorTarget(reflection.pose.targetId) }, unit.pose, `Same contact timing for ${unit.id} at ${a.time}s`);
+    }
+  }
+  for (const key of ['winner', 'time', 'leftFieldValue', 'rightFieldValue']) assert.equal(results[0][key], results[1][key]);
+});
