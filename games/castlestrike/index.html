@@ -3,27 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#141b18">
+  <meta name="theme-color" content="#171615">
   <meta name="description" content="Command a fantasy army in Castle Strike. Build your formation, master three factions, and conquer a living 3D battlefield in this wave-based strategy game.">
   <title>Castle Strike — The War of Three Crowns</title>
   <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="war-table.css">
+  <link rel="stylesheet" href="combat.css">
+  <link rel="stylesheet" href="unit-tooltip.css">
 </head>
-<body>
+<body data-faction="alliance" data-enemy-faction="horde">
   <div class="game-shell">
     <header class="topbar">
       <a class="brand" href="../../" aria-label="Castle Strike — return to game hall"><span class="brand-crest" data-icon="castle"></span><span><strong>CASTLE <em>STRIKE</em></strong><small>THE WAR OF THREE CROWNS</small></span></a>
       <div class="resources" aria-label="Your resources">
-        <div class="resource gold"><span data-icon="coins"></span><span><strong id="gold">280</strong><small>GOLD <b id="income">+5.0 /s</b></small></span></div>
+        <div class="resource gold" id="income-resource"><span data-icon="coins"></span><span><strong id="gold">280</strong><small>GOLD <b id="income">+100 /20s</b></small><span id="income-countdown" class="income-countdown">First payout after battle begins</span></span></div>
         <div class="resource"><span data-icon="army"></span><span><strong id="supply">3 <i>/ 24</i></strong><small>ARMY SUPPLY</small></span></div>
         <div class="resource tech"><span data-icon="crown"></span><span><strong id="tier">Age I</strong><small id="age-name">AGE OF IRON</small></span></div>
       </div>
-      <nav class="top-actions" aria-label="Game controls"><button id="audio-btn" class="icon-btn" title="Enable sound" aria-label="Enable sound" data-icon="sound"></button><button id="help-btn" class="icon-btn" title="How to play" aria-label="How to play" data-icon="help"></button><button id="settings-btn" class="icon-btn" title="Match settings" aria-label="Match settings" data-icon="settings"></button></nav>
+      <nav class="top-actions" aria-label="Game controls"><button id="audio-btn" class="icon-btn" title="Sound & music settings" aria-label="Sound & music settings" data-icon="sound"></button><button id="help-btn" class="icon-btn" title="How to play" aria-label="How to play" data-icon="help"></button><button id="settings-btn" class="icon-btn" title="Match settings" aria-label="Match settings" data-icon="settings"></button></nav>
     </header>
     <main class="game-layout">
       <section class="battle-panel panel" aria-label="Battlefield">
         <div class="battle-topline"><div class="map-title"><span class="live-dot"></span> THE KING'S CROSSING <span class="map-subtitle">Skirmish · <b id="difficulty-label">Normal</b></span></div><span id="match-clock">00:00</span></div>
-        <div id="battlefield" tabindex="0" aria-label="3D battlefield. Scroll to zoom, right-drag to pan, click a unit to inspect."></div>
+        <div id="battlefield" tabindex="0" aria-label="3D battlefield. Hover over units for stats, scroll to zoom, right-drag to pan, click a unit to inspect."></div>
         <div class="scoreboard">
           <div class="keep-score allied"><span class="tiny-crest" data-icon="shield"></span><div><div class="keep-title"><strong id="ally-name">DAWN ALLIANCE</strong><span id="ally-hp">2400</span></div><div class="health-track"><i id="ally-fill"></i></div></div></div>
           <div class="wave-score"><small id="wave-label">PREPARE YOUR ARMY</small><strong id="wave-value">WAVE I</strong><span id="wave-countdown">Awaiting your command</span></div>
@@ -45,17 +48,35 @@
         <div class="battle-command"><div class="command-meta"><span id="command-hint">Your army returns every 25 seconds</span><div class="speed-switch" aria-label="Battle speed"><button data-speed="1" class="active" aria-pressed="true">1×</button><button data-speed="2" aria-pressed="false">2×</button><button data-speed="3" aria-pressed="false">3×</button></div></div><button id="play-btn" class="gold-btn play-btn"><span data-icon="swords"></span><span>Begin Battle</span><kbd>SPACE</kbd></button></div>
       </aside>
       <section class="command-deck panel" aria-label="Army management">
-        <aside class="tactical-map"><div class="section-caption">BATTLE OVERVIEW <span id="live-units">0 ON FIELD</span></div><canvas id="minimap" width="280" height="140" aria-label="Battlefield minimap"></canvas><div class="map-legend"><span><i class="blue-dot"></i>Your army</span><span><i class="red-dot"></i>Enemy</span></div><div class="battle-stats"><span>Defeated <b id="kills">0</b></span><span>Lost <b id="losses">0</b></span></div></aside>
+        <aside class="tactical-map"><div class="section-caption">BATTLE OVERVIEW <span id="live-units">0 ON FIELD</span></div><canvas id="minimap" width="280" height="140" aria-label="Battlefield minimap"></canvas><div class="map-legend"><span><i class="blue-dot"></i>Your army</span><span><i class="red-dot"></i>Enemy</span></div><div class="battle-stats"><span>Defeated <b id="kills">0</b></span><span>Lost <b id="losses">0</b></span></div><button id="battle-report-btn" class="map-report-link">Last 25 seconds · battle report →</button></aside>
         <div class="army-workspace"><div class="army-toolbar"><div class="army-tabs" role="tablist" aria-label="Command panels"><button class="active" data-tab="army" role="tab" aria-selected="true"><span data-icon="army"></span> Recruit</button><button data-tab="research" role="tab" aria-selected="false"><span data-icon="anvil"></span> Research</button><button data-tab="formation" role="tab" aria-selected="false"><span data-icon="grid"></span> Formation</button><button data-tab="scout" role="tab" aria-selected="false"><span data-icon="eye"></span> Scout</button></div><span id="roster-count">3 in your army</span></div><div id="workspace-content" class="workspace-content" role="tabpanel"></div></div>
       </section>
     </main>
     <footer class="statusbar"><span><i class="live-dot"></i> <span id="status-text">Build your army. Take the crossing. Break their crown.</span></span><span id="save-status">CASTLE STRIKE <b>2.0</b></span></footer>
-    <div class="mobile-command"><div><strong id="mobile-gold">280</strong><small>GOLD · <span id="mobile-wave">PREPARATION</span></small></div><button id="mobile-play-btn" class="gold-btn">Begin Battle</button></div>
+    <div class="mobile-command"><div><strong id="mobile-gold">280</strong><small id="mobile-income">+100 /20s</small><small>GOLD · <span id="mobile-wave">PREPARATION</span></small></div><button id="mobile-play-btn" class="gold-btn">Begin Battle</button></div>
   </div>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-  <dialog id="help-dialog" class="game-dialog"><button class="dialog-close icon-btn" data-close aria-label="Close help">×</button><span class="eyebrow">THE ART OF WAR</span><h2>Every wave is a new chance.</h2><p>Build an army that fights for you. Your entire formation marches every 25 seconds; survivors stay on the field to join the next wave.</p><div class="guide-steps"><div><b>01</b><strong>Build a balanced army</strong><p>Recruit permanent units with gold. Put sturdy fighters in front, archers and spellcasters behind. Inspect portraits to learn their counters.</p></div><div><b>02</b><strong>Control the crossing</strong><p>Hold the central shrine to earn extra gold. Invest in mines for lasting income, or recruit now to win the next fight.</p></div><div><b>03</b><strong>Adapt. Advance. Conquer.</strong><p>Research new ages for elite troops and a unique hero. Use commander abilities at the right moment. Destroy the enemy keep to win.</p></div></div><div class="key-guide"><span><kbd>SPACE</kbd> Pause / play</span><span><kbd>F</kbd> Formation</span><span><kbd>Q W E</kbd> Abilities</span><span><kbd>ESC</kbd> Cancel</span><span>Scroll to zoom · Right-drag to pan</span></div><button class="gold-btn" data-close>My army awaits</button></dialog>
+  <dialog id="help-dialog" class="game-dialog"><button class="dialog-close icon-btn" data-close aria-label="Close help">×</button><span class="eyebrow">THE ART OF WAR</span><h2>Every wave is a new chance.</h2><p>Build an army that fights for you. Your entire formation marches every 25 seconds; survivors stay on the field to join the next wave.</p><div class="guide-steps"><div><b>01</b><strong>Build a balanced army</strong><p>Recruit permanent units with gold. Put sturdy fighters in front, archers and spellcasters behind. Hover over units or portraits for stats and counters.</p></div><div><b>02</b><strong>Control the crossing</strong><p>Receive 100 gold every 20 seconds. Each mine and control of the Sunwell add 10 per payout. Mines are a long-term investment, with 90 seconds between expansions.</p></div><div><b>03</b><strong>Adapt. Advance. Conquer.</strong><p>Research new ages for elite troops and a unique hero. Use commander abilities at the right moment. Destroy the enemy keep to win.</p></div></div><div class="key-guide"><span><kbd>SPACE</kbd> Pause / play</span><span><kbd>F</kbd> Formation</span><span><kbd>Q W E</kbd> Abilities</span><span><kbd>ESC</kbd> Cancel</span><span>Scroll to zoom · Right-drag to pan</span></div><button class="gold-btn" data-close>My army awaits</button></dialog>
   <dialog id="settings-dialog" class="game-dialog settings-dialog"><button class="dialog-close icon-btn" data-close aria-label="Close settings">×</button><span class="eyebrow">A NEW CHAPTER</span><h2>Choose your allegiance</h2><p>Three armies. Three ways to rule the battlefield.</p><div id="faction-options" class="faction-options"></div><div class="match-options"><label>Opponent difficulty<select id="difficulty-select"><option value="easy">Recruit — forgiving</option><option value="normal" selected>Veteran — balanced</option><option value="hard">Warlord — relentless</option></select></label><label>Visual detail<select id="quality-select"><option value="high">High — shadows & atmosphere</option><option value="low">Low — performance</option></select></label></div><p class="restart-note" id="restart-note">A new match replaces the current match. Your best record is kept.</p><button id="new-match-btn" class="gold-btn">Start new match</button></dialog>
   <dialog id="result-dialog" class="game-dialog result-dialog"><span class="result-crest" data-icon="crown"></span><span id="result-eyebrow" class="eyebrow">THE CROSSING IS YOURS</span><h2 id="result-title">Victory</h2><p id="result-copy"></p><div id="result-stats" class="result-stats"></div><button id="play-again-btn" class="gold-btn">Another campaign</button><button id="view-field-btn" class="text-btn">View battlefield</button></dialog>
+  <dialog id="audio-dialog" class="game-dialog audio-dialog" aria-labelledby="audio-title">
+    <button class="dialog-close icon-btn" data-close aria-label="Close audio settings">×</button>
+    <span class="eyebrow">THE SOUNDS OF WAR</span><h2 id="audio-title">Sound & Music</h2>
+    <p>Set the balance between the battlefield and its soundtrack.</p>
+    <label class="audio-toggle"><span>Enable audio</span><input id="sound-enabled" type="checkbox" checked></label>
+    <div class="audio-mixer">
+      <label for="master-volume">Master volume <output id="master-volume-value" for="master-volume">85%</output></label>
+      <input id="master-volume" type="range" min="0" max="100" step="1" value="85">
+      <label for="effects-volume">Battle & interface sounds <output id="effects-volume-value" for="effects-volume">80%</output></label>
+      <input id="effects-volume" type="range" min="0" max="100" step="1" value="80">
+      <label for="music-volume">Music volume <output id="music-volume-value" for="music-volume">40%</output></label>
+      <input id="music-volume" type="range" min="0" max="100" step="1" value="40">
+    </div>
+    <label class="audio-toggle"><span>Play background music</span><input id="music-enabled" type="checkbox" checked></label>
+    <p id="music-now-playing" class="music-now-playing" aria-live="polite">The soundtrack starts with your first command.</p>
+    <div class="audio-actions"><button id="audio-preview-btn" class="small-btn">Preview battle sounds</button><button class="gold-btn" data-close>Return to battle</button></div>
+    <p class="music-now-playing"><a href="../../assets/audio/sfx/credits.html" target="_blank" rel="noopener">Sound credits</a></p>
+  </dialog>
   <noscript><div class="noscript">Castle Strike needs JavaScript to command the battlefield. Please enable JavaScript and reload.</div></noscript>
   <script type="module" src="game.js"></script>
 </body>

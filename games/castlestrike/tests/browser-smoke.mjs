@@ -60,6 +60,8 @@ try {
   await page.locator('#help-btn').click();
   assert.equal(await page.evaluate(() => castleStrike.state.paused), true, 'Opening help pauses combat');
   await page.getByRole('button', { name: 'My army awaits' }).click();
+  // Native dialog close events resume combat asynchronously.
+  await page.waitForFunction(() => castleStrike.state.paused === false);
   assert.equal(await page.evaluate(() => castleStrike.state.paused), false, 'Closing help resumes combat');
   await page.evaluate(() => { castleStrike.game.togglePause(); castleStrike.save(); });
   const saved = await page.evaluate(() => ({ wave: castleStrike.state.wave, count: castleStrike.state.roster.length, gold: castleStrike.state.gold }));

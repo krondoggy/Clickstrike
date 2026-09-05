@@ -2,6 +2,8 @@ import * as THREE from '../vendor/three.module.js';
 import { UNITS, SPELLS } from './data.js';
 import { createUnitModel, animateUnit, geometry } from './unit-models.js';
 import { createWorld, makeCastle, animateFlags } from './world-model.js';
+import { BattleMotion, ease, bridgeHeight } from './render-motion.js';
+import { createCombatEffect, updateCombatEffect, disposeCombatEffect, StatusMarkers, drawFallbackStatuses, effectKind } from './combat-effects.js';
 
 const UNIT = new Map(UNITS.map(unit => [unit.id, unit]));
 const TEAM = { player: '#62bfe2', enemy: '#e76759' };
@@ -11,18 +13,26 @@ const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 /** A read-only view of the simulation. Its camera, selection and animations are
  * entirely local; no gameplay state is ever changed by the renderer. */
 export class Battlefield {
-  constructor(container, { onSelect = () => {}, onGround = () => {} } = {}) {
-    this.container = container; this.onSelect = onSelect; this.onGround = onGround;
+  constructor(container, { onSelect = () => {}, onGround = () => {}, onHover = () => {} } = {}) {
+    this.container = container; this.onSelect = onSelect; this.onGround = onGround; this.onHover = onHover;
     this.mode = 'battle'; this.time = 0; this.width = container.clientWidth < 620 ? 75 : 112; this.quality = 'high';
     this.center = new THREE.Vector3(); this.units = new Map(); this.structures = new Map(); this.effects = new Map();
     this.flags = []; this.selected = null; this.lastState = null; this.drag = null; this.touchPointers = new Map(); this.pinch = null;
+    this.hoverPointer = null; this.hoverUnit = null; this.hoverCheckedAt = -Infinity;
+    this.motion = new BattleMotion(); this.renderedState = null;
     this.raycaster = new THREE.Raycaster(); this.pointer = new THREE.Vector2();
     this.groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
     this.dummy = new THREE.Object3D(); this.point = new THREE.Vector3(); this.barRight = new THREE.Vector3(1, 0, 0); this.color = new THREE.Color();
     this.listeners = []; this.disposed = false;
+    this.motionPreference = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)');
+    this.reducedMotion = this.motionPreference?.matches || false;
+    if (this.motionPreference) {
+      const change = event => { this.reducedMotion = event.matches; };
+      this.motionPreference.addEventListener('change', change); this.listeners.push([this.motionPreference,'change',change]);
+    }
     const canvas = document.createElement('canvas'); canvas.className = 'battlefield-canvas';
     canvas.style.cssText = 'display:block;width:100%;height:100%;touch-action:none;outline:none;';
-    canvas.setAttribute('aria-label', 'Castle Strike battlefield. Mouse wheel zooms, right-drag pans, click selects a unit.');
+    canvas.setAttribute('aria-label', 'Castle Strike battlefield. Hover over units for stats. Mouse wheel zooms, right-drag pans, click selects a unit.');
     canvas.tabIndex = 0;
     try {
       this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
@@ -45,6 +55,7 @@ export class Battlefield {
       this.unitGroup = new THREE.Group(); this.scene.add(this.unitGroup);
       this.effectGroup = new THREE.Group(); this.scene.add(this.effectGroup);
       this._makeDecorations(); this._makeHealthBars(); this._makeGrid();
+      this.statusMarkers = new StatusMarkers(this.scene, MAX_VISIBLE);
       this.canvas = canvas; container.appendChild(canvas);
       this._bind(); this.resize();
     } catch (error) {
@@ -111,7 +122,9 @@ export class Battlefield {
     this._listen(this.canvas, 'wheel', event => {
       event.preventDefault(); this.width = clamp(this.width * (1 + Math.sign(event.deltaY) * .085), 34, 138); this.resize();
     }, { passive: false });
+    this._listen(this.canvas, 'pointerenter', event => this._trackHover(event));
     this._listen(this.canvas, 'pointerdown', event => {
+      this._clearHover();
       this.drag = { x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, button: event.button, pointerId: event.pointerId, moved: false };
       if (event.pointerType === 'touch') {
         this.touchPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -156,6 +169,7 @@ export class Battlefield {
           this.gridHover.visible = true; this.gridHover.position.set(-33 + clamp(Math.round((point.x + 33) / 2.4), 0, 4) * 2.4, .27, -7.5 + clamp(Math.round((point.z + 7.5) / 3), 0, 5) * 3);
         } else this.gridHover.visible = false;
       }
+      this._trackHover(event);
     });
     this._listen(this.canvas, 'pointerup', event => {
       const drag = this.drag; this.drag = null;
@@ -166,20 +180,13 @@ export class Battlefield {
       if (!drag || drag.moved || drag.button !== 0) return;
       if (this.fallback) { this._fallbackSelect(event); return; }
       if (this.targeting) { const point = this._groundPoint(event); if (point) this.onGround(point.x, point.z); return; }
-      this._setRay(event);
-      const hits = this.raycaster.intersectObjects(this.unitGroup.children, true);
-      let unit = null;
-      for (const hit of hits) {
-        let object = hit.object;
-        while (object && !object.userData.unit) object = object.parent;
-        if (object?.userData.unit) { unit = object.userData.unit; break; }
-      }
+      const unit = this._pickUnit(event);
       if (unit) { this.selected = unit.rosterId ? `preview:${unit.team}:${unit.rosterId}` : unit.id; this.onSelect(unit); }
       else { const point = this._groundPoint(event); if (point) { this.onGround(point.x, point.z); if (this.mode !== 'formation') { this.selected = null; this.onSelect(null); } } }
     });
-    this._listen(this.canvas, 'pointercancel', event => { this.drag = null; this.pinch = null; this.touchPointers.delete(event.pointerId); });
-    this._listen(this.canvas, 'pointerleave', () => { if (this.gridHover) this.gridHover.visible = false; if (this.targetMarker) this.targetMarker.visible = false; this.targetPoint = null; });
-    this._listen(this.canvas, 'webglcontextlost', event => { event.preventDefault(); this.contextLost = true; });
+    this._listen(this.canvas, 'pointercancel', event => { this._clearHover(); this.drag = null; this.pinch = null; this.touchPointers.delete(event.pointerId); });
+    this._listen(this.canvas, 'pointerleave', () => { this._clearHover(); if (this.gridHover) this.gridHover.visible = false; if (this.targetMarker) this.targetMarker.visible = false; this.targetPoint = null; });
+    this._listen(this.canvas, 'webglcontextlost', event => { this._clearHover(); event.preventDefault(); this.contextLost = true; });
     this._listen(this.canvas, 'webglcontextrestored', () => { this.contextLost = false; });
   }
 
@@ -191,7 +198,53 @@ export class Battlefield {
 
   _groundPoint(event) { this._setRay(event); return this.raycaster.ray.intersectPlane(this.groundPlane, this.point); }
 
+  // Clicks and hover share the same hit area in either rendering mode.
+  _pickUnit(event) {
+    if (this.fallback) {
+      const rect = this.canvas.getBoundingClientRect(), x = event.clientX - rect.left, y = event.clientY - rect.top;
+      return (this.fallbackUnits || []).find(unit => {
+        const p = this._fallbackProject(unit.x, unit.z);
+        return unit.hp > 0 && Math.hypot(p.x - x, p.y - 7 - y) < 15;
+      }) || null;
+    }
+    this._setRay(event);
+    for (const hit of this.raycaster.intersectObjects(this.unitGroup.children, true)) {
+      let object = hit.object;
+      while (object && !object.userData.unit) object = object.parent;
+      if (object?.userData.unit) return object.userData.unit.hp > 0 ? object.userData.unit : null;
+    }
+    return null;
+  }
+
+  _clearHover(forgetPointer = true) {
+    const pointer = this.hoverPointer, hadUnit = !!this.hoverUnit;
+    this.hoverUnit = null;
+    if (forgetPointer) { this.hoverPointer = null; this.hoverCheckedAt = -Infinity; }
+    if (hadUnit) this.onHover(null, pointer);
+  }
+
+  _trackHover(event) {
+    if (event.pointerType === 'touch' || event.buttons || this.drag || this.pinch || this.touchPointers.size || this.targeting) { this._clearHover(); return; }
+    this.hoverPointer = { clientX: event.clientX, clientY: event.clientY, pointerType: event.pointerType || 'mouse' };
+    this._refreshHover();
+  }
+
+  _refreshHover(now = performance.now()) {
+    if (!this.hoverPointer || this.disposed) return;
+    if (this.drag || this.pinch || this.touchPointers.size || this.targeting || this.contextLost) { this._clearHover(); return; }
+    // Recheck still pointers as units move or die, without raycasting every frame.
+    if (now - this.hoverCheckedAt < 100) return;
+    const pointer = this.hoverPointer, rect = this.canvas.getBoundingClientRect();
+    if (pointer.clientX < rect.left || pointer.clientX >= rect.right || pointer.clientY < rect.top || pointer.clientY >= rect.bottom) { this._clearHover(); return; }
+    this.hoverCheckedAt = now;
+    const unit = this._pickUnit(pointer);
+    if (!unit) { this._clearHover(false); return; }
+    this.hoverUnit = unit;
+    this.onHover(unit, pointer);
+  }
+
   _updateCamera() {
+    this._clearHover();
     if (!this.camera) return;
     this.camera.position.set(this.center.x + 7, 64, this.center.z + 73);
     this.camera.lookAt(this.center.x, 0, this.center.z); this.camera.updateMatrixWorld();
@@ -200,9 +253,17 @@ export class Battlefield {
 
   resize() {
     if (this.disposed) return;
+    this._clearHover();
     const width = Math.max(1, this.container.clientWidth), height = Math.max(1, this.container.clientHeight);
     this.viewWidth = width; this.viewHeight = height;
-    if (this.fallback) { this.canvas.width = width * Math.min(devicePixelRatio || 1, 2); this.canvas.height = height * Math.min(devicePixelRatio || 1, 2); this.ctx?.setTransform(this.canvas.width / width, 0, 0, this.canvas.height / height, 0, 0); return; }
+    if (this.fallback) {
+      const ratio = Math.min(devicePixelRatio || 1, 2), pixelsWide = Math.round(width * ratio), pixelsHigh = Math.round(height * ratio);
+      if (this.canvas.width !== pixelsWide) this.canvas.width = pixelsWide;
+      if (this.canvas.height !== pixelsHigh) this.canvas.height = pixelsHigh;
+      this.ctx?.setTransform(this.canvas.width / width, 0, 0, this.canvas.height / height, 0, 0);
+      if (this.renderedState) this._renderFallback(this.renderedState);
+      return;
+    }
     this.renderer.setSize(width, height, false);
     const aspect = width / height, frustum = this.width / aspect;
     this.camera.left = -this.width / 2; this.camera.right = this.width / 2; this.camera.top = frustum / 2; this.camera.bottom = -frustum / 2;
@@ -226,6 +287,7 @@ export class Battlefield {
   }
 
   setTargeting(spellOrNull) {
+    this._clearHover();
     this.targeting = typeof spellOrNull === 'string' ? SPELLS.find(spell => spell.id === spellOrNull) || null : spellOrNull;
     this.canvas.style.cursor = this.targeting ? 'crosshair' : 'default';
     if (!this.targetMarker) return;
@@ -287,7 +349,7 @@ export class Battlefield {
 
   _syncUnits(visible) {
     const seen = new Set(); let bars = 0, rings = 0;
-    for (const unit of visible) {
+    for (const unit of visible.slice(0, MAX_VISIBLE)) {
       const spec = UNIT.get(unit.unitId); if (!spec) continue;
       seen.add(unit.id); let object = this.units.get(unit.id);
       if (object && object.userData.model !== spec.model) { this.unitGroup.remove(object); this.units.delete(unit.id); object = null; }
@@ -295,11 +357,11 @@ export class Battlefield {
       object.userData.unit = unit;
       object.position.x = unit.x; object.position.z = unit.z;
       object.rotation.y = Number.isFinite(unit.heading) ? unit.heading : unit.team === 'player' ? Math.PI / 2 : -Math.PI / 2;
-      animateUnit(object, unit, this.time);
+      animateUnit(object, unit, this.reducedMotion ? 0 : this.time);
       // The bridge crown is low enough to leave ranged projectiles unobstructed.
-      if (Math.abs(unit.x) < 6.6 && Math.abs(unit.z) < 9.5) object.position.y += .28;
+      const ground = bridgeHeight(unit.x, unit.z); object.position.y += ground;
       if (unit.action === 'dead' || unit.hp <= 0) continue;
-      const d = this.dummy; d.rotation.set(0, 0, 0); d.position.set(unit.x, Math.abs(unit.x) < 6.7 ? .32 : .045, unit.z); d.scale.setScalar(unit.hero ? 1.35 : 1); d.updateMatrix();
+      const d = this.dummy; d.rotation.set(0, 0, 0); d.position.set(unit.x, .045 + ground, unit.z); d.scale.setScalar(unit.hero ? 1.35 : 1); d.updateMatrix();
       this.teamRings.setMatrixAt(rings, d.matrix); this.teamRings.setColorAt(rings, this.color.set(TEAM[unit.team] || TEAM.player));
       d.position.y -= .01; d.scale.setScalar(object.userData.type === 'flying' ? 1.55 : 1.0); d.updateMatrix(); this.blobs.setMatrixAt(rings, d.matrix); rings++;
       const selected = this.selected === unit.id;
@@ -316,74 +378,50 @@ export class Battlefield {
     if (this.barFill.instanceColor) this.barFill.instanceColor.needsUpdate = true;
     this.teamRings.count = rings; this.blobs.count = rings; this.teamRings.instanceMatrix.needsUpdate = true; this.blobs.instanceMatrix.needsUpdate = true;
     if (this.teamRings.instanceColor) this.teamRings.instanceColor.needsUpdate = true;
+    this.statusMarkers.sync(this.units, this.camera, this.quality);
     const selected = this.units.get(this.selected);
-    this.selectionRing.visible = !!selected;
-    if (selected) { this.selectionRing.position.set(selected.position.x, Math.abs(selected.position.x) < 6.7 ? .34 : .065, selected.position.z); this.selectionRing.rotation.y = this.time * .65; this.selectionRing.scale.setScalar(selected.userData.unit.hero ? 1.45 : 1.12); }
+    this.selectionRing.visible = !!selected && selected.userData.unit.hp > 0;
+    if (selected) { this.selectionRing.position.set(selected.position.x, .065 + bridgeHeight(selected.position.x, selected.position.z), selected.position.z); this.selectionRing.rotation.y = this.time * .65; this.selectionRing.scale.setScalar(selected.userData.unit.hero ? 1.45 : 1.12); }
   }
 
   _newEffect(effect) {
-    const group = new THREE.Group(), color = effect.type === 'heal' ? '#a6f5a7' : effect.team === 'enemy' ? '#f7a071' : '#93ddff';
-    const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .9, depthWrite: false });
-    if (effect.type === 'arrow') {
-      const shaft = new THREE.Mesh(geometry('cylinder'), new THREE.MeshBasicMaterial({ color: '#e4d5a2' })); shaft.scale.set(.055, 1.16, .055); shaft.rotation.x = Math.PI / 2; group.add(shaft);
-      const tip = new THREE.Mesh(geometry('cone'), new THREE.MeshBasicMaterial({ color: '#d8e7d8' })); tip.scale.set(.18, .36, .18); tip.rotation.x = Math.PI / 2; tip.position.z = .69; group.add(tip);
-    } else if (effect.type === 'magic' || effect.type === 'meteor') {
-      const orb = new THREE.Mesh(geometry('sphere'), material); orb.scale.setScalar(effect.type === 'meteor' ? .95 : .32); group.add(orb);
-      const halo = new THREE.Mesh(geometry('sphere'), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .2, depthWrite: false })); halo.scale.setScalar(effect.type === 'meteor' ? 1.8 : .65); group.add(halo);
-      if (effect.type === 'meteor') material.color.set('#ffc574');
-    } else if (effect.type === 'lightning') {
-      const points = [];
-      for (let i = 0; i <= 9; i++) { const t = i / 9; points.push(new THREE.Vector3((effect.tx - effect.x) * t + (i > 0 && i < 9 ? Math.sin(i * 18.7) * .42 : 0), 1.7 + Math.sin(i * 9) * .45, (effect.tz - effect.z) * t)); }
-      const g = new THREE.BufferGeometry().setFromPoints(points); group.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color: '#d4f4ff', transparent: true, opacity: .95 })));
-    } else {
-      const ring = new THREE.Mesh(new THREE.RingGeometry(.68, .95, 32), material); ring.rotation.x = -Math.PI / 2; group.add(ring);
-      if (['explosion', 'heal', 'rally'].includes(effect.type)) {
-        for (let i = 0; i < 8; i++) { const spark = new THREE.Mesh(geometry('rock'), material); spark.scale.setScalar(.18); spark.position.set(Math.sin(i * .785) * .8, .4, Math.cos(i * .785) * .8); group.add(spark); }
-      }
-      if (effect.type === 'explosion') material.color.set('#ffd086');
-    }
-    group.userData.type = effect.type; this.effectGroup.add(group); return group;
+    const group = createCombatEffect(effect, this.quality);
+    this.effectGroup.add(group); return group;
   }
 
   _syncEffects(effects) {
     const seen = new Set();
-    for (const effect of effects) {
-      if (effect.life <= 0) continue;
+    const budget = this.quality === 'low' ? 42 : 100;
+    // Prioritize visible contact over faint windups when a whole army fires.
+    const visible = [...effects].filter(effect => effect.life > 0).sort((a,b) =>
+      (a.phase === 'windup' ? 1 : 0) - (b.phase === 'windup' ? 1 : 0)).slice(0,budget);
+    for (const effect of visible) {
       seen.add(effect.id); let object = this.effects.get(effect.id);
-      if (!object) { object = this._newEffect(effect); this.effects.set(effect.id, object); }
-      const progress = clamp(1 - effect.life / (effect.maxLife || 1), 0, 1), fade = Math.min(1, effect.life / Math.min(.3, effect.maxLife || 1));
-      const tx = Number.isFinite(effect.tx) ? effect.tx : effect.x, tz = Number.isFinite(effect.tz) ? effect.tz : effect.z;
-      if (['arrow', 'magic'].includes(effect.type)) {
-        const y = 1.5 + Math.sin(progress * Math.PI) * (effect.type === 'arrow' ? 2.4 : .6);
-        object.position.set(effect.x + (tx - effect.x) * progress, y, effect.z + (tz - effect.z) * progress);
-        object.lookAt(tx, 1.4, tz);
-      } else if (effect.type === 'meteor') object.position.set(tx + (1 - progress) * 5, .6 + (1 - progress) * 13, tz);
-      else {
-        object.position.set(effect.x, effect.type === 'lightning' ? 0 : .4, effect.z);
-        if (effect.type !== 'lightning') {
-          const scale = effect.type === 'slash' ? .8 + progress : .7 + progress * (effect.type === 'explosion' ? 4 : 3);
-          object.scale.setScalar(scale);
-          object.children.slice(1).forEach((spark, i) => { spark.position.y = .3 + progress * 1.5 + Math.sin(i * 2) * .2; });
-        }
-      }
-      object.traverse(child => { if (child.material?.transparent) child.material.opacity = (child.geometry?.type === 'IcosahedronGeometry' ? .5 : .85) * fade; });
+      if (!object) { object = this._newEffect(effect); this.effects.set(effect.id,object); }
+      updateCombatEffect(object,effect,this.time,this.reducedMotion);
     }
-    for (const [id, object] of this.effects) if (!seen.has(id)) {
-      this.effectGroup.remove(object);
-      const mats = new Set(); object.traverse(child => { if (child.material) mats.add(child.material); if (child.isLine || child.geometry?.type === 'RingGeometry') child.geometry.dispose(); }); mats.forEach(m => m.dispose());
-      this.effects.delete(id);
+    for (const [id,object] of this.effects) if (!seen.has(id)) {
+      this.effectGroup.remove(object); disposeCombatEffect(object); this.effects.delete(id);
     }
   }
 
   render(state, dt = 0) {
     if (this.disposed || !state) return;
-    this.lastState = state; this.time += Math.min(dt || 1 / 60, .12);
-    if (this.fallback) { this._renderFallback(state); return; }
+    this.lastState = state;
+    const frame = this.motion.sample(state, this._visibleUnits(state), dt);
+    this.time = frame.time; this.renderedState = { ...state, units: frame.units, structures: frame.structures, effects: frame.effects };
+    if (frame.reset) {
+      this._clearHover();
+      for (const object of this.units.values()) this.unitGroup?.remove(object);
+      this.units.clear();
+    }
+    if (this.fallback) { this._renderFallback(this.renderedState); this._refreshHover(); return; }
     if (this.contextLost) return;
-    this._syncStructures(state); this._syncUnits(this._visibleUnits(state)); this._syncEffects(state.effects || []);
-    this.world.animate(this.time, state.control || 0); animateFlags(this.flags, this.time);
+    this._syncStructures(this.renderedState); this._syncUnits(frame.units); this._syncEffects(frame.effects);
+    this.world.animate(this.reducedMotion ? 0 : this.time, state.control || 0); animateFlags(this.flags, this.reducedMotion ? 0 : this.time);
     if (this.targeting) { this.targetEdge.material.opacity = .77 + Math.sin(this.time * 5) * .15; this.targetReticle.rotation.y = this.time * .4; }
     this.renderer.render(this.scene, this.camera);
+    this._refreshHover();
   }
 
   _fallbackProject(x, z) { return { x: this.viewWidth / 2 + (x - this.center.x) / this.width * this.viewWidth, y: this.viewHeight * .52 + (z - this.center.z) / this.width * this.viewWidth * .75 }; }
@@ -409,15 +447,33 @@ export class Battlefield {
       c.fillStyle = '#233d33'; c.fillRect(p.x - size * .28 * s, p.y - bh * .47 * s, size * .56 * s, bh * .47 * s);
       c.fillStyle = '#172f26'; c.fillRect(p.x - size * s, p.y + 3, size * 2 * s, 3); c.fillStyle = TEAM[structure.team]; c.fillRect(p.x - size * s, p.y + 3, size * 2 * s * clamp(structure.hp / structure.maxHp, 0, 1), 3);
     }
-    this.fallbackUnits = this._visibleUnits(state);
+    this.fallbackUnits = state.units;
     for (const unit of [...this.fallbackUnits].sort((a, b) => a.z - b.z)) {
       const p = this._fallbackProject(unit.x, unit.z), spec = UNIT.get(unit.unitId), size = Math.max(3, s * .56);
+      const death = unit.motion?.death || 0;
+      c.save(); c.globalAlpha = 1 - death;
+      if (death) { c.translate(p.x, p.y); c.rotate(-death * Math.PI / 2); c.translate(-p.x, -p.y); }
       c.fillStyle = '#203b3180'; c.beginPath(); c.ellipse(p.x, p.y + 1, size * 1.2, size * .5, 0, 0, Math.PI * 2); c.fill();
       c.fillStyle = TEAM[unit.team]; c.fillRect(p.x - size * .7, p.y - size * 1.8, size * 1.4, size * 1.6);
       c.fillStyle = '#e0c69a'; c.beginPath(); c.arc(p.x, p.y - size * 2.15, size * .58, 0, Math.PI * 2); c.fill();
-      c.strokeStyle = '#d9d7ac'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(p.x + size, p.y - size * .5); c.lineTo(p.x + size * 1.5, p.y - size * 2.8); c.stroke();
+      const swing = unit.motion?.attack >= 0 && unit.motion.attack < 1 ? Math.sin(unit.motion.attack * Math.PI) : 0;
+      c.strokeStyle = '#d9d7ac'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(p.x + size, p.y - size * .5); c.lineTo(p.x + size * (1.5 + swing), p.y - size * (2.8 - swing * 1.6)); c.stroke();
       if (spec?.role === 'magic' || spec?.role === 'support') { c.fillStyle = '#95deec'; c.beginPath(); c.arc(p.x + size * 1.5, p.y - size * 2.8, 2.5, 0, Math.PI * 2); c.fill(); }
-      if (this.selected === unit.id) { c.strokeStyle = '#f3de91'; c.beginPath(); c.ellipse(p.x, p.y, size * 1.4, size * .7, 0, 0, Math.PI * 2); c.stroke(); }
+      if (this.selected === unit.id && unit.hp > 0) { c.strokeStyle = '#f3de91'; c.beginPath(); c.ellipse(p.x, p.y, size * 1.4, size * .7, 0, 0, Math.PI * 2); c.stroke(); }
+      if (unit.hp > 0) { c.fillStyle = '#1b3128'; c.fillRect(p.x - size, p.y - size * 3.25, size * 2, 2); c.fillStyle = TEAM[unit.team]; c.fillRect(p.x - size, p.y - size * 3.25, size * 2 * clamp(unit.hp / unit.maxHp, 0, 1), 2); }
+      c.restore();
+      if (unit.hp > 0) drawFallbackStatuses(c, unit, p.x, p.y - size * 3.25 - 10, this.quality);
+    }
+    for (const effect of state.effects || []) {
+      if(effect.phase==='windup')continue;
+      const kind=effectKind(effect),progress = 1 - effect.life / (effect.maxLife || 1), projectile = effect.phase==='release'||(!effect.phase&&['arrow','magic','meteor'].includes(effect.type))||(effect.type==='meteor'&&effect.phase!=='impact');
+      const p = this._fallbackProject(effect.x + ((effect.tx ?? effect.x) - effect.x) * (projectile ? progress : 0), effect.z + ((effect.tz ?? effect.z) - effect.z) * (projectile ? progress : 0));
+      c.save(); c.globalAlpha = Math.min(1, effect.life / .2); c.strokeStyle = c.fillStyle = effect.type === 'heal' ? '#a6f5a7' : effect.type === 'meteor' ? '#ffc574' : '#c0e8ff';
+      if(kind==='heal'||kind==='chain'){
+        const end=this._fallbackProject(effect.tx,effect.tz);c.beginPath();c.moveTo(p.x,p.y-1.6*s);c.quadraticCurveTo((p.x+end.x)/2,Math.min(p.y,end.y)-3*s,end.x,end.y-1.6*s);c.stroke();c.beginPath();c.ellipse(end.x,end.y,.8*s,.6*s,0,0,Math.PI*2);c.stroke();
+      }else{
+        c.beginPath(); c.arc(p.x, p.y - (projectile ? (kind==='meteor'?1+(1-progress)*13:1.5 + Math.sin(progress * Math.PI) * (kind==='siege'?4:1.15)) * s : 0), projectile ? Math.max(1.5, s * (kind==='siege'?.45:.2)) : ((effect.radius||1)*(.45+progress*.55)) * s, 0, Math.PI * 2); projectile ? c.fill() : c.stroke();
+      }c.restore();
     }
     c.fillStyle = '#13291eb3'; c.fillRect(12, h - 32, 230, 22); c.fillStyle = '#d1dcb8'; c.font = '11px system-ui'; c.fillText('Illustrated mode · WebGL unavailable', 22, h - 17);
     if (this.targeting && this.targetPoint) {
@@ -429,15 +485,18 @@ export class Battlefield {
 
   _fallbackSelect(event) {
     const rect = this.canvas.getBoundingClientRect(), x = event.clientX - rect.left, y = event.clientY - rect.top;
-    const unit = (this.fallbackUnits || []).find(unit => { const p = this._fallbackProject(unit.x, unit.z); return Math.hypot(p.x - x, p.y - 7 - y) < 15; });
+    const unit = this._pickUnit(event);
     if (unit && !this.targeting) { this.selected = unit.id; this.onSelect(unit); }
     else this.onGround((x - this.viewWidth / 2) / this.viewWidth * this.width + this.center.x, (y - this.viewHeight * .52) / this.viewWidth * this.width / .75 + this.center.z);
   }
 
   destroy() {
     if (this.disposed) return;
+    this._clearHover();
     this.disposed = true; this.resizeObserver?.disconnect();
     this.listeners.forEach(([target, event, fn, options]) => target.removeEventListener(event, fn, options));
+    this.statusMarkers?.destroy();
+    for (const object of this.effects.values()) disposeCombatEffect(object);
     // Unit templates are intentionally shared across battlefield instances.
     this.renderer?.dispose(); this.canvas.remove(); this.units.clear(); this.effects.clear();
   }

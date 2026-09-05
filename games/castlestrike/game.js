@@ -2,6 +2,10 @@ import { createGame, restoreGame } from './src/engine.js';
 import { FACTIONS, UNITS, UNIT_MAP, RESEARCH, SPELLS } from './src/data.js';
 import { Battlefield } from './src/battlefield.js';
 import { BattleAudio } from './src/audio.js';
+import { UnitTooltip } from './src/unit-tooltip.js';
+import { getUnitStats } from './src/unit-stats.js';
+import { activeStatuses } from './src/combat-status.js';
+import { recommendCounters, concreteCounters } from './src/combat-ui.js';
 
 const $ = id => document.getElementById(id);
 const SAVE_KEY = 'castlestrike-v2-save', SETTINGS_KEY = 'castlestrike-v2-settings', RECORD_KEY = 'castlestrike-v2-record';
@@ -44,8 +48,18 @@ const portraitStyle = unit => {
 };
 const factionOf = id => FACTIONS.find(f => f.id === id) || FACTIONS[0];
 const audio = new BattleAudio();
-let preferences = { sound: false, quality: 'high' };
-try { const p = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'); preferences = { sound: !!p.sound, quality: p.quality === 'low' ? 'low' : 'high' }; } catch { /* Storage can be disabled. */ }
+const volumePreference = (value, fallback) => typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : fallback;
+let preferences = { sound: true, music: true, masterVolume: .85, effectsVolume: .8, musicVolume: .4, quality: 'high' };
+try {
+  const p = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+  preferences = {
+    sound: typeof p.sound === 'boolean' ? p.sound : true,
+    music: typeof p.music === 'boolean' ? p.music : true,
+    masterVolume: volumePreference(p.masterVolume, .85), effectsVolume: volumePreference(p.effectsVolume, .8), musicVolume: volumePreference(p.musicVolume, .4),
+    quality: p.quality === 'low' ? 'low' : 'high',
+  };
+} catch { /* Storage can be disabled. */ }
+audio.configure(preferences);
 let game, restored = false, badSave = false;
 try { const save = localStorage.getItem(SAVE_KEY); if (save) { game = restoreGame(save); restored = true; if (game.state.status === 'playing') game.state.paused = true; } } catch { badSave = true; }
 game ||= createGame({ seed: 42 });
@@ -53,7 +67,11 @@ let selectedId = game.state.roster[0]?.unitId || UNITS[0].id, selectedRoster = n
 let activeTab = 'army', armedSpell = null, pendingFaction = game.state.faction;
 let workspaceKey = '', detailKey = '', lastWave = game.state.wave, resultShown = restored && ['victory', 'defeat'].includes(game.state.status);
 let toastTimer, waveTimer, lastSave = 0, lastHud = 0, lastTime = performance.now(), dialogWasRunning = false;
+let heardEffects = new Set(game.state.effects.map(effect => effect.id));
+let pendingAudio = [];
+const unitTooltip = new UnitTooltip({ getState: () => game.state, portraitStyle });
 const field = new Battlefield($('battlefield'), {
+  onHover(unit, position) { unitTooltip.hoverBattlefield(unit, position); },
   onSelect(unit) {
     if (armedSpell && unit) { castAt(unit.x, unit.z); return; }
     if (!unit?.unitId) return;
@@ -88,10 +106,11 @@ function save() {
 function savePreferences() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(preferences)); } catch { /* Optional preference storage. */ } }
 function perform(result, sound = 'select') {
   if (!result.ok) { notify(result.message, true); return false; }
-  audio.play(sound); notify(result.message); renderWorkspace(true); renderDetail(true); updateHud(); save(); return true;
+  if (sound) audio.play(sound); notify(result.message); renderWorkspace(true); renderDetail(true); updateHud(); save(); return true;
 }
 function ended() { return ['victory', 'defeat'].includes(game.state.status); }
 function setTab(tab) {
+  unitTooltip.reset();
   activeTab = tab; armedSpell = null; $('cast-prompt').hidden = true;
   field.setTargeting(null); $('battlefield').style.cursor = '';
   field.setMode(tab === 'formation' ? 'formation' : 'battle');
@@ -125,8 +144,9 @@ function renderWorkspace(force = false) {
     }).join('')}</div></div><div class="formation-copy"><h3>Victory starts with a formation.</h3><p>Select a unit, then choose its new position. Occupied positions swap. Changes take effect with the next wave.</p><p class="formation-selection">${chosen ? `${escape(UNIT_MAP[chosen.unitId].name)} selected — choose a position` : 'Shields in front. Healers and siege in the rear.'}</p>${chosen ? `<button class="small-btn" data-sell="${chosen.id}">Dismiss unit · +${Math.floor(UNIT_MAP[chosen.unitId].cost * .7)} gold</button>` : '<button class="small-btn" data-tab="army">Recruit reinforcements</button>'}</div></div>`;
   } else {
     const counts = new Map(); s.enemyRoster.forEach(r => counts.set(r.unitId, (counts.get(r.unitId) || 0) + 1));
-    root.innerHTML = `<div class="scout-panel"><div class="scout-copy"><h3>${escape(factionOf(s.enemyFaction).name)}</h3><p>${s.enemyRoster.length} units in their next wave. Inspect their army and recruit counters.</p><p style="margin-top:9px;color:var(--gold)">Age ${roman(s.enemy?.tier || 1)} · ${s.enemy?.mineLevel || 0} mines</p></div><div class="scout-units">${[...counts].map(([id, count]) => { const u = UNIT_MAP[id]; return `<button class="scout-unit" data-inspect="${id}" title="Inspect ${escape(u.name)}"><div class="portrait" style="${portraitStyle(u)}"></div><strong>${escape(u.name)}</strong><small>× ${count} · ${escape(u.role)}</small></button>`; }).join('')}</div></div>`;
+    root.innerHTML = `<div class="scout-dashboard"><div class="scout-panel"><div class="scout-copy"><h3>${escape(factionOf(s.enemyFaction).name)}</h3><p>${s.enemyRoster.length} units in their next wave. Inspect their army and recruit counters.</p><p style="margin-top:9px;color:var(--gold)">Age ${roman(s.enemy?.tier || 1)} · ${s.enemy?.mineLevel || 0} mines</p></div><div class="scout-units">${[...counts].map(([id, count]) => { const u = UNIT_MAP[id]; return `<button class="scout-unit" data-inspect="${id}" title="Inspect ${escape(u.name)}"><div class="portrait" style="${portraitStyle(u)}"></div><strong>${escape(u.name)}</strong><small>× ${count} · ${escape(u.role)}</small></button>`; }).join('')}</div></div><div class="counter-advice"><h3>Answer their army</h3><p>Options for your next wave. Protect specialists with a front line.</p>${recommendCounters(s).map(({unit,target,reason,unlocked})=>`<button class="counter-suggestion ${unlocked?'':'locked'}" data-inspect="${unit.id}" aria-label="Inspect ${escape(unit.name)} as an answer to ${escape(target.name)}"><div class="portrait" style="${portraitStyle(unit)}"></div><div><strong>${escape(unit.name)}</strong><small>${unit.cost} gold · ${unlocked?'Available at your age':`Requires Age ${roman(unit.tier)}`}</small><p>Against ${escape(target.name)}: ${escape(reason)}</p></div></button>`).join('')}</div><section id="combat-summary" class="combat-summary" aria-label="Recent combat report"></section></div>`;
   }
+  unitTooltip.bindCards(root);
   root.scrollLeft = scroll;
   if (focusAttr) root.querySelector(`[data-${focusAttr}="${focusValue}"]`)?.focus({ preventScroll: true });
   updateButtons();
@@ -138,30 +158,57 @@ function updateButtons() {
     button.disabled = ended() || locked || ownedHero || s.gold < u.cost || s.supply + u.supply > s.supplyCap || s.roster.length >= 30;
     const content = locked ? `<span class="lock-text">${icon('lock')} Age ${roman(u.tier)}</span>` : ownedHero ? '<span class="lock-text">Hero enlisted</span>' : `<span>${icon('coins')} ${u.cost}</span><span class="plus">＋</span>`;
     if (button.innerHTML !== content) button.innerHTML = content;
-    button.title = locked ? `Research Citadel Age ${roman(u.tier)} to unlock` : ownedHero ? 'One hero per army' : s.supply + u.supply > s.supplyCap ? 'Upgrade War Camp for more supply' : s.gold < u.cost ? `${Math.ceil(u.cost - s.gold)} more gold needed` : `Recruit ${u.name} · ${u.supply} supply · joins every wave`;
+    button.dataset.recruitHint = locked ? `Research Citadel Age ${roman(u.tier)} to unlock` : ownedHero ? 'One hero per army' : s.supply + u.supply > s.supplyCap ? 'Upgrade War Camp for more supply' : s.gold < u.cost ? `${Math.ceil(u.cost - s.gold)} more gold needed` : `Recruit ${u.name} · ${u.supply} supply · joins every wave`;
+    button.removeAttribute('title');
   });
   document.querySelectorAll('[data-research]').forEach(button => {
     const cost = game.getResearchCost(button.dataset.research), maxed = !Number.isFinite(cost);
-    button.disabled = ended() || maxed || s.gold < cost;
-    const content = maxed ? '<span class="lock-text">Fully researched</span>' : `<span>${icon('coins')} ${cost}</span><span class="plus">↑</span>`;
+    const mineCooldown = button.dataset.research === 'mines' ? s.mineCooldown : 0;
+    button.disabled = ended() || maxed || mineCooldown > 0 || s.gold < cost;
+    const content = maxed ? '<span class="lock-text">Fully researched</span>' : mineCooldown > 0 ? `<span>${icon('coins')} ${cost}</span><span class="lock-text">${Math.ceil(mineCooldown)}s</span>` : `<span>${icon('coins')} ${cost}</span><span class="plus">↑</span>`;
     if (button.innerHTML !== content) button.innerHTML = content;
-    button.title = maxed ? 'Maximum level reached' : `Research for ${cost} gold`;
+    button.title = maxed ? 'Maximum level reached' : mineCooldown > 0 ? `Next mine available in ${Math.ceil(mineCooldown)} seconds` : `Research for ${cost} gold`;
   });
 }
 function renderDetail(force = false) {
   const s = game.state, u = UNIT_MAP[selectedId] || UNIT_MAP[s.roster[0]?.unitId] || UNITS[0];
   const live = s.units.find(unit => unit.id === selectedLive), chosen = s.roster.find(r => r.id === selectedRoster);
-  const key = [u.id, chosen?.id, live?.id, Math.ceil(live?.hp || 0), JSON.stringify(s.research), JSON.stringify(s.enemy.research), s.wave, s.roster.filter(r => r.unitId === u.id).length].join('|');
+  const stats = getUnitStats(s, u.id, { team: u.faction === s.faction ? 'player' : 'enemy', live });
+  const hp = Math.ceil(stats.health), damage = stats.damage, armor = stats.armor;
+  const key = [u.id, chosen?.id, live?.id, hp, damage, armor, s.wave, s.roster.filter(r => r.unitId === u.id).length].join('|');
   if (!force && detailKey === key) return; detailKey = key;
-  const playerUnit = u.faction === s.faction;
-  const heroLevel = u.hero ? 1 + Math.floor(s.wave / 5) : 1;
-  const damage = live?.damage ?? u.damage * (1 + (playerUnit ? s.research.weapons : s.enemy.research.weapons) * .12) * (1 + (heroLevel - 1) * .1);
-  const hp = live ? Math.ceil(live.hp) : Math.round(u.hp * (1 + (playerUnit ? s.research.armor : s.enemy.research.armor) * .08) * (1 + (heroLevel - 1) * .12));
-  const armor = live?.armor ?? u.armor + (playerUnit ? s.research.armor : s.enemy.research.armor) * 2;
   $('unit-detail').innerHTML = `<div class="detail-heading"><div class="portrait detail-portrait" style="${portraitStyle(u)}" role="img" aria-label="${escape(u.name)} portrait"></div><div><h3>${escape(u.name)}</h3><span class="unit-role">${escape(u.role)} · ${live ? `Wave fighter${u.hero ? ` · Lv ${live.level || 1}` : ''}` : `Tier ${roman(u.tier)}`}</span></div></div><p class="detail-description">${escape(u.description)}</p><div class="unit-stat-grid"><span title="${live ? 'Current health' : 'Health of next reinforcement'}">${icon('heart')}${hp}<small>HP</small></span><span title="${escape(u.attackType)} attack damage">${icon('sword')}${Math.round(damage)}<small>ATK</small></span><span title="${escape(u.armorType)} armor">${icon('shield')}${armor}<small>ARM</small></span></div><p class="ability-description"><strong>${escape(u.ability)}</strong>${escape(u.abilityDescription)}</p><div class="counter-row">STRONG VS <span>${escape(u.strongVs?.join(' · ') || 'Balanced armies')}</span></div><div class="counter-row">WEAK VS <span>${escape(u.weakVs?.join(' · ') || 'Balanced counters')}</span></div>`;
+  renderCombatDetails();
+}
+function renderCombatDetails() {
+  const root=$('unit-detail'),s=game.state,u=UNIT_MAP[selectedId]; if(!u)return;
+  if(!root.querySelector('.automatic-tactics')){
+    const tactics=document.createElement('p');tactics.className='automatic-tactics';
+    tactics.innerHTML=`<strong>AUTOMATIC BEHAVIOR</strong>${escape(u.tactics)}`;
+    root.querySelector('.ability-description')?.after(tactics);
+    const foe=u.faction===s.faction?s.enemyFaction:s.faction,matchups=concreteCounters(u,foe);
+    const rows=root.querySelectorAll('.counter-row');
+    if(rows[0])rows[0].innerHTML=`STRONG VS <span>${escape(matchups.strong.map(v=>v.name).join(' · ')||u.strongVs.join(' · '))}</span>`;
+    if(rows[1])rows[1].innerHTML=`ANSWERED BY <span>${escape(matchups.weak.map(v=>v.name).join(' · ')||u.weakVs.join(' · '))}</span>`;
+    const statuses=document.createElement('div');statuses.className='unit-statuses';statuses.setAttribute('aria-label','Active combat effects');tactics.after(statuses);
+  }
+  const statuses=root.querySelector('.unit-statuses'),live=s.units.find(v=>v.id===selectedLive);
+  const active=activeStatuses(live),key=active.map(v=>v.id).join(',');
+  if(statuses&&statuses.dataset.statuses!==key){statuses.dataset.statuses=key;statuses.innerHTML=active.map(v=>`<span style="color:${v.color}">${escape(v.symbol)} ${escape(v.label)}</span>`).join('');}
+}
+function updateCombatSummary() {
+  const root=$('combat-summary');if(!root)return;
+  const summary=game.state.telemetry?.summary;
+  if(!summary){root.innerHTML='<h3>Last 25 seconds</h3><p>The combat report appears after battle begins.</p>';return;}
+  const number=n=>Math.round(n||0).toLocaleString();
+  const html=`<h3>Last 25 seconds</h3><div class="combat-summary-grid">${['player','enemy'].map(team=>{
+    const totals=summary[team]||{},leader=totals.leadingThreat;
+    return `<div class="combat-summary-team ${team}"><strong>${team==='player'?'YOUR ARMY':'ENEMY ARMY'}</strong><div class="combat-metrics"><span><b>${number(totals.damage)}</b>Damage</span><span><b>${number(totals.healing)}</b>Healing</span><span><b>${number(totals.shielding)}</b>Shielded</span></div><p>${leader?.damage>0?`Leading threat: ${escape(UNIT_MAP[leader.unitId]?.name||'Defenses / commander')} · ${number(leader.damage)} damage`:'No damage dealt in this window.'}</p></div>`;
+  }).join('')}</div><p>Actual damage, health restored, and damage absorbed. Surviving waves overlap.</p>`;
+  if(root.innerHTML!==html)root.innerHTML=html;
 }
 function renderSpells() {
-  $('spells').innerHTML = SPELLS.map((spell, i) => `<button class="spell" data-spell="${spell.id}" aria-label="${escape(spell.name)}: ${escape(spell.description)}" title="${escape(spell.name)} · ${spell.cost} gold · ${spell.cooldown}s cooldown&#10;${escape(spell.description)}"><kbd>${['Q', 'W', 'E'][i]}</kbd>${icon(spell.id)}<strong>${escape(spell.name)}</strong><small id="spell-status-${spell.id}">${spell.cost} gold</small></button>`).join('');
+  $('spells').innerHTML = SPELLS.map((spell, i) => `<button class="spell" data-spell="${spell.id}" aria-label="${escape(spell.name)}: ${escape(spell.description)}" title="${escape(spell.name)} · ${spell.cost} gold · ${spell.cooldown}s cooldown&#10;${escape(spell.description)}"><kbd>${['Q', 'W', 'E'][i]}</kbd><span class="spell-art" aria-hidden="true"></span><strong>${escape(spell.name)}</strong><small id="spell-status-${spell.id}">${spell.cost} gold</small></button>`).join('');
 }
 function armSpell(id) {
   const s = game.state, spell = SPELLS.find(sp => sp.id === id);
@@ -181,21 +228,28 @@ function armSpell(id) {
 function castAt(x, z) {
   if (!armedSpell) return;
   const result = game.cast(armedSpell, x, z);
-  if (perform(result, 'spell')) cancelSpell();
+  if (perform(result, null)) cancelSpell();
 }
 function cancelSpell() { armedSpell = null; field.setTargeting(null); $('cast-prompt').hidden = true; $('battlefield').style.cursor = ''; updateHud(); }
 function playPause() {
   if (ended()) { openSettings(); return; }
-  if (preferences.sound && !audio.enabled) audio.enable(true);
+  if (preferences.sound) void audio.unlock();
   if (game.state.status === 'preparation') {
-    game.start(); audio.play('wave');
+    game.start();
     notify('Your army is marching. Reinforcements arrive every 25 seconds.');
   } else { game.togglePause(); cancelSpell(); }
   updateHud(); renderWorkspace(true); save();
 }
 function updateHud() {
   const s = game.state, ally = s.structures.find(v => v.id === 'player-castle'), enemy = s.structures.find(v => v.id === 'enemy-castle');
-  $('gold').textContent = Math.floor(s.gold).toLocaleString(); $('income').textContent = `+${s.income.toFixed(1)} /s`;
+  if (document.body.dataset.faction !== s.faction) document.body.dataset.faction = s.faction;
+  if (document.body.dataset.enemyFaction !== s.enemyFaction) document.body.dataset.enemyFaction = s.enemyFaction;
+  const payout = s.incomeAmount;
+  const incomeWait = Math.ceil(s.nextIncome);
+  $('gold').textContent = Math.floor(s.gold).toLocaleString(); $('income').textContent = `+${payout} /20s`;
+  $('income-countdown').textContent = ended() ? 'Battle complete' : s.status === 'preparation' ? 'First payout 20s after launch' : `Next payout in ${incomeWait}s${s.paused ? ' · paused' : ''}`;
+  $('income-resource').title = `Income arrives every 20 seconds: 100 base + ${s.mineLevel * 10} from mines + ${s.control > .7 ? 10 : 0} for the Sunwell. Payout timers follow battle speed.`;
+  $('mobile-income').textContent = ended() ? 'Battle complete' : s.status === 'preparation' ? `+${payout} every 20s` : `+${payout} gold in ${incomeWait}s`;
   $('mobile-gold').textContent = Math.floor(s.gold).toLocaleString();
   $('mobile-wave').textContent = s.status === 'preparation' ? 'PREPARATION' : ended() ? s.status.toUpperCase() : `WAVE ${s.wave} · ${Math.ceil(s.nextWave)}s`;
   $('supply').innerHTML = `${s.supply} <i>/ ${s.supplyCap}</i>`; $('tier').textContent = `Age ${roman(s.tier)}`;
@@ -213,7 +267,7 @@ function updateHud() {
   if (s.status === 'preparation') $('control-label').textContent = 'The Sunwell awaits';
   $('control-fill').style.left = `${control < 0 ? 50 + control * 50 : 50}%`;
   $('control-fill').style.width = `${Math.abs(control) * 50}%`; $('control-fill').style.background = control < 0 ? 'var(--red)' : 'var(--blue)';
-  $('control-hint').textContent = Math.abs(control) > .7 ? '+1.8 gold /s to the controlling army' : 'Hold the crossing for bonus income';
+  $('control-hint').textContent = Math.abs(control) > .7 ? '+10 gold each income payout' : 'Hold the crossing for +10 gold /20s';
   $('kills').textContent = s.stats.kills; $('losses').textContent = s.stats.losses; $('live-units').textContent = `${s.units.filter(u => u.hp > 0).length} ON FIELD`;
   $('roster-count').textContent = `${s.roster.length} in your army`;
   const playing = s.status === 'playing' && !s.paused;
@@ -233,7 +287,10 @@ function updateHud() {
   });
   const status = s.events[0]; if (status) $('status-text').textContent = status.text;
   if (s.wave > lastWave) { lastWave = s.wave; announceWave(); }
-  renderWorkspace(); renderDetail(); drawMinimap();
+  renderWorkspace(); renderDetail(); renderCombatDetails(); updateCombatSummary(); drawMinimap();
+  unitTooltip.refresh();
+  audio.setActivity({ paused: s.paused, hidden: document.hidden, ended: ended() });
+  if ($('audio-dialog').open) updateMusicStatus();
   if (ended() && !resultShown) showResult();
 }
 function announceWave() {
@@ -259,6 +316,7 @@ function drawMinimap() {
 }
 function openDialog(dialog) {
   if (dialog.open) return;
+  unitTooltip.reset();
   dialogWasRunning = game.state.status === 'playing' && !game.state.paused;
   if (dialogWasRunning) game.togglePause(); cancelSpell(); dialog.showModal();
 }
@@ -272,10 +330,12 @@ function openSettings() {
   renderFactionOptions(); openDialog($('settings-dialog'));
 }
 function renderFactionOptions() {
-  $('faction-options').innerHTML = FACTIONS.map((f,i) => `<button class="faction-option ${pendingFaction===f.id?'active':''}" data-faction="${f.id}" aria-pressed="${pendingFaction===f.id}"><div class="portrait" style="${portraitStyle(UNIT_MAP[f.heroId])}"></div><strong>${escape(f.name)}</strong><small>${escape(f.title)}<br>${escape(f.perk)}</small></button>`).join('');
+  $('faction-options').innerHTML = FACTIONS.map(f => `<button class="faction-option ${pendingFaction===f.id?'active':''}" data-faction="${f.id}" aria-pressed="${pendingFaction===f.id}"><div class="portrait" style="${portraitStyle(UNIT_MAP[f.heroId])}"><img class="faction-choice-crest" src="assets/ui/${f.id}-crest.svg" alt=""></div><strong>${escape(f.name)}</strong><small>${escape(f.title)}<br>${escape(f.perk)}</small></button>`).join('');
 }
 function newMatch() {
   game = createGame({ faction: pendingFaction, difficulty: $('difficulty-select').value, seed: Math.floor(Date.now() % 1000000) });
+  heardEffects.clear();
+  pendingAudio = [];
   preferences.quality = $('quality-select').value; field.setQuality(preferences.quality); savePreferences();
   dialogWasRunning = false; closeDialog($('settings-dialog'));
   selectedId=game.state.roster[0].unitId; selectedRoster=null;selectedLive=null;resultShown=false;lastWave=0;workspaceKey='';detailKey='';
@@ -318,11 +378,33 @@ $('new-match-btn').addEventListener('click',newMatch);
 $('formation-toggle').addEventListener('click',()=>setTab(activeTab==='formation'?'army':'formation'));
 $('camera-reset').addEventListener('click',()=>field.resetCamera());
 $('quality-select').addEventListener('change',()=>{preferences.quality=$('quality-select').value;field.setQuality(preferences.quality);savePreferences();});
-$('audio-btn').addEventListener('click',()=>{preferences.sound=audio.enable(!preferences.sound);savePreferences();updateAudioButton();audio.play('select');});
-function updateAudioButton(){const b=$('audio-btn');b.innerHTML=icon(preferences.sound?'sound':'muted');b.classList.toggle('active',preferences.sound);b.setAttribute('aria-label',preferences.sound?'Mute sound':'Enable sound');b.title=preferences.sound?'Mute sound':'Enable sound';b.setAttribute('aria-pressed',preferences.sound);}
+$('audio-btn').addEventListener('click',()=>{syncAudioControls();openDialog($('audio-dialog'));});
+function updateAudioButton(){const b=$('audio-btn'),enabled=preferences.sound&&preferences.masterVolume>0;b.innerHTML=icon(enabled?'sound':'muted');b.classList.toggle('active',enabled);b.setAttribute('aria-label','Sound & music settings');b.title=enabled?'Sound & music settings':'Audio muted — sound & music settings';}
+function syncAudioControls(){
+  $('sound-enabled').checked=preferences.sound;$('music-enabled').checked=preferences.music;
+  for(const [id,key] of [['master-volume','masterVolume'],['effects-volume','effectsVolume'],['music-volume','musicVolume']]){
+    const value=Math.round(preferences[key]*100);$(id).value=value;$(id+'-value').value=value+'%';
+  }
+  updateMusicStatus();
+}
+function updateMusicStatus(){
+  const track=audio.musicElement;
+  $('music-now-playing').textContent=!preferences.sound?'Audio is muted.':!preferences.music||preferences.musicVolume===0?'Music is off.':!audio.musicTracks.length?'No music tracks are available.':audio.musicError?'The soundtrack could not load. Sound effects are available.':track&&!track.paused?`Now playing · ${audio.musicTitle}`:'The soundtrack starts with your first command.';
+}
+function applyAudioPreferences(){audio.configure(preferences);if(preferences.sound)void audio.unlock();savePreferences();updateAudioButton();updateMusicStatus();}
+$('sound-enabled').addEventListener('change',()=>{preferences.sound=$('sound-enabled').checked;applyAudioPreferences();});
+$('music-enabled').addEventListener('change',()=>{preferences.music=$('music-enabled').checked;applyAudioPreferences();});
+for(const [id,key] of [['master-volume','masterVolume'],['effects-volume','effectsVolume'],['music-volume','musicVolume']]){
+  $(id).addEventListener('input',()=>{preferences[key]=Number($(id).value)/100;$(id+'-value').value=$(id).value+'%';applyAudioPreferences();});
+}
+$('audio-preview-btn').addEventListener('click',async()=>{await audio.unlock();audio.previewBattle();});
+// Browser audio starts with a user gesture; subsequent gestures can resume a suspended device.
+document.addEventListener('pointerdown',()=>{if(preferences.sound)void audio.unlock();},{capture:true});
+document.addEventListener('keydown',event=>{if(!event.ctrlKey&&!event.metaKey&&preferences.sound)void audio.unlock();},{capture:true});
 $('play-again-btn').addEventListener('click',()=>{closeDialog($('result-dialog'));openSettings();});
 $('view-field-btn').addEventListener('click',()=>closeDialog($('result-dialog')));
 $('minimap').addEventListener('click',event=>{const r=$('minimap').getBoundingClientRect();field.focus(((event.clientX-r.left)/r.width*280-140)/2.65,((event.clientY-r.top)/r.height*140-70)/2.3);});
+$('battle-report-btn').addEventListener('click',()=>{setTab('scout');$('combat-summary')?.scrollIntoView({block:'nearest'});});
 document.addEventListener('keydown',event=>{
   if(document.querySelector('dialog[open]')||/INPUT|SELECT|TEXTAREA/.test(event.target.tagName)||event.ctrlKey||event.metaKey||event.altKey||event.repeat)return;
   if(event.code==='Space' && event.target.closest('button') && !['play-btn','mobile-play-btn','resume-btn'].includes(event.target.closest('button').id))return;
@@ -336,11 +418,39 @@ document.addEventListener('keydown',event=>{
   else if(['KeyQ','KeyW','KeyE'].includes(event.code)){event.preventDefault();armSpell(SPELLS[['KeyQ','KeyW','KeyE'].indexOf(event.code)].id);}
   else if(event.code==='Escape'){cancelSpell();selectedRoster=null;renderWorkspace(true);}
 });
-document.addEventListener('visibilitychange',()=>{if(document.hidden){if(game.state.status==='playing'&&!game.state.paused)game.togglePause();save();}lastTime=performance.now();updateHud();});
-window.addEventListener('pagehide',save);
+document.addEventListener('visibilitychange',()=>{if(document.hidden){if(game.state.status==='playing'&&!game.state.paused)game.togglePause();save();}audio.setActivity({paused:game.state.paused,hidden:document.hidden,ended:ended()});lastTime=performance.now();updateHud();});
+window.addEventListener('pagehide',()=>{save();audio.setActivity({hidden:true});});
+function playCombatAudio(){
+  const current=new Set();const running=game.state.status==='playing'&&!game.state.paused;
+  const detailsFor=source=>{
+    const unitId=source.unitId||source.sourceUnitId,def=UNIT_MAP[unitId];
+    return {...source,unitId,faction:def?.faction||source.faction,role:def?.role||source.role||source.sourceKind,
+      armorType:def?.armorType||source.armorType,hero:!!def?.hero||!!source.hero,
+      heavy:!!source.heavy||!!source.sourceKind||!!def?.hero||(def?.supply||0)>=4,
+      pan:Math.max(-.85,Math.min(.85,((source.x||0)-(field.center?.x||0))/(field.width*.5||48))),effectType:source.semanticKind||source.type};
+  };
+  // Play true casualties first; visual effects alone never record a unit death.
+  // Always drain while muted/paused so returning to battle cannot replay a backlog.
+  pendingAudio.push(...game.drainAudioEvents());
+  pendingAudio=pendingAudio.slice(-256);
+  pendingAudio=pendingAudio.filter(event=>{
+    if(game.state.paused||document.hidden)return false;
+    if(Number.isFinite(event.time)&&event.time>(field.time??game.state.time)+1e-8)return true;
+    audio.play(event.kind,detailsFor(event));return false;
+  });
+  for(const effect of field.renderedState?.effects || game.state.effects){
+    current.add(effect.id);
+    if(running&&!heardEffects.has(effect.id)&&effect.sound!==null){
+      const semantic=effect.semanticKind;
+      const kind=effect.phase==='impact'?({melee:'hit',arrow:'arrowHit',bolt:'magic',siege:'impact',meteor:'impact',chain:'magic'})[semantic]:effect.sound==='siege'?'siege':({slash:'hit',arrow:'arrow',explosion:'impact',meteor:'impact',lightning:'magic',magic:'magic',heal:'magic',rally:'magic'})[effect.type];
+      if(kind)audio.play(kind,detailsFor(effect));
+    }
+  }
+  heardEffects=current;
+}
 function frame(now){
   const elapsed=Math.min((now-lastTime)/1000,.15);lastTime=now;
-  if(!document.hidden){game.update(elapsed*game.state.speed);field.render(game.state,game.state.paused?0:elapsed*game.state.speed);if(game.state.effects.some(e=>['slash','arrow','explosion'].includes(e.type)))audio.play('hit');}
+  if(!document.hidden){game.update(elapsed*game.state.speed);field.render(game.state,game.state.paused?0:elapsed*game.state.speed);playCombatAudio();}
   if(now-lastHud>150){updateHud();lastHud=now;}
   if(now-lastSave>5000){if(game.state.status==='playing')save();lastSave=now;}
   requestAnimationFrame(frame);
@@ -349,4 +459,4 @@ renderSpells();setTab('army');updateAudioButton();updateHud();field.render(game.
 if(restored)notify(game.state.status==='playing'?'Your battle has been restored. Resume when you are ready.':'Your army has been restored.');
 else if(badSave)notify('The previous save could not be read. A fresh army stands ready.',true);
 // Small integration surface for automated smoke tests and embedders.
-window.castleStrike={get game(){return game;},get battlefield(){return field;},get state(){return game.state;},setTab,save};
+window.castleStrike={get game(){return game;},get battlefield(){return field;},get state(){return game.state;},get audio(){return audio;},setTab,save};

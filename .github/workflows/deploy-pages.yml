@@ -26,6 +26,7 @@ jobs:
 
       - name: Prepare site
         run: |
+          node scripts/music-manifest.mjs
           mkdir _site
           cp index.html favicon.svg 404.html LICENSE CHANGELOG.md .nojekyll _site/
           cp -r assets shared games _site/

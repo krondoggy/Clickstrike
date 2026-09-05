@@ -12,6 +12,8 @@ The home page lists every game. Clickstrike lives at [games/clickstrike](https:/
 
 Recruit complementary frontline, ranged, cavalry, magic, support, siege, and flying units; unlock stronger troops and faction heroes; invest in income, supply, weapons, and armor; and use commander spells to influence the battle. An enchanted river crossing, original animated fantasy units, painted portraits, spell effects, and a stone-and-gold interface give the rework its own classic RTS atmosphere.
 
+The economy follows Direct Strike's deliberate rhythm: 280 starting gold, 100 gold every 20 seconds, +10 per mine and +10 for holding the center. Mines have a 90-second purchase cooldown, making army strength and long-term income a real tradeoff. A local fantasy music playlist and separate master, sound-effect, and music volume controls accompany the battlefield.
+
 Run `npm start` from the repository root and open the local address it prints, then choose Castle Strike from the hall. A static server is required for its JavaScript modules; no build step is needed. See [Castle Strike's rework guide](games/castlestrike/REWORK.md) for controls, systems, and asset credits. Castle Strike saves separately from Clickstrike.
 
 ## Clickstrike
@@ -59,7 +61,9 @@ Progress autosaves in the browser (`localStorage`). Refresh resumes meta progres
 
 ## Music
 
-Background tracks: `07-human-1.mp3`, `13-arrival-at-kalimdor.mp3` (included for personal use in this project).
+Castle Strike shuffles all audio files in `assets/audio/music/`. Add or remove tracks in that folder and reload the game; `npm start` discovers the current files automatically. Supported file extensions are `.mp3`, `.ogg`, `.wav`, `.m4a`, `.aac`, `.flac`, `.opus`, and `.webm` (playback support depends on the browser).
+
+GitHub Pages regenerates the music playlist on every deployment. For another static host, run `npm run music:refresh` after changing the music folder and upload the updated `assets/audio/music/playlist.js` with the audio files. Included music is for personal use in this project.
 
 ## Site layout
 

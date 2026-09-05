@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <linearGradient id="rim" x1="12" y1="9" x2="113" y2="121" gradientUnits="userSpaceOnUse"><stop stop-color="#d1bd8c"/><stop offset=".23" stop-color="#776b53"/><stop offset=".5" stop-color="#302d26"/><stop offset=".8" stop-color="#8e7954"/><stop offset="1" stop-color="#463a2b"/></linearGradient>
+    <linearGradient id="sky" x1="43" y1="12" x2="83" y2="116" gradientUnits="userSpaceOnUse"><stop stop-color="#24273c"/><stop offset="1" stop-color="#422323"/></linearGradient>
+    <linearGradient id="fire" x1="101" y1="24" x2="40" y2="96" gradientUnits="userSpaceOnUse"><stop stop-color="#f6e898"/><stop offset=".35" stop-color="#ffd779"/><stop offset=".68" stop-color="#ed8b32"/><stop offset="1" stop-color="#a53e25"/></linearGradient>
+    <radialGradient id="glow" cx=".4" cy=".66" r=".62"><stop stop-color="#ee862d" stop-opacity=".5"/><stop offset="1" stop-color="#ee862d" stop-opacity="0"/></radialGradient>
+  </defs>
+  <path d="M5 1h118l4 4v118l-4 4H5l-4-4V5Z" fill="#100f0d"/>
+  <path d="M7 5h114l2 2v114l-2 2H7l-2-2V7Z" fill="url(#rim)"/>
+  <path d="M13 12h102v104H13Z" fill="url(#sky)" stroke="#171710" stroke-width="4"/>
+  <path d="M16 16h96v96H16Z" fill="url(#glow)"/>
+  <path d="m111 16-17 28 13-1-20 17 12 1-17 21 6 7-32 20-22-6-17-18 8-22 14-8 9-21 1 17 31-27-6 16Z" fill="#632b27"/>
+  <path d="m109 19-24 38 14-9-27 32 6 9-26 14-20-7-11-17 11-17 16-3 20-28-5 21Z" fill="url(#fire)"/>
+  <path d="m102 30-31 46-19 19-21-15 16-15 9 2 22-26-5 17Z" fill="#fff1ae"/>
+  <path d="m34 65 18-1 15 12-1 17-16 12-18-6-9-16Z" fill="#251f23" stroke="#bd5d27" stroke-width="3"/>
+  <path d="m36 67 16 1 10 10-14-1-7 10-14-5Z" fill="#71504a"/>
+  <path d="m44 85 7-7 12 3-3 10-12 10-3-6-12 1-4-8Z" fill="#3c2e30"/>
+  <path d="m35 69 7 3-3 9-10 2m22-14-2 8 11 5-2 10m-25-2 9-2 6 12" stroke="#ed953d" stroke-width="3"/>
+  <path d="m46 75 5 4-4 7-7-1 3-6Z" fill="#ffd883"/>
+  <path d="m26 103-7 7 13-2m49-13 5 6 9-5m-58-48 3-11 3 7m56-15 5-9-9 5" fill="#ed9b49"/>
+  <path d="m73 25 2-5 3 5-3 5Zm28 48 3-5 2 5-2 4ZM21 40l2-4 3 3-2 4Z" fill="#d6ae78"/>
+  <path d="M9 8h110M8 9v109" stroke="#dfcca0" stroke-width="2" opacity=".6"/>
+  <path d="m7 7 10 10m104-10-10 10M7 121l10-10m104 10-10-10" stroke="#201d18" stroke-width="2"/>
+  <path d="m7 7 7 1-6 6Zm114 0-7 1 6 6ZM7 121l1-7 6 6Zm114 0-1-7-6 6Z" fill="#b6a276"/>
+</svg>

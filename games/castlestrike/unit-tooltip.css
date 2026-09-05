@@ -1,0 +1,37 @@
+.unit-tooltip {
+  position: fixed; z-index: 40; width: 330px; max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 24px); overflow: auto; padding: 13px;
+  border: 9px solid #7b633f; border-image: url('assets/ui/command-frame.png') 220 / 18px / 0 stretch;
+  background: linear-gradient(#111810ed, #131611f2), url('assets/ui/stone-grain.svg');
+  color: #e9dcbd; box-shadow: 0 7px 25px #000c, inset 0 0 0 1px #b2915444;
+  font: 12px/1.4 Georgia, serif; text-align: left;
+  scrollbar-width: thin; scrollbar-color: #8d754c #151813;
+}
+.tooltip-heading { display: flex; gap: 11px; align-items: center; }
+.tooltip-portrait { width: 55px; height: 62px; flex: none; border: 3px ridge #a58b55; box-shadow: 0 2px 5px #0009; }
+.tooltip-allegiance { display: block; font: 8px/1.5 var(--sans); color: #93bdd4; }
+.unit-tooltip[data-team="enemy"] .tooltip-allegiance { color: #edb299; }
+.tooltip-heading h3 { font: 700 15px/1.3 var(--serif); color: #f3d599; margin: 3px 0; text-shadow: 0 2px #000; }
+.tooltip-heading p { font-size: 10px; color: #b9a884; text-transform: capitalize; }
+.tooltip-health { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 5px; margin: 12px 0; font-size: 11px; }
+.tooltip-health strong { font-variant-numeric: tabular-nums; color: #e3e9c5; }
+.tooltip-health i { display: block; width: 100%; height: 7px; background: linear-gradient(90deg, #8bb887 var(--health), #080e09 var(--health)); border: 1px solid #8c815c66; box-shadow: inset 0 1px #f9efbc22; }
+.unit-tooltip[data-team="enemy"] .tooltip-health i { background: linear-gradient(90deg, #d78464 var(--health), #160b08 var(--health)); }
+.tooltip-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 11px 8px; margin: 0; padding: 0 0 12px; border-bottom: 1px solid #b4995940; }
+.tooltip-stats dt { color: #b8a781; font: 9px var(--sans); }
+.tooltip-stats dd { margin: 2px 0; font: 700 17px Georgia, serif; color: #eeddaf; font-variant-numeric: tabular-nums; }
+.tooltip-stats small { display: block; font: 9px Georgia, serif; color: #adab91; text-transform: capitalize; }
+.tooltip-ability { color: #c8bea2; font-size: 12px; margin: 11px 0; line-height: 1.45; }
+.tooltip-ability strong { display: block; margin-bottom: 3px; color: #efd294; font-size: 13px; }
+.tooltip-counters p { margin: 5px 0; color: #c2b797; font-size: 10px; }
+.tooltip-counters b { display: inline-block; min-width: 51px; color: #aa9875; font-weight: 400; }
+.tooltip-recruit-hint { color: #dcc28f; font-size: 11px; margin: 9px 0 0; }
+.tooltip-shield { margin-top: 8px; font-size: 11px; color: #a3d5eb; }
+.tooltip-statuses { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 9px; }
+.tooltip-statuses span { font: 9px var(--sans); color: #e4c7ef; background: #483e4b55; padding: 3px 5px; border: 1px solid #c7acd244; }
+.tooltip-footer { display: flex; justify-content: space-between; gap: 8px; margin-top: 11px; padding-top: 9px; border-top: 1px solid #a08a5840; font-size: 9px; color: #ac9b7a; }
+.tooltip-footer span { white-space: nowrap; color: #887d68; }
+@media (max-width: 650px) {
+  .unit-tooltip { padding: 11px; width: 316px; }
+  .tooltip-heading h3 { font-size: 14px; }
+}

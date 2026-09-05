@@ -1,0 +1,164 @@
+[
+  {
+    "file": "sword-clash-01.wav",
+    "seconds": 0.66,
+    "sampleRate": 44100,
+    "channels": 1,
+    "peak": 0.85,
+    "source": "tinysized/sfx-cc0/sword-clash-03.wav",
+    "author": "Vehicle",
+    "license": "CC0-1.0",
+    "sourceTrimStartSeconds": 0.049569,
+    "sha256": "0ca7be1fcebef83e9df95129b2e8705cafe5a79156441c9c3f24fd379f21f797"
+  },
+  {
+    "file": "sword-clash-02.wav",
+    "seconds": 0.59,
+    "sampleRate": 44100,
+    "channels": 1,
+    "peak": 0.85,
+    "source": "tinysized/sfx-cc0/sword-clash-04.wav",
+    "author": "Vehicle",
+    "license": "CC0-1.0",
+    "sourceTrimStartSeconds": 0.038549,
+    "sha256": "9823c4ab9269d2ad3d3c546744de0fdfdd1974d28f1f70465361aeef333b3809"
+  },
+  {
+    "file": "sword-clash-03.wav",
+    "seconds": 0.65,
+    "sampleRate": 44100,
+    "channels": 1,
+    "peak": 0.85,
+    "source": "tinysized/sfx-cc0/sword-clash-05.wav",
+    "author": "Vehicle",
+    "license": "CC0-1.0",
+    "sourceTrimStartSeconds": 0.022426,
+    "sha256": "01e214dd1b117d7edd52795f5203818b2bcd0d1eb69430dcffb7a36c273fb400"
+  },
+  {
+    "file": "sword-swing-01.wav",
+    "seconds": 0.326757,
+    "sampleRate": 44100,
+    "channels": 1,
+    "peak": 0.85,
+    "source": "battle/battle_sound_effects/swish_2.wav",
+    "author": "artisticdude",
+    "license": "CC0-1.0",
+    "sourceTrimStartSeconds": 0.044059,
+    "sha256": "6e616e1e34b6d1372846684ad9997694682c6e866b49198509f8b947e141fa7b"
+  },
+  {
+    "file": "sword-swing-02.wav",
+    "seconds": 0.320476,
+    "sampleRate": 44100,
+    "channels": 1,
+    "peak": 0.85,
+    "source": "battle/battle_sound_effects/swish_4.wav",
+    "author": "artisticdude",
+    "license": "CC0-1.0",
+    "sourceTrimStartSeconds": 0.054512,
+    "sha256": "497edc930c42dfa83fa0d139d7b5f1957ac1e64205ca1b80a5eba743b305e197"
+  },
+  {
+    "file": "bow-release-01.wav",
+    "seconds": 0.448662,
+    "sampleRate": 44100,
+    "channels": 1,
+    "peak": 0.85,
+    "source": "battle/battle_sound_effects/Bow.wav",
+    "author": "artisticdude",
+    "license": "CC0-1.0",
+    "sourceTrimStartSeconds": 0.099909,
+    "sha256": "efe87cfa3eda31af3846b1578170aed96b6fd7a431e1226f249bf44202d5ccef"
+  },
+  {
+    "file": "flesh-hit-01.wav",
+    "seconds": 0.349977,
+    "sampleRate": 44100,
+    "channels": 1,
+    "peak": 0.85,
+    "source": "tinysized/sfx-cc0/apple-cut-01.wav",
+    "author": "Vehicle",
+    "license": "CC0-1.0",
+    "sourceTrimStartSeconds": 0.013696,
+    "sha256": "7f9327d6f0f2e5167603385c2b7b6d2072e989d8d29e18cfd2774683854b5e0d"
+  },
+  {
+    "file": "flesh-hit-02.wav",
+    "seconds": 0.3,
+    "sampleRate": 44100,
+    "channels": 1,
+    "peak": 0.85,
+    "source": "tinysized/sfx-cc0/apple-cut-02.wav",
+    "author": "Vehicle",
+    "license": "CC0-1.0",
+    "sourceTrimStartSeconds": 0.207664,
+    "sha256": "a4940769ece34da381046fac1f60f861bfa8ac79c0742e5f9b7c167c79deccfc"
+  },
+  {
+    "file": "heavy-clash-01.wav",
+    "seconds": 0.77,
+    "sampleRate": 44100,
+    "channels": 1,
+    "peak": 0.85,
+    "source": "tinysized/sfx-cc0/metal-hammer-hit-01.wav",
+    "author": "Vehicle",
+    "license": "CC0-1.0",
+    "sourceTrimStartSeconds": 0.016599,
+    "sha256": "42dae2c50c4079f0156c4c0642d3f1b06aba2eac90ce6229c50499f2da3567c2"
+  },
+  {
+    "file": "heavy-clash-02.wav",
+    "seconds": 0.79,
+    "sampleRate": 44100,
+    "channels": 1,
+    "peak": 0.85,
+    "source": "tinysized/sfx-cc0/metal-hammer-hit-02.wav",
+    "author": "Vehicle",
+    "license": "CC0-1.0",
+    "sourceTrimStartSeconds": 0.013492,
+    "sha256": "c3411a3a20f9eaf23fed643a5f9a1378d6323d364868401fe802bcfb82dbdd3c"
+  },
+  {
+    "file": "body-fall-01.wav",
+    "seconds": 0.468957,
+    "sampleRate": 44100,
+    "channels": 1,
+    "peak": 0.85,
+    "source": "tinysized/sfx-cc0/boots-leather-jump-01.wav",
+    "author": "Vehicle",
+    "license": "CC0-1.0",
+    "sourceTrimStartSeconds": 0.026893,
+    "sha256": "36a96ddc6a6698d2d7c7acfc17eac0217d7cb9ecb2dfe02019de81ced55c73c1"
+  },
+  {
+    "file": "arrow-hit-01.wav",
+    "seconds": 0.46,
+    "sampleRate": 44100,
+    "channels": 1,
+    "peak": 0.85,
+    "source": [
+      "wood-bowl-spoon-02.wav",
+      "wood-twigs-break-01.wav"
+    ],
+    "author": "Vehicle",
+    "license": "CC0-1.0",
+    "sourceTrimStartSeconds": 0,
+    "sha256": "87aac13cf6633a0ef51c928198b800ba81dc329c658b4a73823a460b471d5978"
+  },
+  {
+    "file": "arrow-hit-02.wav",
+    "seconds": 0.46,
+    "sampleRate": 44100,
+    "channels": 1,
+    "peak": 0.85,
+    "source": [
+      "wood-bowl-spoon-04.wav",
+      "wood-twigs-break-02.wav"
+    ],
+    "author": "Vehicle",
+    "license": "CC0-1.0",
+    "sourceTrimStartSeconds": 0,
+    "sha256": "e138ec2d9c5276090a8a519954200a63b0cf41cf62d08f7e638b6b0829a210ec"
+  }
+]

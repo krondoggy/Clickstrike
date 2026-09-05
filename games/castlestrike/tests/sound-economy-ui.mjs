@@ -1,0 +1,72 @@
+import assert from 'node:assert/strict';
+import { pathToFileURL } from 'node:url';
+import { mkdir } from 'node:fs/promises';
+const { chromium } = await import(process.env.PLAYWRIGHT_MODULE ? pathToFileURL(process.env.PLAYWRIGHT_MODULE).href : 'playwright');
+const browser = await chromium.launch({ headless: true, ...(process.env.BROWSER_EXECUTABLE ? { executablePath: process.env.BROWSER_EXECUTABLE } : { channel: 'chrome' }), args: ['--enable-webgl', '--ignore-gpu-blocklist', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const base = process.env.BASE_URL || 'http://127.0.0.1:4173';
+const errors = [];
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+page.on('pageerror', e => errors.push(e.message));
+page.on('response', r => { if (r.url().startsWith(base) && r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
+await mkdir('test-results', { recursive: true });
+try {
+  await page.goto(`${base}/games/castlestrike/`);
+  await page.waitForFunction(() => !!window.castleStrike);
+  assert.match(await page.locator('#income').textContent(), /100.*20s/);
+  assert.equal(await page.evaluate(() => castleStrike.audio.musicElement?.paused ?? true), true, 'No autoplay before user input');
+  await page.locator('#audio-btn').click();
+  await page.locator('#audio-dialog').waitFor({ state: 'visible' });
+  await page.waitForFunction(() => castleStrike.audio.musicElement && !castleStrike.audio.musicElement.paused && castleStrike.audio.musicElement.currentTime > .05);
+  assert.equal(await page.evaluate(() => castleStrike.audio.context.state), 'running');
+  assert.match(await page.locator('#music-now-playing').textContent(), /Now playing/);
+  for (const [id, value, key] of [['master-volume', 75, 'masterVolume'], ['effects-volume', 90, 'effectsVolume'], ['music-volume', 30, 'musicVolume']]) {
+    await page.locator('#'+id).evaluate((input, value) => { input.value=String(value); input.dispatchEvent(new Event('input', { bubbles: true })); }, value);
+    assert.equal(await page.evaluate(key => castleStrike.audio.settings[key], key), value/100);
+    assert.equal(await page.locator('#'+id+'-value').textContent(), value+'%');
+  }
+  await page.locator('#music-enabled').uncheck();
+  await page.waitForFunction(() => castleStrike.audio.musicElement.paused);
+  await page.locator('#music-enabled').check();
+  await page.waitForFunction(() => !castleStrike.audio.musicElement.paused);
+  await page.locator('#audio-preview-btn').click();
+  await page.screenshot({ path: 'test-results/castle-strike-audio-settings.png', fullPage: true });
+  await page.locator('#audio-dialog [data-close]').first().click();
+  await page.getByRole('tab', { name: 'Research' }).click();
+  await page.locator('[data-research="mines"]').click();
+  assert.equal(await page.locator('[data-research="mines"]').isDisabled(), true);
+  assert.match(await page.locator('[data-research="mines"]').textContent(), /90s/);
+  assert.match(await page.locator('#income').textContent(), /110.*20s/);
+  // Freeze rendering's RAF in a synchronous evaluation while crossing the exact payday.
+  const ledger = await page.evaluate(() => {
+    const g = castleStrike.game;
+    const opening = g.state.gold;
+    g.start(); g.update(19.9);
+    const before = g.state.gold;
+    g.update(.1);
+    const after = g.state.gold;
+    g.togglePause(); castleStrike.save();
+    return { opening, before, after, timer: g.state.nextIncome, cooldown: g.state.mineCooldown };
+  });
+  assert.equal(ledger.before, ledger.opening, 'No continuous income between payouts');
+  assert.equal(ledger.after-ledger.before, 110, 'First payout includes exactly one mine');
+  assert.ok(Math.abs(ledger.timer-20)<1e-6);
+  assert.ok(Math.abs(ledger.cooldown-70)<1e-6);
+  await page.waitForFunction(() => document.getElementById('income-countdown').textContent.includes('paused'));
+  await page.reload();
+  await page.waitForFunction(() => !!window.castleStrike);
+  assert.equal(await page.evaluate(() => castleStrike.state.gold), ledger.after, 'Reload does not grant another payout');
+  assert.equal(await page.evaluate(() => castleStrike.audio.settings.masterVolume), .75);
+  assert.equal(await page.evaluate(() => castleStrike.audio.settings.effectsVolume), .9);
+  assert.equal(await page.evaluate(() => castleStrike.audio.settings.musicVolume), .3);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('#audio-btn').click();
+  await page.locator('#audio-dialog').waitFor({ state: 'visible' });
+  await page.waitForFunction(() => !castleStrike.audio.musicElement.paused);
+  await page.locator('#sound-enabled').uncheck();
+  await page.waitForFunction(() => castleStrike.audio.musicElement.paused);
+  assert.equal(await page.evaluate(() => castleStrike.audio.settings.sound), false);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await page.screenshot({ path: 'test-results/castle-strike-audio-mobile.png', fullPage: true });
+  assert.deepEqual(errors, []);
+  console.log('PASS: exact income payouts/countdowns/cooldowns, preserved saves, gesture-started music, live mixer, independent music toggle, master mute, saved volumes, and mobile audio controls.');
+} finally { await browser.close(); }

@@ -71,9 +71,11 @@ try {
     const completed = await page.evaluate(async () => {
       const { UNITS } = await import('/games/castlestrike/src/data.js');
       const g = castleStrike.game, s = g.state;
-      let plan = null;
+      let plan = null, spentPlayer = 0;
       const command = () => {
-        if (s.mineLevel < Math.min(4, Math.floor(s.time / 85) + 1) && s.supply >= 9) { g.research('mines'); return; }
+        // Build a stable army before one long-term mine investment. An unavailable
+        // mine must never block the reinforcement this 20-second payday can afford.
+        if (s.mineLevel < 1 && s.time >= 90 && s.supply >= 13 && s.mineCooldown === 0 && s.gold >= g.getResearchCost('mines') && s.control > -0.35) { g.research('mines'); return; }
         if (s.tier < 3 && s.time > (s.tier === 1 ? 75 : 225) && s.supply >= (s.tier === 1 ? 13 : 25)) { g.research('tier'); return; }
         if (s.supply >= s.supplyCap - 3 && s.research.barracks < 4) { g.research('barracks'); return; }
         if (s.supply >= 22 && s.time > 180) {
@@ -94,12 +96,19 @@ try {
         plan = options[0];
         if (plan && g.recruit(plan.id).ok) plan = null;
       };
-      for (let i = 0; i < 300 && s.status === 'playing'; i++) { command(); g.update(3); }
-      return { status: s.status, time: s.time, kills: s.stats.kills, losses: s.stats.losses, peakUnits: s.stats.peakUnits, spentEnemy: s.enemy.spent, enemyGold: s.enemy.gold, earnedEnemy: s.enemy.goldEarned };
+      for (let i = 0; i < 300 && s.status === 'playing'; i++) {
+        const beforeCommand = s.gold;
+        command();
+        spentPlayer += beforeCommand - s.gold;
+        g.update(3);
+      }
+      return { status: s.status, time: s.time, kills: s.stats.kills, losses: s.stats.losses, peakUnits: s.stats.peakUnits, playerGold: s.gold, earnedPlayer: s.stats.goldEarned, spentPlayer, spentEnemy: s.enemy.spent, enemyGold: s.enemy.gold, earnedEnemy: s.enemy.goldEarned };
     });
     assert.equal(completed.status, 'victory', JSON.stringify(completed));
     assert.ok(completed.kills > 20 && completed.losses > 10, 'This was a played battle, not an artificial terminal state');
     assert.ok(completed.peakUnits <= 180);
+    assert.ok(completed.playerGold >= 0 && completed.spentPlayer > 0);
+    assert.ok(Math.abs(completed.playerGold + completed.spentPlayer - completed.earnedPlayer - 280) < 0.01, 'Every player command was paid for from starting gold and visible income');
     assert.ok(Math.abs(completed.enemyGold + completed.spentEnemy - completed.earnedEnemy - 280) < 0.01);
     await page.locator('#result-dialog[open]').waitFor();
     assert.equal(await page.locator('#result-title').textContent(), 'Victory');
@@ -135,7 +144,7 @@ try {
     assert.match(await page.locator('#toast').textContent(), /previous save could not be read/i);
     await page.locator('[data-recruit="footman"]').click();
     const replacement = await page.evaluate(key => JSON.parse(localStorage.getItem(key)), SAVE_KEY);
-    assert.equal(replacement.version, 2); assert.equal(replacement.roster.length, 4);
+    assert.equal(replacement.version, 3); assert.equal(replacement.roster.length, 4);
     assert.equal(replacement.status, 'preparation');
   }, () => { localStorage.setItem('castlestrike-v2-save', '{not valid JSON'); });
 

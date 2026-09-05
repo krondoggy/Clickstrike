@@ -1,4 +1,41 @@
 export const WAVE_INTERVAL = 25;
+// Warcraft III Direct Strike's economy: discrete shared paydays, modest mine income.
+export const INCOME_INTERVAL = 20;
+export const BASE_INCOME = 100;
+export const MINE_INCOME = 10;
+export const SHRINE_INCOME = 10;
+export const MINE_COOLDOWN = 90;
+
+// Shared simulation and inspection values. Units retain their own attack interval.
+export const ABILITY_RULES = Object.freeze(Object.fromEntries(Object.entries({
+  controlRecovery: { duration: 2 },
+  shieldwall: { rangedReduction: 0.22 },
+  skyhunter: { airDamageMultiplier: 1.35 },
+  brace: { cavalryDamageMultiplier: 1.55, cancelsCharge: true, braceHold: 0.5, braceFacingDot: 0.5, interceptRadius: 4 },
+  charge: { minDistance: 4, damageMultiplier: 1.9, stunDuration: 1 },
+  renewal: { cooldown: 4, radius: 11, heal: 65 },
+  chain: { every: 3, radius: 5, targets: 2, damageRatio: 0.55, heavyDamageMultiplier: 1.7, canHitAir: true },
+  splash: { radius: 3.5, damageRatio: 0.55, canHitAir: false },
+  thunder: { radius: 3, damageRatio: 0.4, canHitAir: true },
+  beacon: { cooldown: 7, radius: 6, auraRadius: 7, armor: 2, heal: 55 },
+  fury: { threshold: 0.5, damageMultiplier: 1.35 },
+  venom: { damage: 5, duration: 5, canHitAir: true },
+  net: { cooldown: 5, duration: 2, canHitAir: true },
+  bloodlust: { cooldown: 8, radius: 10, duration: 7, amount: 0.3, targets: 4, armorBreak: 3, armorBreakDuration: 5 },
+  cleave: { radius: 3, damageRatio: 0.45, canHitAir: false },
+  pitch: { radius: 3, damageRatio: 0.45, damage: 6, duration: 5, canHitAir: false },
+  stomp: { cooldown: 6, radius: 4, damage: 55, duration: 1, canHitAir: false },
+  sting: { damage: 9, duration: 6, canHitAir: true },
+  bladestorm: { every: 3, radius: 3, damageMultiplier: 1.8, damageRatio: 0.45, canHitAir: false },
+  ravenous: { healFraction: 0.24 },
+  unbroken: { reviveFraction: 0.35, reviveStun: 0.6, cancelsCharge: true, braceHold: 0.5, braceFacingDot: 0.5, interceptRadius: 4 },
+  web: { duration: 3, amount: 0.6, airDamageMultiplier: 1.3, canHitAir: true },
+  raise: { cooldown: 12, radius: 14, summons: 2, limit: 4, lifespan: 22, healthFraction: 0.48 },
+  curse: { duration: 6, damageReduction: 0.22 },
+  plague: { radius: 3.5, damage: 8, canHitAir: false },
+  frost: { radius: 3, damageRatio: 0.4, duration: 3, amount: 0.35, canHitAir: true },
+  embrace: { cooldown: 6, radius: 5.5, triggerRange: 7, damage: 35, heal: 40, canHitAir: false },
+}).map(([key, rule]) => [key, Object.freeze(rule)])));
 
 export const FACTIONS = [
   { id: 'alliance', name: 'Dawn Alliance', title: 'Order. Steel. Radiance.', description: 'Disciplined shield lines, precision archers and spellcasters. Keep your healers behind a durable vanguard, then break the gates with siege engines.', color: '#67aaff', perk: 'Sanctuary · healing received +15%', heroId: 'paladin' },
@@ -41,10 +78,100 @@ export const UNITS = [
   unit('deathknight', 'undead', 'Morvath, the Hollow King', 'hero', 2, 470, 6, 1025, 61, 7, 2.2, 2.7, 1.4, 'deathknight', 8, { hero: true, armorType: 'heavy', ability: 'Death’s Embrace', abilityId: 'embrace', abilityDescription: 'Every 6 seconds, heals nearby allies for 40 and strikes nearby enemies for 35 magic damage. Gains strength every 5 waves.', description: 'An immortal king leading his cursed host toward one final conquest.', strongVs: ['Attrition', 'Grouped melee'], weakVs: ['Ranged focus fire', 'Magic damage'] }),
 ];
 
+const tacticalProfiles = {
+  footman: ['Screens nearby ranged allies and holds the closest ground threat.', [['ranged', 'Shieldwall reduces incoming ranged hits.'], ['lightArmor', 'Durable shields survive fragile skirmishers.']]],
+  archer: ['Keeps distance behind the frontline and prioritizes exposed flyers.', [['air', 'Skyhunter adds damage against flying units.'], ['lightArmor', 'Piercing arrows punish light armor.']]],
+  spearman: ['Intercepts charging cavalry near the frontline and protects nearby allies.', [['cavalry', 'A stationary, facing brace cancels charge bonuses; pikes deal bonus damage to riders.'], ['air', 'Long pikes can strike flyers that enter melee reach.']]],
+  knight: ['Looks for an open flank and charges exposed ranged or support units.', [['ranged', 'A moving charge closes the gap to vulnerable archers.'], ['support', 'Flanks unprotected healers and casters.']]],
+  priest: ['Follows behind the frontline and heals the most wounded reachable ally.', [['attrition', 'Repeated healing keeps a protected frontline alive.'], ['singleTarget', 'Sustained healing helps valuable allies survive focused attacks.']]],
+  mage: ['Casts from behind allied screens, favoring armored elites and packed targets.', [['armorHeavy', 'Arcane bolts deal 70% extra damage against heavy armor; protect the caster from a rush.'], ['swarm', 'Chain lightning hits additional enemies in a close group.']]],
+  ballista: ['Stays behind allied troops and favors structures or dense ground groups.', [['structures', 'Siege damage has a large bonus against fortified defenses.'], ['swarm', 'A wide impact damages clustered ground troops.']]],
+  gryphon: ['Flies around the ground screen and attacks armored clusters.', [['armorHeavy', 'Magic attacks damage heavy armor effectively.'], ['swarm', 'Thunderclap splashes through nearby enemies.']]],
+  paladin: ['Anchors the frontline near wounded allies so his armor aura and healing can protect them.', [['physical', 'An armor aura reduces nearby allies’ physical damage taken.'], ['attrition', 'Repeated area healing supports long fights.']]],
+  grunt: ['Holds the frontline and presses the closest ground opponent.', [['lightArmor', 'Heavy armor and Blood Fury punish fragile ground troops.'], ['physical', 'A durable body trades efficiently in a close fight.']]],
+  headhunter: ['Keeps a screen between himself and melee threats, favoring flyers and light armor.', [['air', 'Thrown spears and poison can reach flying units.'], ['lightArmor', 'Piercing damage and poison punish fragile troops.']]],
+  raider: ['Flanks exposed enemies and roots reachable flyers or vulnerable backline units.', [['air', 'Ensnare stops a flyer from moving while the raider closes.'], ['support', 'Fast movement and roots catch exposed support units.'], ['siege', 'A flank reaches slow, unprotected siege engines.']]],
+  shaman: ['Stays behind allies, empowers strong attackers and marks heavy armor for the warband.', [['armorHeavy', 'Attacks weaken heavy armor by 3 for 5 seconds.'], ['physical', 'Bloodlust increases nearby warriors’ attack speed.']]],
+  ironmaw: ['Screens allies and seeks clustered ground enemies for cleaving swings.', [['swarm', 'Cleave spreads damage across adjacent ground troops.'], ['singleTarget', 'A strong frontline punishes armies that cannot clear groups.']]],
+  demolisher: ['Bombards structures or compact ground formations from behind the frontline.', [['structures', 'Siege attacks break fortified defenses.'], ['swarm', 'Burning pitch splashes through grouped ground troops.']]],
+  tauren: ['Holds a contested frontline and stomps packed ground attackers.', [['swarm', 'War Stomp damages and briefly stuns nearby ground enemies.'], ['cavalry', 'A large body and ground stun interrupt exposed riders.']]],
+  wyvern: ['Flies around the melee and hunts light armor or exposed siege.', [['lightArmor', 'Piercing attacks and venom punish light armor.'], ['siege', 'Flying avoids siege retaliation.']]],
+  blademaster: ['Seeks an open route to vulnerable enemies and cleaves every third strike.', [['support', 'Fast movement reaches unprotected support units.'], ['swarm', 'Every third strike cleaves nearby ground enemies.']]],
+  ghoul: ['Seeks an open flank toward exposed ranged or support units.', [['ranged', 'Fast movement and lifesteal reward access to exposed archers.'], ['support', 'Punishes support units left outside a protective screen.']]],
+  skeleton: ['Screens allies, braces against charges and reassembles once when destroyed.', [['cavalry', 'A stationary sentinel facing a charge cancels its bonus damage and stun.'], ['physical', 'Armor and reassembly absorb repeated physical attacks.']]],
+  cryptfiend: ['Stays behind the screen and prioritizes flyers with its slowing web.', [['air', 'Graveweb slows flyers and adds anti-air damage.'], ['lightArmor', 'Piercing attacks punish lightly armored targets.']]],
+  necromancer: ['Stays behind the screen and raises disposable troops near an active battle.', [['singleTarget', 'Summons occupy opponents that can attack only one body at a time.'], ['attrition', 'Repeated summons replace an expendable frontline.']]],
+  banshee: ['Keeps behind allied screens and curses powerful armored attackers or heroes.', [['armorHeavy', 'Magic damage is effective against heavy armor.'], ['hero', 'Withering Curse reduces a powerful target’s attack damage.']]],
+  abomination: ['Anchors a ground engagement and keeps packed enemies inside its plague cloud.', [['swarm', 'Carrion Cloud damages every nearby ground enemy.'], ['physical', 'A large armored body absorbs sustained frontline pressure.']]],
+  graveengine: ['Bombards defenses or grouped ground enemies while staying behind its screen.', [['structures', 'Siege attacks damage fortified defenses effectively.'], ['swarm', 'Soulburst splashes across dense ground formations.']]],
+  frostwyrm: ['Flies over the screen and slows armored clusters from range.', [['armorHeavy', 'Magic breath is effective against heavy armor.'], ['swarm', 'Winter’s Breath damages and slows neighboring enemies.']]],
+  deathknight: ['Stays near the frontline so nearby allies receive healing while ground enemies take damage.', [['attrition', 'Death’s Embrace sustains nearby allies.'], ['swarm', 'Death’s Embrace also strikes nearby ground enemies.']]],
+};
+for (const u of UNITS) {
+  const [tactics, counters] = tacticalProfiles[u.id];
+  u.tactics = tactics;
+  u.counters = counters.map(([threat, reason]) => Object.freeze({ threat, reason }));
+  // Machine-readable automatic policy, distinct from explanatory tactics copy.
+  u.targeting = Object.freeze({
+    flanker: u.role === 'cavalry' || ['ghoul', 'blademaster'].includes(u.id),
+    antiArmor: ['mage', 'banshee', 'shaman'].includes(u.id),
+    antiAir: u.role === 'ranged',
+    healer: u.id === 'priest',
+    heroHunter: u.id === 'banshee',
+    clusterHunter: u.role === 'siege',
+    structureHunter: u.role === 'siege',
+  });
+}
+const abilityCopy = {
+  mage: 'Bolts deal 70% extra damage against heavy armor. Every third attack jumps to two nearby enemies for 55% damage. Requires a protective frontline.',
+  spearman: 'Deals 55% more damage to cavalry. Standing still for 0.5 seconds and facing a charge cancels its bonus damage and stun. Can strike flyers within pike reach.',
+  knight: 'After moving at least 4 meters into a charge, the strike deals 90% bonus damage and stuns for 1 second. Braced defenders reduce the charge.',
+  gryphon: 'Attacks splash for 40% damage within 3 meters, including flying targets.',
+  raider: 'Every 5 seconds, roots the target for 2 seconds. Rooted units can still attack. Can strike flyers within reach.',
+  shaman: 'Every 8 seconds, grants 30% attack speed to up to 4 nearby allies for 7 seconds. Attacks reduce heavy armor by 3 for 5 seconds; armor breaks do not stack.',
+  ironmaw: 'Melee attacks deal 45% splash damage to ground enemies within 3 meters of the target.',
+  tauren: 'Every 6 seconds in melee, deals 55 magic damage and stuns ground enemies within 4 meters for 1 second.',
+  blademaster: 'Every third strike deals 180% damage and cleaves nearby ground enemies. Gains strength every 5 waves.',
+  skeleton: 'Reassembles once with 35% health when slain. Standing still for 0.5 seconds and facing a charge cancels its bonus damage and stun. Summoned skeletons cannot reassemble.',
+  deathknight: 'Every 6 seconds, heals nearby allies for 40 and strikes nearby ground enemies for 35 magic damage. Gains strength every 5 waves.',
+};
+for (const u of UNITS) if (abilityCopy[u.id]) u.abilityDescription = abilityCopy[u.id];
+
 export const UNIT_MAP = Object.freeze(Object.assign(Object.create(null), Object.fromEntries(UNITS.map(u => [u.id, u]))));
 
+// A counter score counts declared matchup strengths; it is not a win probability.
+// Keep inspection, scouting and opponent recruitment on the same threat vocabulary.
+export function threatMatches(target, threat) {
+  const u = typeof target === 'string' ? UNIT_MAP[target] : target;
+  if (!u) return false;
+  switch (threat) {
+    case 'armorHeavy': return u.armorType === 'heavy';
+    case 'air': return u.role === 'flying';
+    case 'cavalry': return u.role === 'cavalry';
+    case 'swarm': return !u.kind && (u.supply <= 2 || u.abilityId === 'raise');
+    case 'siege': return u.role === 'siege';
+    case 'structures': return ['castle', 'tower'].includes(u.kind);
+    case 'sustain': return ['renewal', 'beacon', 'embrace', 'ravenous', 'raise'].includes(u.abilityId);
+    case 'support': return ['support', 'magic'].includes(u.role);
+    case 'hero': return u.hero === true;
+    case 'ranged': return u.role === 'ranged';
+    case 'lightArmor': return u.armorType === 'light';
+    case 'physical': return ['normal', 'piercing'].includes(u.attackType);
+    case 'attrition': return !u.kind && ['frontline', 'support', 'hero'].includes(u.role);
+    case 'singleTarget': return !u.kind && !['splash', 'pitch', 'thunder', 'cleave', 'frost', 'chain', 'plague', 'stomp', 'bladestorm', 'embrace'].includes(u.abilityId);
+    default: return false;
+  }
+}
+
+export function counterScore(candidate, target) {
+  const u = typeof candidate === 'string' ? UNIT_MAP[candidate] : candidate;
+  const t = typeof target === 'string' ? UNIT_MAP[target] : target;
+  if (!u || !t || (t.role === 'flying' && !u.canHitAir)) return 0;
+  return u.counters.reduce((score, counter) => score + (threatMatches(t, counter.threat) ? 1 : 0), 0);
+}
+
 export const RESEARCH = [
-  { id: 'mines', name: 'Gold Mine', description: '+2.2 gold per second, permanently. Early investment pays for a larger army.', maxLevel: 4, baseCost: 145 },
+  { id: 'mines', name: 'Gold Mine', description: '+10 gold each 20-second payday. 90 seconds between mines; up to 4. A long-term investment that delays your next troops.', maxLevel: 4, baseCost: 145 },
   { id: 'tier', name: 'Citadel Age', description: 'Unlock the next tier of units. Age II unlocks your faction hero.', maxLevel: 2, baseCost: 260 },
   { id: 'weapons', name: 'Forged Weapons', description: '+12% attack damage for all future reinforcements.', maxLevel: 3, baseCost: 180 },
   { id: 'armor', name: 'Runic Armor', description: '+2 armor and +8% health for all future reinforcements.', maxLevel: 3, baseCost: 170 },
@@ -52,7 +179,7 @@ export const RESEARCH = [
 ];
 
 export const SPELLS = [
-  { id: 'meteor', name: 'Starfall', description: 'Deal 145 magic damage to enemies in a 6-meter area. Deals reduced damage to structures.', cost: 65, cooldown: 45, radius: 6, color: '#ffac62' },
+  { id: 'meteor', name: 'Starfall', description: 'After a 1.4-second warning, strike a 6-meter area for 145 magic damage to enemy units and 75 magic damage to structures.', cost: 65, cooldown: 45, radius: 6, color: '#ffac62' },
   { id: 'rally', name: 'War Cry', description: 'Allies within 9 meters gain 35% attack speed and a 70-point shield for 10 seconds.', cost: 45, cooldown: 38, radius: 9, color: '#e5bd62' },
   { id: 'mend', name: 'Restoration', description: 'Restore 150 health to allied units in an 8-meter area.', cost: 50, cooldown: 42, radius: 8, color: '#77e6aa' },
 ];

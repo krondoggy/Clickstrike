@@ -6,8 +6,16 @@
   "description": "Castle Strike and Clickstrike — browser strategy games",
   "scripts": {
     "start": "node scripts/serve.mjs",
+    "music:refresh": "node scripts/music-manifest.mjs",
     "test": "node --test games/castlestrike/tests/*.test.mjs",
     "test:browser": "node games/castlestrike/tests/browser-smoke.mjs",
-    "test:edge": "node games/castlestrike/tests/edge-cases.mjs"
+    "test:tooltips": "node games/castlestrike/tests/tooltip-browser.mjs",
+    "test:edge": "node games/castlestrike/tests/edge-cases.mjs",
+    "test:motion": "node games/castlestrike/tests/animation-browser.mjs",
+    "test:combat": "node games/castlestrike/tests/combat-browser.mjs",
+    "test:balance": "node games/castlestrike/tests/balance-report.mjs",
+    "test:performance": "node games/castlestrike/tests/performance-browser.mjs",
+    "test:audio": "node games/castlestrike/tests/audio-browser.mjs",
+    "test:pacing": "node games/castlestrike/tests/sound-economy-ui.mjs"
   }
 }

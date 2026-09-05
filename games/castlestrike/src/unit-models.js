@@ -1,4 +1,5 @@
 import * as THREE from '../vendor/three.module.js';
+import { attackPose, ease, lerp } from './render-motion.js';
 
 // Every model is original, made from shared low-poly geometry. Vertex colours let
 // an entire articulated body part render in a single draw call.
@@ -112,14 +113,17 @@ function buildTemplate(model, team) {
   let height = 2.8, scale = 1.12;
   const bulky = ['tauren', 'abomination'].includes(model);
   const robe = ['priest', 'mage', 'shaman', 'necromancer', 'banshee'].includes(model);
-  const archer = ['archer', 'headhunter', 'skeleton'].includes(model);
+  const archer = ['archer', 'headhunter'].includes(model);
 
   if (model === 'catapult') {
     part(body, 'box', leather, 0, .68, 0, 1.8, .35, 2.2);
     part(body, 'box', darkIron, 0, 1.1, -.2, 1.2, .38, .8);
     for (const x of [-.95, .95]) for (const z of [-.75, .75]) {
-      part(body, 'cylinder', '#372e27', x, .55, z, .88, .25, .88, 0, 0, Math.PI / 2);
-      part(body, 'cylinder', trim, x * 1.14, .55, z, .24, .03, .24, 0, 0, Math.PI / 2);
+      const wheel = [];
+      part(wheel, 'cylinder', '#372e27', 0, 0, 0, .88, .25, .88, 0, 0, Math.PI / 2);
+      part(wheel, 'cylinder', trim, Math.sign(x) * .13, 0, 0, .24, .03, .24, 0, 0, Math.PI / 2);
+      for (let i = 0; i < 3; i++) part(wheel, 'box', '#947444', Math.sign(x) * .14, 0, 0, .035, .7, .055, i * Math.PI / 3);
+      addChunk(`wheel${x < 0 ? 'L' : 'R'}${z < 0 ? 'B' : 'F'}`, wheel, [x, .55, z]);
     }
     part(body, 'box', cloth, 0, 1.33, -.4, .85, .06, .7);
     part(rightArm, 'box', '#8c6440', 0, .25, .3, .22, .24, 2.8, -.47);
@@ -218,7 +222,7 @@ function buildTemplate(model, team) {
     part(leg, 'box', leather, 0, -.64, .12, .37, .32, .55);
   }
   if (robe) part(body, 'taper', torsoColor, 0, .61, -.015, 1.08, .97, .78);
-  if (['footman', 'knight', 'deathknight', 'paladin'].includes(model)) {
+  if (['footman', 'knight', 'deathknight', 'paladin', 'skeleton'].includes(model)) {
     part(leftArm, 'box', trim, -.14, -.53, .37, .72, .99, .15);
     part(leftArm, 'box', cloth, -.14, -.53, .465, .58, .82, .06);
     part(leftArm, 'box', trim, -.14, -.53, .51, .09, .58, .025);
@@ -279,13 +283,12 @@ function buildTemplate(model, team) {
     part(horse, 'cone', '#333934', 0, .95, -1.25, .33, 1.03, .33, -.75);
     for (const side of [-1, 1]) part(horse, 'cone', horseColor, side * .18, 2.28, 1.09, .18, .37, .17);
     addChunk('horse', horse, [0, 0, 0]);
-    const horseL = [], horseR = [];
     for (const z of [-.77, .62]) for (const side of [-1, 1]) {
-      const hp = side < 0 ? horseL : horseR;
-      part(hp, 'box', horseColor, side * .32, -.33, z, .2, .72, .24);
-      part(hp, 'box', '#3b3531', side * .32, -.7, z + .05, .24, .2, .32);
+      const hoof = [];
+      part(hoof, 'box', horseColor, 0, -.33, 0, .2, .72, .24);
+      part(hoof, 'box', '#3b3531', 0, -.7, .05, .24, .2, .32);
+      addChunk(`hoof${side < 0 ? 'L' : 'R'}${z < 0 ? 'B' : 'F'}`, hoof, [side * .32, .84, z]);
     }
-    addChunk('hoofL', horseL, [0, .84, 0]); addChunk('hoofR', horseR, [0, .84, 0]);
     height = 3.65;
   }
   addChunk('body', body, [0, bodyOffset, 0]);
@@ -305,6 +308,7 @@ export function createUnitModel(model, team = 'player') {
   for (const chunk of template.chunks) {
     const mesh = new THREE.Mesh(chunk.geometry, armyMaterial);
     mesh.position.fromArray(chunk.offset);
+    mesh.userData.restPosition = mesh.position.clone();
     mesh.castShadow = true; mesh.receiveShadow = true;
     if (chunk.wing) {
       mesh.scale.x = chunk.wing;
@@ -318,23 +322,59 @@ export function createUnitModel(model, team = 'player') {
 }
 
 export function animateUnit(root, unit, time) {
-  const { limbs: l, phase, type, baseScale } = root.userData;
-  const walk = unit.action === 'walk';
-  const stride = Math.sin(time * 9 + phase) * (walk ? .62 : .018);
-  const attack = Math.max(0, unit.attackFlash || 0);
-  if (l.legL) l.legL.rotation.x = stride;
-  if (l.legR) l.legR.rotation.x = -stride;
-  if (l.armL) l.armL.rotation.x = stride * -.35 - (attack ? attack * .62 : .07);
-  if (l.armR) { l.armR.rotation.x = -stride * -.4 - attack * 1.9; l.armR.rotation.z = -attack * .22; }
-  if (l.hoofL) l.hoofL.rotation.x = stride * .45;
-  if (l.hoofR) l.hoofR.rotation.x = -stride * .45;
-  if (l.weapon) l.weapon.rotation.x = -attack * .8;
+  const data = root.userData, { limbs: l, phase, type, baseScale, model } = data;
+  const motion = unit.motion || { delta: 0, walk: unit.action === 'walk' ? 1 : 0, speed: unit.speed || 2, attack: Infinity, hit: 0, death: unit.action === 'dead' ? 1 : 0, spawn: 1 };
+  data.walkBlend = lerp(data.walkBlend ?? motion.walk, motion.walk, 1 - Math.exp(-motion.delta * 12));
+  data.stridePhase = (data.stridePhase ?? phase) + motion.delta * Math.min(14, Math.max(5, motion.speed * (type === 'mounted' ? 3.3 : 4.1))) * data.walkBlend;
+  data.wheelAngle = (data.wheelAngle || 0) + motion.delta * motion.speed * data.walkBlend / .44;
+  const gait = Math.sin(data.stridePhase), stride = gait * .59 * data.walkBlend;
+  const idle = Math.sin(time * 2 + phase), { windup, strike, strength } = attackPose(motion.attack);
+  for (const limb of Object.values(l)) { limb.position.copy(limb.userData.restPosition); limb.rotation.set(0, 0, 0); }
+  if (l.legL) l.legL.rotation.x = type === 'mounted' ? -.23 : stride;
+  if (l.legR) l.legR.rotation.x = type === 'mounted' ? -.23 : -stride;
+  if (l.armL) l.armL.rotation.x = -stride * .36 - .07 - strength * .28;
+  if (l.armR) { l.armR.rotation.x = stride * .4 + windup * .6 - strike * 1.75; l.armR.rotation.z = -windup * .35 - strike * .14; }
+  if (l.body) { l.body.rotation.y = windup * -.12 + strike * .2; l.body.rotation.x = -strike * .09; l.body.position.y += idle * .014; }
+  if (['archer'].includes(model)) {
+    l.armL.rotation.x = -strength * 1.25; l.armL.rotation.y = -.12 * strength;
+    l.armR.rotation.x = -strength * 1.08; l.armR.rotation.y = -windup * .65 + strike * .25;
+    l.armR.position.z -= windup * .23;
+  } else if (['priest', 'mage', 'shaman', 'necromancer', 'banshee'].includes(model)) {
+    l.armR.rotation.x = windup * -.55 - strike * 1.08; l.armR.rotation.z = -windup * .32;
+    l.armL.rotation.x = -strength * .9; l.armL.rotation.z = strength * .3;
+    l.body.rotation.y = windup * -.08 + strike * .12;
+  } else if (['spearman', 'headhunter'].includes(model)) {
+    l.armR.rotation.x = -strength * .85 - strike * .35;
+    l.armR.position.z += strike * .5 - windup * .28;
+    l.body.rotation.y = windup * -.16 + strike * .22;
+  } else if (model === 'ghoul') {
+    l.armL.rotation.x = -strike * 1.3 + windup * .4;
+    l.armR.rotation.x = -strike * 1.7 + windup * .6;
+  }
+  for (const [name, limb] of Object.entries(l)) {
+    if (name.startsWith('hoof')) {
+      const opposite = name === 'hoofLF' || name === 'hoofRB';
+      limb.rotation.x = stride * (opposite ? .82 : -.82);
+      limb.position.y += Math.max(0, gait * (opposite ? 1 : -1)) * .1 * data.walkBlend;
+    }
+    if (name.startsWith('wheel')) limb.rotation.x = data.wheelAngle;
+  }
+  if (l.horse) l.horse.rotation.x = -stride * .045;
+  if (l.weapon) l.weapon.rotation.x = windup * -.4 + strike * 1.4;
+  if (type === 'spider') {
+    l.legL.rotation.set(0, stride * .21, stride * .15); l.legR.rotation.set(0, -stride * .21, -stride * .15);
+    l.body.rotation.x = -strike * .2;
+  }
   if (type === 'flying') {
     l.wingL.rotation.z = -Math.sin(time * 5.8 + phase) * .46;
     l.wingR.rotation.z = Math.sin(time * 5.8 + phase) * .46;
+    l.body.rotation.x = -strike * .22;
   }
-  root.position.y = type === 'flying' ? 3.8 + Math.sin(time * 2 + phase) * .2 : type === 'ghost' ? .38 + Math.sin(time * 2 + phase) * .13 : walk ? Math.abs(Math.sin(time * 9 + phase)) * .075 : 0;
-  if (unit.action === 'dead') { root.rotation.z = -Math.PI / 2; root.position.y = .15; }
-  else root.rotation.z = 0;
-  root.scale.setScalar(baseScale * (1 + (unit.hitFlash || 0) * .035));
+  const bob = (1 - Math.cos(data.stridePhase * 2)) * .035 * data.walkBlend;
+  root.position.y = type === 'flying' ? 3.8 + idle * .2 : type === 'ghost' ? .38 + idle * .13 : type === 'siege' ? bob * .16 : bob;
+  const death = ease(motion.death), hit = Math.sin(motion.hit * Math.PI) * .065;
+  root.rotation.x = hit;
+  root.rotation.z = -death * Math.PI * .48;
+  root.position.y = lerp(root.position.y, .12 - ease((motion.death - .75) / .25) * .65, death);
+  root.scale.setScalar(baseScale * (.86 + motion.spawn * .14) * (1 - ease((motion.death - .8) / .2) * .24));
 }

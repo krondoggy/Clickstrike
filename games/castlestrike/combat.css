@@ -1,0 +1,33 @@
+.automatic-tactics { margin:10px 0; padding:8px 10px; border-left:2px solid var(--faction-color); background:#10151055; color:#d1c7af; font:11px/1.5 var(--sans); }
+.automatic-tactics strong { color:var(--bright); display:block; font-size:9px; letter-spacing:.6px; margin-bottom:3px; }
+.unit-statuses { display:flex; flex-wrap:wrap; gap:4px; margin:8px 0; }
+.unit-statuses span { border:1px solid currentColor; padding:3px 5px; font-size:9px; background:#10120dc0; }
+.counter-explanation { font:10px/1.45 var(--sans); color:#cfc4aa; margin-top:4px; }
+.scout-dashboard { display:grid; grid-template-columns:minmax(230px,1fr) minmax(220px,.9fr); gap:16px; align-items:start; }
+.scout-dashboard .scout-panel { display:block; min-width:0; }
+.scout-dashboard .scout-copy { width:auto; margin-bottom:12px; }
+.scout-dashboard .scout-units { display:flex; flex-wrap:wrap; gap:7px; min-width:0; }
+.scout-dashboard .scout-unit { width:95px; min-width:0; }
+.counter-advice h3,.combat-summary h3 { font:600 12px var(--serif); color:var(--bright); margin:0 0 8px; }
+.counter-advice > p { color:var(--muted); font-size:10px; line-height:1.4; margin-bottom:8px; }
+.counter-suggestion { display:grid; grid-template-columns:38px 1fr; gap:8px; width:100%; text-align:left; margin:0 0 7px; padding:8px; background:#0e171280; border:1px solid #9a825244; }
+.counter-suggestion .portrait { width:38px; height:46px; border:1px solid #9a825266; }
+.counter-suggestion strong { color:var(--bright); font-size:10px; }
+.counter-suggestion small { display:block; color:#b3c5aa; font-size:9px; margin:3px 0; }
+.counter-suggestion p { color:#c8c1ad; font-size:9px; line-height:1.4; }
+.counter-suggestion.locked small { color:#d8ae7e; }
+.combat-summary { grid-column:1/-1; border-top:1px solid #9a825244; padding-top:12px; margin-top:2px; }
+.combat-summary > p { color:var(--muted); font-size:10px; line-height:1.5; }
+.combat-summary-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.combat-summary-team { background:#11191066; border:1px solid #75998544; padding:10px; }
+.combat-summary-team.enemy { border-color:#bd6b4a44; }
+.combat-summary-team > strong { color:var(--blue); font-size:10px; }
+.combat-summary-team.enemy > strong { color:var(--red); }
+.combat-metrics { display:flex; gap:12px; margin:8px 0; flex-wrap:wrap; }
+.combat-metrics span { color:var(--muted); font-size:9px; }
+.combat-metrics b { display:block; color:var(--text); font-size:14px; font-variant-numeric:tabular-nums; }
+.combat-summary-team p { color:#c9c0a6; font-size:9px; line-height:1.45; }
+.map-report-link { color:var(--gold); background:none; font-size:9px; margin-top:7px; padding:3px 0; text-align:left; }
+@media(max-width:950px) { .scout-dashboard { grid-template-columns:1fr; } .combat-summary { grid-column:auto; } }
+@media(max-width:650px) { .scout-dashboard { gap:12px; } .counter-suggestion strong { font-size:12px; } .counter-suggestion p,.counter-suggestion small { font-size:10px; } .combat-summary-grid { grid-template-columns:1fr; } .automatic-tactics { font-size:12px; } .unit-statuses span { font-size:10px; } }
+@media(prefers-reduced-motion:reduce) { .wave-announcement { animation:none!important; } button,select { transition:none!important; } }

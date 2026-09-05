@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <linearGradient id="rim" x1="12" y1="9" x2="113" y2="121" gradientUnits="userSpaceOnUse"><stop stop-color="#d1bd8c"/><stop offset=".23" stop-color="#776b53"/><stop offset=".5" stop-color="#302d26"/><stop offset=".8" stop-color="#8e7954"/><stop offset="1" stop-color="#463a2b"/></linearGradient>
+    <linearGradient id="forest" x1="30" y1="15" x2="99" y2="114" gradientUnits="userSpaceOnUse"><stop stop-color="#2c4d3f"/><stop offset=".55" stop-color="#1b332f"/><stop offset="1" stop-color="#182325"/></linearGradient>
+    <linearGradient id="leaf" x1="89" y1="26" x2="45" y2="83" gradientUnits="userSpaceOnUse"><stop stop-color="#eff4a9"/><stop offset=".35" stop-color="#a5c879"/><stop offset=".67" stop-color="#5f995e"/><stop offset="1" stop-color="#2c604c"/></linearGradient>
+    <linearGradient id="hand" x1="40" y1="73" x2="73" y2="107" gradientUnits="userSpaceOnUse"><stop stop-color="#e4cf9a"/><stop offset=".45" stop-color="#b3a578"/><stop offset="1" stop-color="#6a785d"/></linearGradient>
+    <radialGradient id="aura"><stop stop-color="#d8f8a4" stop-opacity=".4"/><stop offset="1" stop-color="#91cc84" stop-opacity="0"/></radialGradient>
+  </defs>
+  <path d="M5 1h118l4 4v118l-4 4H5l-4-4V5Z" fill="#100f0d"/>
+  <path d="M7 5h114l2 2v114l-2 2H7l-2-2V7Z" fill="url(#rim)"/>
+  <path d="M13 12h102v104H13Z" fill="url(#forest)" stroke="#171710" stroke-width="4"/>
+  <circle cx="69" cy="55" r="50" fill="url(#aura)"/>
+  <path d="m49 50-23-8 8 12 16 5Zm8-8-7-22-4 11 6 16Zm22 21 26 9-8-14-16-1Zm2-25 17-18-14 5-8 13Z" fill="#cde29b" opacity=".23"/>
+  <path d="M48 79c-9-28 2-44 24-46 10-2 16-5 23-13 7 34-3 61-37 61l-9 10Z" fill="#162b26" stroke="#172620" stroke-width="4"/>
+  <path d="M48 75c-7-23 5-37 25-39 10-1 15-6 19-10 4 31-7 50-36 51l-8 10Z" fill="url(#leaf)"/>
+  <path d="M49 76c5-16 25-32 41-47-6 32-20 44-41 47Z" fill="#3e7652"/>
+  <path d="M48 84c5-24 25-37 43-57" stroke="#d4e999" stroke-width="3"/>
+  <path d="m56 66-2-14m9 8-1-14m8 7-1-11m-12 26 15-1m-8-8 16-1m-9-6 14-2" stroke="#c5d991" stroke-width="2" opacity=".7"/>
+  <path d="m25 103 7-12 12-4 12 1 6-4 11-3 17-14c3-2 7 1 5 5L84 90 67 104l-13 9H34Z" fill="url(#hand)" stroke="#1b2a25" stroke-width="3"/>
+  <path d="m45 88 5-9 9-2 14-2c6-1 8 4 2 7l-15 5-4 6 13-2 15-8-8 10-19 6-13-6Z" fill="#d8c591" stroke="#576a4c" stroke-width="2"/>
+  <path d="m29 98 13-1 13 14-8 5H26Z" fill="#536b58" stroke="#202c28" stroke-width="2"/>
+  <path d="m32 101 9-1 11 11-6 4Z" fill="#98a579"/>
+  <path d="m33 60 3-9 3 9 8 3-8 3-3 9-3-9-9-3Zm63 26 2-6 2 6 6 2-6 2-2 6-2-6-6-2ZM61 21l2-6 2 6 6 2-6 2-2 6-2-6-6-2Z" fill="#ecf3b7"/>
+  <path d="m30 26 3 3-3 3-3-3Zm74 12 2 2-2 3-2-3ZM24 77l2 2-2 2-2-2Z" fill="#b9d697"/>
+  <path d="M9 8h110M8 9v109" stroke="#dfcca0" stroke-width="2" opacity=".6"/>
+  <path d="m7 7 10 10m104-10-10 10M7 121l10-10m104 10-10-10" stroke="#201d18" stroke-width="2"/>
+  <path d="m7 7 7 1-6 6Zm114 0-7 1 6 6ZM7 121l1-7 6 6Zm114 0-1-7-6 6Z" fill="#b6a276"/>
+</svg>

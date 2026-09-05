@@ -7,11 +7,11 @@ Castle Strike is an original fantasy army-building auto-battler inspired by the 
 - Start with 280 gold and three permanent recruits. Preparation has no timer: inspect the codex, arrange your army and spend your opening gold before starting.
 - Every 25 seconds, your complete permanent roster deploys again. Survivors stay on the field. A fallen fighter is replaced automatically in the next wave; the roster is never consumed.
 - Armies advance and fight automatically. Destroy the opposing citadel to win. Each citadel has 8,500 health and two 1,800-health defensive towers.
-- Base income is 7 gold per second. The central Sunwell provides its owner another 1.8 gold per second. Units within 8 meters along the lane and 9 meters across it contest the shrine; greater army supply captures it over time.
+- Both armies receive 100 gold on a shared payday every 20 seconds, starting 20 seconds after the battle launches. Gold stays unchanged between paydays. Each mine adds 10 gold to that payment; owning the central Sunwell adds another 10. The gold panel shows the next payout and its countdown. Units within 8 meters along the lane and 9 meters across it contest the shrine; greater army supply captures it over time.
 - Income does not grow from kills, so a lost wave still leaves an opportunity to counter the enemy.
 - At 7:55, damage against structures begins increasing. At 12:00, the Sunwell fractures and damages both citadels continuously. Holding the center slows that damage on your castle and accelerates it on the enemy. Even a perfect stalemate ends by 15:00.
 - Battle speed changes simulation time only when the interface advances it. Pause freezes combat, income, cooldowns and reinforcement timers. Recruitment, research and formation planning remain available while paused.
-- Save and continue preserves the full battlefield, enemy plans, random seed, timers, treasury and both permanent armies. Old or damaged saves are rejected.
+- Save and continue preserves the full battlefield, enemy plans, random seed, timers, treasury and both permanent armies. Earlier version 2 saves keep every existing coin and resume at the next 20-second payday under the new rates. Incompatible prototype saves and damaged saves are rejected.
 
 ## Army planning
 
@@ -22,6 +22,16 @@ Castle Strike is an original fantasy army-building auto-battler inspired by the 
 - At most 90 active units per side are simulated, including summons. Reinforcements that cannot fit wait for future waves; no supply is permanently lost.
 - Heroes gain a level every five waves, receiving 12% more base health and 10% more base damage per level when they next deploy.
 - Flying units ignore attacks from ordinary melee and siege units. Archers, spellcasters, pikes, raiders and crypt stalkers can hit them. Towers and citadels can also attack flying units.
+
+## Automatic battlefield behavior
+
+Attacks land at contact: melee during the swing, missiles at arrival, and siege at its committed ground position. Death and stun cancel unreleased attacks; released missiles continue toward their original target. Simultaneous lethal strikes can trade. Flying targets remain immune to ground-only abilities.
+
+Ground bodies and bridge boundaries make screens matter. Frontliners take engagement positions; cavalry and raiders seek reachable exposed backlines; ranged troops retreat briefly and then fight. Keep healers behind durable allies. There are no standing orders or extra unit commands.
+
+A Cavalier needs a four-meter run-up. A pike or Bone Sentinel that stands still for half a second and faces the charge cancels its bonus and stun. Roots stop movement but permit attacks. Roots and stuns cannot extend an active disable, and share a two-second recovery after expiration. Weaker poison or frost cannot extend a stronger effect; duplicate buffs and armor breaks do not stack their magnitude.
+
+The Scout tab recommends your faction's relevant recruits with their age requirement and explanation. Its Last 25 seconds report shows actual damage, effective healing, absorbed shielding, and leading threats across overlapping waves. Version 3 saves retain attacks in flight and migrate existing version 2 campaigns through the same save key.
 
 ## Damage and counters
 
@@ -42,13 +52,15 @@ Upgrades take effect immediately in your economy or recruitment options. Weapons
 
 | Research | First cost | Levels | Effect |
 |---|---:|---:|---|
-| Gold Mine | 145 | 4 | +2.2 gold per second, permanently. Early investment pays for a larger army. |
+| Gold Mine | 145 | 4 | +10 gold every 20-second payday. Wait 90 battle seconds between mine upgrades. |
 | Citadel Age | 260 | 2 | Unlock the next tier of units. Age II unlocks your faction hero. |
 | Forged Weapons | 180 | 3 | +12% attack damage for all future reinforcements. |
 | Runic Armor | 170 | 3 | +2 armor and +8% health for all future reinforcements. |
 | War Camp | 155 | 4 | +12 army supply, up to 72. Arrange your army across 30 formation positions. |
 
-Each next level costs `round(first cost × 1.65^current level)`. Citadel Age begins at I; its two research levels unlock Ages II and III. Fully upgraded mines add 8.8 gold per second.
+Each next level costs `round(first cost × 1.65^current level)`. Citadel Age begins at I; its two research levels unlock Ages II and III. Four mines raise the base payment from 100 to 140 gold; holding the Sunwell makes it 150. Mines are a long-term choice: the first 145-gold mine needs 15 paydays to repay its cost through its extra income. Preparation and pause do not advance the mine cooldown. The research button displays the remaining wait.
+
+The 280-gold start, 20-second payments, 10-gold mine and center bonuses, and 90-second mine cooldown follow [Warcraft III Direct Strike's economy](https://directstrike.net/guide/overview). Castle Strike retains its own unit prices, upgrade prices, and 25-second reinforcement rhythm.
 
 ## Commander spells
 
@@ -56,13 +68,13 @@ Select a spell and click its target on the battlefield. Spells use the same gold
 
 | Spell | Gold | Cooldown | Effect |
 |---|---:|---:|---|
-| Starfall | 65 | 45s | Deal 145 magic damage to enemies in a 6-meter area. Deals reduced damage to structures. |
+| Starfall | 65 | 45s | After 1.4 seconds, deal 145 magic damage to enemies still in a 6-meter area; 75 base damage against structures. |
 | War Cry | 45 | 38s | Allies within 9 meters gain 35% attack speed and a 70-point shield for 10 seconds. |
 | Restoration | 50 | 42s | Restore 150 health to allied units in an 8-meter area. |
 
 ## The opposing commander
 
-The opponent pays the same prices from the same starting treasury and earns the same base income, mine income and shrine bonus. It cannot create free recruits or upgrades. It saves for expensive units, invests in mines, advances through the ages and builds a mixed army. Normal and Hard respond to the broad composition of your roster; Easy makes slower, less targeted decisions. Hard makes decisions more frequently. Commander spells are the player’s additional tactical advantage.
+The opponent pays the same prices from the same starting treasury and receives income on the same payday, with identical mine income and shrine bonuses. It cannot create free recruits or upgrades. It builds a core army before considering its first mine after 90 seconds, and a second mine becomes an option after eight minutes with a larger army. It avoids economic investment while losing ground or its castle is threatened, and never waits for an unaffordable mine instead of buying an available planned reinforcement. It also saves for expensive units, advances through the ages and builds a mixed army. Normal and Hard use the shared counter relationships, weighting your invested gold and their existing army coverage; Easy makes slower, less targeted decisions. Hard makes decisions more frequently. Commander spells are the player’s additional tactical advantage.
 
 ## Dawn Alliance
 
@@ -88,6 +100,10 @@ A steadfast shieldbearer who buys time for the back line. **normal damage; heavy
 
 **Shieldwall:** Takes 22% less damage from ranged attacks.
 
+**Automatic behavior:** Screens nearby ranged allies and holds the closest ground threat.
+
+**Counter purpose:** Shieldwall reduces incoming ranged hits. Durable shields survive fragile skirmishers.
+
 **Strong against:** Archers, Light infantry. **Vulnerable to:** Spellcasters, Siege damage.
 
 ### Silverleaf Ranger
@@ -96,13 +112,21 @@ Longbows punish exposed skirmishers and airborne beasts. **piercing damage; ligh
 
 **Skyhunter:** Deals 35% more damage to flying units.
 
+**Automatic behavior:** Keeps distance behind the frontline and prioritizes exposed flyers.
+
+**Counter purpose:** Skyhunter adds damage against flying units. Piercing arrows punish light armor.
+
 **Strong against:** Flying units, Light armor. **Vulnerable to:** Heavy armor, Cavalry.
 
 ### Kingsguard Pike
 
 An inexpensive answer to charging riders and aerial raids. **normal damage; medium armor.**
 
-**Brace:** Deals 55% more damage to cavalry. Can strike low-flying units.
+**Brace:** Deals 55% more damage to cavalry. Standing still for 0.5 seconds and facing a charge cancels its bonus damage and stun. Can strike flyers within pike reach.
+
+**Automatic behavior:** Intercepts charging cavalry near the frontline and protects nearby allies.
+
+**Counter purpose:** A stationary, facing brace cancels charge bonuses; pikes deal bonus damage to riders. Long pikes can strike flyers that enter melee reach.
 
 **Strong against:** Cavalry, Flying units. **Vulnerable to:** Archers, Area damage.
 
@@ -110,7 +134,11 @@ An inexpensive answer to charging riders and aerial raids. **normal damage; medi
 
 A fast, heavily armored rider built to smash a vulnerable flank. **normal damage; heavy armor.**
 
-**Lance Charge:** The first strike deals 90% bonus damage and stuns for 1 second.
+**Lance Charge:** After moving at least 4 meters into a charge, the strike deals 90% bonus damage and stuns for 1 second. Braced defenders reduce the charge.
+
+**Automatic behavior:** Looks for an open flank and charges exposed ranged or support units.
+
+**Counter purpose:** A moving charge closes the gap to vulnerable archers. Flanks unprotected healers and casters.
 
 **Strong against:** Archers, Support units. **Vulnerable to:** Pikes, Magic damage.
 
@@ -120,13 +148,21 @@ A fragile healer who keeps expensive frontline units in the fight. **magic damag
 
 **Renewal:** Every 4 seconds, heals the most wounded ally within 11 meters for 65 health.
 
+**Automatic behavior:** Follows behind the frontline and heals the most wounded reachable ally.
+
+**Counter purpose:** Repeated healing keeps a protected frontline alive. Sustained healing helps valuable allies survive focused attacks.
+
 **Strong against:** Sustained combat, Heavy armor. **Vulnerable to:** Cavalry, Burst damage.
 
 ### Tempest Arcanist
 
 Crackling arcane bolts unravel clustered armored formations. **magic damage; light armor.**
 
-**Chain Lightning:** Every third attack jumps to two nearby enemies for 55% damage.
+**Chain Lightning:** Bolts deal 70% extra damage against heavy armor. Every third attack jumps to two nearby enemies for 55% damage. Requires a protective frontline.
+
+**Automatic behavior:** Casts from behind allied screens, favoring armored elites and packed targets.
+
+**Counter purpose:** Arcane bolts deal 70% extra damage against heavy armor; protect the caster from a rush. Chain lightning hits additional enemies in a close group.
 
 **Strong against:** Heavy armor, Packed formations. **Vulnerable to:** Cavalry, Light skirmishers.
 
@@ -136,13 +172,21 @@ An imposing engine with the reach to dismantle castle defenses. **siege damage; 
 
 **Shattershot:** Shots deal 55% splash damage within 3.5 meters. Siege damage devastates structures.
 
+**Automatic behavior:** Stays behind allied troops and favors structures or dense ground groups.
+
+**Counter purpose:** Siege damage has a large bonus against fortified defenses. A wide impact damages clustered ground troops.
+
 **Strong against:** Structures, Dense infantry. **Vulnerable to:** Flying units, Flanking cavalry.
 
 ### Stormwing
 
 An armored storm rider who sails above the melee. **magic damage; light armor.**
 
-**Thunderclap:** Attacks splash for 40% damage within 2.8 meters.
+**Thunderclap:** Attacks splash for 40% damage within 3 meters, including flying targets.
+
+**Automatic behavior:** Flies around the ground screen and attacks armored clusters.
+
+**Counter purpose:** Magic attacks damage heavy armor effectively. Thunderclap splashes through nearby enemies.
 
 **Strong against:** Ground melee, Heavy armor. **Vulnerable to:** Skyhunters, Webs and nets.
 
@@ -151,6 +195,10 @@ An armored storm rider who sails above the melee. **magic damage; light armor.**
 A radiant commander whose presence turns a shield line into a fortress. **normal damage; heavy armor.**
 
 **Beacon of Dawn:** Nearby allies gain 2 armor. Every 7 seconds, heals allies within 6 meters for 55. Gains strength every 5 waves.
+
+**Automatic behavior:** Anchors the frontline near wounded allies so his armor aura and healing can protect them.
+
+**Counter purpose:** An armor aura reduces nearby allies’ physical damage taken. Repeated area healing supports long fights.
 
 **Strong against:** Attrition, Physical armies. **Vulnerable to:** Magic focus fire, Dispersed fights.
 
@@ -178,6 +226,10 @@ A brutal axe fighter who becomes deadlier as the battle wears on. **normal damag
 
 **Blood Fury:** Deals 35% more damage while below half health.
 
+**Automatic behavior:** Holds the frontline and presses the closest ground opponent.
+
+**Counter purpose:** Heavy armor and Blood Fury punish fragile ground troops. A durable body trades efficiently in a close fight.
+
 **Strong against:** Light infantry, Close combat. **Vulnerable to:** Magic damage, Kiting.
 
 ### Venom Hunter
@@ -186,13 +238,21 @@ Thrown spears leave a lingering sting in beasts and fragile troops. **piercing d
 
 **Venom Tips:** Attacks poison their target for 5 damage per second over 5 seconds. Poison refreshes; it does not stack.
 
+**Automatic behavior:** Keeps a screen between himself and melee threats, favoring flyers and light armor.
+
+**Counter purpose:** Thrown spears and poison can reach flying units. Piercing damage and poison punish fragile troops.
+
 **Strong against:** Flying units, Light armor. **Vulnerable to:** Heavy armor, Healing.
 
 ### Warg Raider
 
 Fast wolf riders drag flying prey into reach and harry back lines. **normal damage; medium armor.**
 
-**Ensnare:** Every 5 seconds, roots the target for 2 seconds. Can attack flying units.
+**Ensnare:** Every 5 seconds, roots the target for 2 seconds. Rooted units can still attack. Can strike flyers within reach.
+
+**Automatic behavior:** Flanks exposed enemies and roots reachable flyers or vulnerable backline units.
+
+**Counter purpose:** Ensnare stops a flyer from moving while the raider closes. Fast movement and roots catch exposed support units. A flank reaches slow, unprotected siege engines.
 
 **Strong against:** Flying units, Exposed support. **Vulnerable to:** Pikes, Heavy frontline.
 
@@ -200,7 +260,11 @@ Fast wolf riders drag flying prey into reach and harry back lines. **normal dama
 
 An elemental mystic who drives warriors into a killing frenzy. **magic damage; light armor.**
 
-**Bloodlust:** Every 8 seconds, grants 30% attack speed to up to 4 nearby allies for 7 seconds.
+**Bloodlust:** Every 8 seconds, grants 30% attack speed to up to 4 nearby allies for 7 seconds. Attacks reduce heavy armor by 3 for 5 seconds; armor breaks do not stack.
+
+**Automatic behavior:** Stays behind allies, empowers strong attackers and marks heavy armor for the warband.
+
+**Counter purpose:** Attacks weaken heavy armor by 3 for 5 seconds. Bloodlust increases nearby warriors’ attack speed.
 
 **Strong against:** Large warbands, Heavy armor. **Vulnerable to:** Cavalry, Area damage.
 
@@ -208,7 +272,11 @@ An elemental mystic who drives warriors into a killing frenzy. **magic damage; l
 
 A veteran wielding a great axe that cuts through crowded ranks. **normal damage; heavy armor.**
 
-**Sweeping Cleave:** Melee attacks deal 45% damage to enemies within 2.8 meters of the target.
+**Sweeping Cleave:** Melee attacks deal 45% splash damage to ground enemies within 3 meters of the target.
+
+**Automatic behavior:** Screens allies and seeks clustered ground enemies for cleaving swings.
+
+**Counter purpose:** Cleave spreads damage across adjacent ground troops. A strong frontline punishes armies that cannot clear groups.
 
 **Strong against:** Mass infantry, Summons. **Vulnerable to:** Flying units, Magic damage.
 
@@ -218,13 +286,21 @@ A lumbering siege cart hurling cauldrons of burning pitch. **siege damage; forti
 
 **Burning Pitch:** Shots splash for 45% damage within 3 meters and burn the main target for 6 damage per second.
 
+**Automatic behavior:** Bombards structures or compact ground formations from behind the frontline.
+
+**Counter purpose:** Siege attacks break fortified defenses. Burning pitch splashes through grouped ground troops.
+
 **Strong against:** Structures, Packed formations. **Vulnerable to:** Flying units, Cavalry.
 
 ### Earthshaker
 
 A towering horned guardian who breaks enemy lines underfoot. **normal damage; heavy armor.**
 
-**War Stomp:** Every 6 seconds in melee, deals 55 damage and stuns enemies within 4 meters for 1 second.
+**War Stomp:** Every 6 seconds in melee, deals 55 magic damage and stuns ground enemies within 4 meters for 1 second.
+
+**Automatic behavior:** Holds a contested frontline and stomps packed ground attackers.
+
+**Counter purpose:** War Stomp damages and briefly stuns nearby ground enemies. A large body and ground stun interrupt exposed riders.
 
 **Strong against:** Mass infantry, Melee armies. **Vulnerable to:** Flying units, Focused magic.
 
@@ -234,13 +310,21 @@ A venomous drake that hunts archers and unguarded siege engines. **piercing dama
 
 **Virulent Sting:** Attacks poison their target for 9 damage per second over 6 seconds.
 
+**Automatic behavior:** Flies around the melee and hunts light armor or exposed siege.
+
+**Counter purpose:** Piercing attacks and venom punish light armor. Flying avoids siege retaliation.
+
 **Strong against:** Ground melee, Light armor. **Vulnerable to:** Archers, Healing and nets.
 
 ### Korr, the Ashblade
 
 A relentless duelist whose whirling blade carves open the enemy flank. **normal damage; heavy armor.**
 
-**Bladestorm:** Every third strike deals 180% damage and cleaves nearby enemies. Gains strength every 5 waves.
+**Bladestorm:** Every third strike deals 180% damage and cleaves nearby ground enemies. Gains strength every 5 waves.
+
+**Automatic behavior:** Seeks an open route to vulnerable enemies and cleaves every third strike.
+
+**Counter purpose:** Fast movement reaches unprotected support units. Every third strike cleaves nearby ground enemies.
 
 **Strong against:** Support units, Grouped melee. **Vulnerable to:** Crowd control, Focused magic.
 
@@ -268,13 +352,21 @@ A tireless scavenger whose claws sustain it through the melee. **normal damage; 
 
 **Ravenous:** Heals for 24% of attack damage dealt to units.
 
+**Automatic behavior:** Seeks an open flank toward exposed ranged or support units.
+
+**Counter purpose:** Fast movement and lifesteal reward access to exposed archers. Punishes support units left outside a protective screen.
+
 **Strong against:** Exposed archers, Small skirmishes. **Vulnerable to:** Heavy armor, Area damage.
 
 ### Bone Sentinel
 
 A rusted shield and ancient bones, sworn to serve beyond death. **normal damage; heavy armor.**
 
-**Unbroken:** Reassembles once with 35% health when slain. Summoned skeletons cannot reassemble.
+**Unbroken:** Reassembles once with 35% health when slain. Standing still for 0.5 seconds and facing a charge cancels its bonus damage and stun. Summoned skeletons cannot reassemble.
+
+**Automatic behavior:** Screens allies, braces against charges and reassembles once when destroyed.
+
+**Counter purpose:** A stationary sentinel facing a charge cancels its bonus damage and stun. Armor and reassembly absorb repeated physical attacks.
 
 **Strong against:** Physical damage, Attrition. **Vulnerable to:** Magic damage, Siege splash.
 
@@ -284,6 +376,10 @@ An armored arachnid that pins aerial threats beneath barbed webs. **piercing dam
 
 **Graveweb:** Attacks slow flying units by 60% and deal 30% bonus damage to them.
 
+**Automatic behavior:** Stays behind the screen and prioritizes flyers with its slowing web.
+
+**Counter purpose:** Graveweb slows flyers and adds anti-air damage. Piercing attacks punish lightly armored targets.
+
 **Strong against:** Flying units, Light armor. **Vulnerable to:** Heavy armor, Siege splash.
 
 ### Graveweaver
@@ -291,6 +387,10 @@ An armored arachnid that pins aerial threats beneath barbed webs. **piercing dam
 A dark ritualist who swells the ranks with expendable servants. **magic damage; light armor.**
 
 **Raise the Fallen:** Every 12 seconds in battle, summons 2 fragile skeletons for 22 seconds. At most 4 per caster.
+
+**Automatic behavior:** Stays behind the screen and raises disposable troops near an active battle.
+
+**Counter purpose:** Summons occupy opponents that can attack only one body at a time. Repeated summons replace an expendable frontline.
 
 **Strong against:** Single-target armies, Attrition. **Vulnerable to:** Area damage, Cavalry.
 
@@ -300,6 +400,10 @@ A sorrowful spirit whose curse cripples powerful enemy champions. **magic damage
 
 **Withering Curse:** Attacks reduce the target’s damage by 22% for 6 seconds.
 
+**Automatic behavior:** Keeps behind allied screens and curses powerful armored attackers or heroes.
+
+**Counter purpose:** Magic damage is effective against heavy armor. Withering Curse reduces a powerful target’s attack damage.
+
 **Strong against:** Heroes, Heavy armor. **Vulnerable to:** Mass infantry, Light skirmishers.
 
 ### Plague Colossus
@@ -307,6 +411,10 @@ A sorrowful spirit whose curse cripples powerful enemy champions. **magic damage
 A shambling wall of stitched flesh, surrounded by choking decay. **normal damage; heavy armor.**
 
 **Carrion Cloud:** Deals 8 magic damage per second to ground enemies within 3.5 meters.
+
+**Automatic behavior:** Anchors a ground engagement and keeps packed enemies inside its plague cloud.
+
+**Counter purpose:** Carrion Cloud damages every nearby ground enemy. A large armored body absorbs sustained frontline pressure.
 
 **Strong against:** Mass infantry, Long melees. **Vulnerable to:** Flying units, Focused magic.
 
@@ -316,6 +424,10 @@ A bone-bound engine that hurls restless souls at castle walls. **siege damage; f
 
 **Soulburst:** Shots deal 55% splash damage within 3.5 meters. Siege damage devastates structures.
 
+**Automatic behavior:** Bombards defenses or grouped ground enemies while staying behind its screen.
+
+**Counter purpose:** Siege attacks damage fortified defenses effectively. Soulburst splashes across dense ground formations.
+
 **Strong against:** Structures, Mass infantry. **Vulnerable to:** Flying units, Cavalry.
 
 ### Frostbound Wyrm
@@ -324,19 +436,27 @@ An ancient skeletal dragon trailing a storm of killing frost. **magic damage; li
 
 **Winter’s Breath:** Attacks splash for 40% damage within 3 meters and slow victims by 35% for 3 seconds.
 
+**Automatic behavior:** Flies over the screen and slows armored clusters from range.
+
+**Counter purpose:** Magic breath is effective against heavy armor. Winter’s Breath damages and slows neighboring enemies.
+
 **Strong against:** Heavy armor, Ground armies. **Vulnerable to:** Archers, Webs and nets.
 
 ### Morvath, the Hollow King
 
 An immortal king leading his cursed host toward one final conquest. **normal damage; heavy armor.**
 
-**Death’s Embrace:** Every 6 seconds, heals nearby allies for 40 and strikes nearby enemies for 35 magic damage. Gains strength every 5 waves.
+**Death’s Embrace:** Every 6 seconds, heals nearby allies for 40 and strikes nearby ground enemies for 35 magic damage. Gains strength every 5 waves.
+
+**Automatic behavior:** Stays near the frontline so nearby allies receive healing while ground enemies take damage.
+
+**Counter purpose:** Death’s Embrace sustains nearby allies. Death’s Embrace also strikes nearby ground enemies.
 
 **Strong against:** Attrition, Grouped melee. **Vulnerable to:** Ranged focus fire, Magic damage.
 
 ## Opening suggestions
 
-- **Dawn Alliance:** add a Dawnshield and a ranger, then invest in a mine. Age II Lightkeepers turn a durable frontline into a sustained push; Tempest Arcanists answer armored opponents.
+- **Dawn Alliance:** add a Dawnshield and a ranger, then decide whether your frontline can spare the cost of a mine. Its slow return rewards a stable position. Age II Lightkeepers turn a durable frontline into a sustained push; Tempest Arcanists answer armored opponents.
 - **Ironclad Horde:** build a core of grunts and hunters before overinvesting in raiders. A Stormcaller rewards a larger melee force. Mix siege into the warband once the opposing army is contained.
 - **Hollow Covenant:** Bone Sentinels hold enemies in place for Crypt Stalkers. At Age II, choose Graveweavers against single-target armies or Veil Sirens against armored elites. Protect casters from flanking cavalry.
 
