@@ -6,6 +6,8 @@ const MAX_UNITS = 180;
 const MAX_GOLD = 99999;
 const EPSILON = 1e-8;
 const TELEMETRY_WINDOW = 25;
+const TELEMETRY_RECORD_BYTES = 15;
+const TELEMETRY_KINDS = ['damage', 'healing', 'shielding'];
 const valid = n => typeof n === 'number' && Number.isFinite(n);
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -23,6 +25,54 @@ const combatDefaults = (u, time) => ({
   poisons: [], slows: [], armorBreaks: [], armorBreak: 0, chargeDistance: 0, chargeUsed: false, stationaryTime: 0,
   targetCommitUntil: 0, retreatUntil: 0, retreatCooldownUntil: 0, flankSide: 0,
 });
+
+// Keep readable events in memory, but avoid repeating field names and actor IDs
+// tens of thousands of times in localStorage. Float64 amounts/times round-trip
+// exactly; this is encoding only, never sampling or a shorter reporting window.
+function packTelemetry(events) {
+  if (!events.length) return [];
+  const times = [], sources = [], targets = [];
+  const timeIds = new Map(), sourceIds = new Map(), targetIds = new Map();
+  const intern = (map, values, key, value = key) => {
+    if (!map.has(key)) { map.set(key, values.length); values.push(value); }
+    return map.get(key);
+  };
+  const bytes = new Uint8Array(events.length * TELEMETRY_RECORD_BYTES), view = new DataView(bytes.buffer);
+  events.forEach((event, index) => {
+    const source = [event.sourceId, event.unitId, event.team];
+    const offset = index * TELEMETRY_RECORD_BYTES;
+    view.setUint16(offset, intern(timeIds, times, event.time), true);
+    view.setUint8(offset + 2, TELEMETRY_KINDS.indexOf(event.kind));
+    view.setUint16(offset + 3, intern(sourceIds, sources, JSON.stringify(source), source), true);
+    view.setUint16(offset + 5, intern(targetIds, targets, event.targetId), true);
+    view.setFloat64(offset + 7, event.amount, true);
+  });
+  if (times.length > 65535 || sources.length > 65535 || targets.length > 65535) return events;
+  const chunks = [];
+  for (let offset = 0; offset < bytes.length; offset += 32768) chunks.push(String.fromCharCode(...bytes.subarray(offset, offset + 32768)));
+  return { format: 'packed-v1', count: events.length, times, sources, targets, rows: btoa(chunks.join('')) };
+}
+
+function unpackTelemetry(packed) {
+  const invalid = () => { throw new Error('Invalid compact combat report.'); };
+  if (!packed || packed.format !== 'packed-v1' || !Number.isInteger(packed.count) || packed.count < 0 || packed.count > 100000) invalid();
+  const ref = value => value === null || (typeof value === 'string' && value.length <= 50);
+  for (const entries of [packed.times, packed.sources, packed.targets]) if (!Array.isArray(entries) || entries.length > 65535) invalid();
+  if (!packed.times.every(time => valid(time) && time >= 0 && time <= 100000) || !packed.targets.every(ref)) invalid();
+  if (!packed.sources.every(source => Array.isArray(source) && source.length === 3 && ref(source[0]) && ref(source[1]) && ['player', 'enemy'].includes(source[2]))) invalid();
+  const expectedBytes = packed.count * TELEMETRY_RECORD_BYTES;
+  if (typeof packed.rows !== 'string' || packed.rows.length !== Math.ceil(expectedBytes / 3) * 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(packed.rows)) invalid();
+  let binary;
+  try { binary = atob(packed.rows); } catch { invalid(); }
+  if (binary.length !== expectedBytes) invalid();
+  const bytes = Uint8Array.from(binary, character => character.charCodeAt(0)), view = new DataView(bytes.buffer);
+  return Array.from({ length: packed.count }, (_, index) => {
+    const offset = index * TELEMETRY_RECORD_BYTES, time = packed.times[view.getUint16(offset, true)], kind = TELEMETRY_KINDS[view.getUint8(offset + 2)];
+    const source = packed.sources[view.getUint16(offset + 3, true)], targetIndex = view.getUint16(offset + 5, true);
+    if (time === undefined || !kind || !source || targetIndex >= packed.targets.length) invalid();
+    return { time, kind, sourceId: source[0], targetId: packed.targets[targetIndex], unitId: source[1], team: source[2], amount: view.getFloat64(offset + 7, true) };
+  });
+}
 
 export function counterNeed(candidate, opponentUnits, ownedUnits) {
   const opposingInvestment = opponentUnits.reduce((total, u) => total + u.cost, 0) || 1;
@@ -744,7 +794,7 @@ function makeEngine(state) {
     },
     setSpeed(n) { if (![1, 1.5, 2, 3].includes(n)) return fail('Choose 1×, 1.5×, 2× or 3× speed.'); state.speed = n; return ok(); },
     togglePause() { if (state.status !== 'playing') return fail('No active battle to pause.'); state.paused = !state.paused; return ok(state.paused ? 'Battle paused.' : 'Battle resumed.'); },
-    serialize() { return JSON.stringify(state); },
+    serialize() { return JSON.stringify({ ...state, telemetry: { ...state.telemetry, events: packTelemetry(state.telemetry.events) } }); },
   };
 }
 
@@ -754,6 +804,9 @@ export function restoreGame(json) {
   const reject = () => { throw new Error('This save is incompatible or damaged. Start a new campaign.'); };
   if (!s || ![2, 3].includes(s.version) || !FACTIONS.some(f => f.id === s.faction) || !FACTIONS.some(f => f.id === s.enemyFaction) || s.faction === s.enemyFaction) reject();
   const legacyCombat = s.version === 2;
+  if (!legacyCombat && s.telemetry?.events?.format === 'packed-v1') {
+    try { s.telemetry.events = unpackTelemetry(s.telemetry.events); } catch { reject(); }
+  }
   if (!['preparation', 'playing', 'victory', 'defeat'].includes(s.status) || !['easy', 'normal', 'hard'].includes(s.difficulty)) reject();
   const number = (n, lo, hi) => valid(n) && n >= lo && n <= hi;
   const integer = (n, lo, hi) => Number.isInteger(n) && number(n, lo, hi);

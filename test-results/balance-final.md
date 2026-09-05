@@ -1,6 +1,6 @@
 # Castle Strike balance evidence
 
-Engine SHA-256: `0ac638b2b3956a1ff1212dd02a03b05d19fb71385fa8535718240f523e4020d8`
+Engine SHA-256: `fe2963f022cde0d634c60c3cdc3804783a7189db4e9e0fc43eda7e23b726f50f`
 Data SHA-256: `f80331c793749fe0b642113e0cd12d2fe3d20b4834d45e144944c321d5a1c2e7`
 Tactics SHA-256: `ecb14f1abfe60c8dfac5848a81928258d38a051fbe823a41512ad26e9536ba62`
 
@@ -15,7 +15,7 @@ Well-spaced 32-bit seeds. Isolated/screened sides retain semantic IDs and initia
 | Pair | Left score | Scenarios |
 |---|---:|---:|
 | alliance / horde | 50.0% | 22 |
-| alliance / undead | 62.5% | 22 |
+| alliance / undead | 63.6% | 22 |
 | horde / undead | 47.7% | 22 |
 
 ## Per-unit coverage
@@ -52,7 +52,6 @@ Well-spaced 32-bit seeds. Isolated/screened sides retain semantic IDs and initia
 
 ## Flags
 
-- SIDE_BIAS_OVER_5_POINTS: alliance / undead  (50.0 percentage points)
 - FACTION_PORTFOLIO_OUTSIDE_40_60: alliance / undead Diagnostic portfolio imbalance, not a measured full-match player win rate.
 
 The JSON contains every tested result, army composition, budget, seed, layout, side, outcome, timeout, and sampled unit count. No failing scenario is discarded.

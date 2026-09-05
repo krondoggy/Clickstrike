@@ -119,3 +119,62 @@ test('commander Starfall survives save/load and the death of every deployed cast
   assert.ok(Math.abs(castle.maxHp - castle.hp - 75 * .7 / (1 + 5 * .055)) < .00001);
   assert.deepEqual(restored.state, g.state);
 });
+
+test('a sustained 180-unit battle fits comfortably below a 5 MiB UTF-16 storage budget without dropping report events', t => {
+  const g = createGame({ faction: 'undead', seed: 42 }), s = g.state;
+  s.enemyFaction = 'alliance';
+  const own = [...Array(10).fill('ghoul'), ...Array(10).fill('skeleton'), ...Array(6).fill('cryptfiend'), ...Array(4).fill('necromancer')];
+  const foe = [...Array(10).fill('footman'), ...Array(10).fill('archer'), ...Array(6).fill('priest'), ...Array(4).fill('mage')];
+  const roster = ids => ids.map((unitId, i) => ({ id: `r${s.nextId++}`, unitId, row: i % 6, col: Math.floor(i / 6) }));
+  s.roster = roster(own); s.enemyRoster = roster(foe); s.supply = 70;
+  for (const wallet of [s, s.enemy]) { wallet.tier = 3; wallet.research.tier = 2; wallet.supplyCap = 72; wallet.research.barracks = 4; }
+  g.start();
+  const firstWave = [...s.units]; s.units = [];
+  for (const team of ['player', 'enemy']) {
+    const templates = firstWave.filter(u => u.team === team);
+    for (let i = 0; i < 90; i++) {
+      const unit = structuredClone(templates[i % templates.length]);
+      unit.id = `u${s.nextId++}`; unit.x = (team === 'player' ? -1 : 1) * (4 + Math.floor(i / 10) * 1.05); unit.z = (i % 10 - 4.5) * 1.05;
+      // Keep every undead body wounded throughout the entire reporting window,
+      // while actual targeting, weapons, healing and regeneration keep running.
+      unit.hp = 5000; unit.maxHp = 10000; s.units.push(unit);
+    }
+  }
+  s.stats.peakUnits = 180;
+  for (let second = 0; second < 30; second++) g.update(1);
+  assert.equal(s.units.length, 180);
+  assert.ok(s.telemetry.events.length > 22500, 'A full window includes 90 regenerating units plus actual combat');
+  assert.ok(JSON.stringify(s).length * 2 > 5 * 1024 * 1024, 'The fixture reproduces the former object-JSON storage overflow');
+  const encoded = g.serialize();
+  t.diagnostic(`${s.units.length} units, ${s.telemetry.events.length} events: ${JSON.stringify(s).length * 2} raw UTF-16 bytes -> ${encoded.length * 2} packed bytes.`);
+  assert.ok(encoded.length * 2 < 2 * 1024 * 1024, `The lossless save leaves ample quota headroom (${encoded.length * 2} UTF-16 bytes)`);
+  assert.equal(JSON.parse(encoded).telemetry.events.count, s.telemetry.events.length, 'Every original report record is retained');
+  const restored = restoreGame(encoded);
+  assert.deepEqual(restored.state, s, 'Float64 amounts, attribution and all timestamps are preserved exactly');
+  assert.equal(restored.serialize(), encoded);
+  g.update(2); restored.update(2);
+  assert.deepEqual(restored.state, s, 'Records expire at the same 25-second boundaries after loading');
+});
+
+test('compact telemetry rejects corrupt binary tables and remains compatible with plain v3 report arrays', () => {
+  const g = flightFixture(); g.update(1);
+  const plain = JSON.stringify(g.state);
+  assert.deepEqual(restoreGame(plain).state, g.state, 'Earlier v3 saves with object events still load');
+  const encoded = g.serialize();
+  assert.equal(JSON.parse(encoded).telemetry.events.format, 'packed-v1');
+  for (const corrupt of [
+    packed => { packed.count++; },
+    packed => { packed.rows = packed.rows.slice(4); },
+    packed => { packed.sources[0][1] = '__proto__'; },
+    packed => { packed.times[0] = -1; },
+    packed => { packed.count = 100001; },
+    packed => {
+      const bytes = Uint8Array.from(atob(packed.rows), c => c.charCodeAt(0));
+      new DataView(bytes.buffer).setUint16(3, 65535, true);
+      packed.rows = btoa(String.fromCharCode(...bytes));
+    },
+  ]) {
+    const saved = JSON.parse(encoded); corrupt(saved.telemetry.events);
+    assert.throws(() => restoreGame(saved));
+  }
+});
