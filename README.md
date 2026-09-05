@@ -8,9 +8,11 @@ The home page lists every game. Clickstrike lives at [games/clickstrike](https:/
 
 ## Castle Strike
 
-Inspired by Warcraft III **Direct Strike**. Passive gold economy — buy units into a permanent roster (Militia through Catapult plus core counters), place each wave on the spawn grid while survivors keep fighting, and every ~30 seconds your army marches against an AI building under the same rules. Roster size starts at 2 and grows by 1 each wave, so early waves stay small. From wave 4 hire one **Champion** (Bulwark, Bonesinger, or Raid Captain) with team auras; rez with gold if they fall during the countdown. **Research** owned unit types (+16% HP / +14% ATK per level, up to 3) and upgrade your **towers** (+HP, +ATK, +range) from the Mercenary Camp Research tab — living fighters and standing towers get stronger immediately. Units use signature abilities (Brace, Volley, Charge, Aegis, etc.) and lane-aware combat AI. Destroy the enemy castle before yours falls.
+**Castle Strike 2.0** is a fantasy army-building auto-battler inspired by Warcraft III **Direct Strike**. Choose the **Dawn Alliance**, **Ironclad Horde**, or **Hollow Covenant**, build a permanent army, and arrange its formation before sending it across a fully 3D battlefield. Fresh armies deploy every 25 seconds while survivors continue fighting. Destroy the opposing castle to win a single-player match against the AI.
 
-Open `games/castlestrike/index.html` from the hall or directly.
+Recruit complementary frontline, ranged, cavalry, magic, support, siege, and flying units; unlock stronger troops and faction heroes; invest in income, supply, weapons, and armor; and use commander spells to influence the battle. An enchanted river crossing, original animated fantasy units, painted portraits, spell effects, and a stone-and-gold interface give the rework its own classic RTS atmosphere.
+
+Run `npm start` from the repository root and open the local address it prints, then choose Castle Strike from the hall. A static server is required for its JavaScript modules; no build step is needed. See [Castle Strike's rework guide](games/castlestrike/REWORK.md) for controls, systems, and asset credits. Castle Strike saves separately from Clickstrike.
 
 ## Clickstrike
 

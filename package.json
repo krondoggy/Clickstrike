@@ -1,0 +1,13 @@
+{
+  "name": "castle-strike",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Castle Strike and Clickstrike — browser strategy games",
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "test": "node --test games/castlestrike/tests/*.test.mjs",
+    "test:browser": "node games/castlestrike/tests/browser-smoke.mjs",
+    "test:edge": "node games/castlestrike/tests/edge-cases.mjs"
+  }
+}

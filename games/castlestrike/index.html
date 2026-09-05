@@ -1,253 +1,62 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="description" content="Castle Strike — Direct Strike-style battlefield. Deploy waves, hold the field with survivors, and tear down the enemy keep." />
-  <meta name="theme-color" content="#0a0c12" />
-  <meta property="og:title" content="Castle Strike" />
-  <meta property="og:description" content="Buy, deploy, and march waves across an open battlefield." />
-  <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://krondoggy.github.io/Clickstrike/games/castlestrike/" />
-  <link rel="canonical" href="https://krondoggy.github.io/Clickstrike/games/castlestrike/" />
-  <title>Castle Strike</title>
-  <link rel="icon" href="../../favicon.svg" type="image/svg+xml" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#141b18">
+  <meta name="description" content="Command a fantasy army in Castle Strike. Build your formation, master three factions, and conquer a living 3D battlefield in this wave-based strategy game.">
+  <title>Castle Strike — The War of Three Crowns</title>
+  <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
 </head>
-<body data-mobile-pane="battle">
-  <div id="app">
-    <header id="topbar">
-      <div class="topbar-rivet topbar-rivet-tl" aria-hidden="true"></div>
-      <div class="topbar-rivet topbar-rivet-tr" aria-hidden="true"></div>
-
-      <div class="topbar-left">
-        <a href="../../" class="btn-ghost" title="Back to game hall">Hall</a>
-        <span id="version-label" class="version-tag">v0.9.0</span>
+<body>
+  <div class="game-shell">
+    <header class="topbar">
+      <a class="brand" href="../../" aria-label="Castle Strike — return to game hall"><span class="brand-crest" data-icon="castle"></span><span><strong>CASTLE <em>STRIKE</em></strong><small>THE WAR OF THREE CROWNS</small></span></a>
+      <div class="resources" aria-label="Your resources">
+        <div class="resource gold"><span data-icon="coins"></span><span><strong id="gold">280</strong><small>GOLD <b id="income">+5.0 /s</b></small></span></div>
+        <div class="resource"><span data-icon="army"></span><span><strong id="supply">3 <i>/ 24</i></strong><small>ARMY SUPPLY</small></span></div>
+        <div class="resource tech"><span data-icon="crown"></span><span><strong id="tier">Age I</strong><small id="age-name">AGE OF IRON</small></span></div>
       </div>
-
-      <div class="castle-block player">
-        <div class="castle-heading">
-          <span class="castle-label">Your Keep</span>
-          <span class="keep-level-chip player" title="Your campaign level">Lv <span id="player-level-display">1</span></span>
-        </div>
-        <div class="castle-hp-bar">
-          <div id="player-castle-fill" class="castle-hp-fill"></div>
-        </div>
-        <span id="player-castle-text" class="castle-hp-text">1500</span>
-      </div>
-
-      <div class="topbar-center">
-        <div class="matchup-badge" title="Campaign matchup">
-          <span class="matchup-side player">You <strong>Lv <span id="matchup-player-level">1</span></strong></span>
-          <span class="matchup-vs" aria-hidden="true">vs</span>
-          <span class="matchup-side enemy">Enemy <strong>Lv <span id="matchup-enemy-level">1</span></strong></span>
-        </div>
-        <div class="round-badge">Wave <span id="round-display">1</span></div>
-        <div id="phase-status" class="phase-status" role="status" aria-live="polite">
-          <span id="phase-label">First wave</span>
-          <span id="phase-timer" class="phase-timer">30s</span>
-        </div>
-        <div id="streak-pill" class="streak-pill is-empty" title="Win streak bonus income">
-          <span class="streak-label">Streak</span>
-          <span id="streak-display">0</span>
-          <span class="streak-bonus">+<span id="streak-gps">0.0</span>/s</span>
-        </div>
-      </div>
-
-      <div class="castle-block enemy">
-        <div class="castle-heading">
-          <span class="castle-label">Enemy Keep</span>
-          <span class="keep-level-chip enemy" title="Enemy campaign level">Lv <span id="enemy-level-display">1</span></span>
-        </div>
-        <div class="castle-hp-bar">
-          <div id="enemy-castle-fill" class="castle-hp-fill enemy"></div>
-        </div>
-        <span id="enemy-castle-text" class="castle-hp-text">1500</span>
-      </div>
-
-      <div class="topbar-right">
-        <div class="stat-pill resource-gold" id="gold-pill" title="Your treasury">
-          <span class="stat-icon gold" aria-hidden="true"></span>
-          <span class="stat-body">
-            <span class="stat-row">
-              <span id="gold-display">24</span>
-              <span class="stat-label">Gold</span>
-            </span>
-            <span class="stat-rate" title="Gold per second">
-              <span class="stat-prefix">+</span>
-              <span id="gps-display">2.2</span>
-              <span class="stat-rate-unit">/s</span>
-            </span>
-          </span>
-        </div>
-        <button type="button" id="help-btn" class="btn-ghost">Help</button>
-        <button
-          type="button"
-          id="music-mute-btn"
-          class="btn-ghost music-mute-btn"
-          aria-pressed="false"
-          title="Mute music (M)"
-        >
-          Music
-        </button>
-        <button
-          type="button"
-          id="sfx-mute-btn"
-          class="btn-ghost sfx-mute-btn"
-          aria-pressed="false"
-          title="Mute sound effects"
-        >
-          SFX
-        </button>
-        <button type="button" id="restart-btn" class="btn-ghost">Restart</button>
-      </div>
+      <nav class="top-actions" aria-label="Game controls"><button id="audio-btn" class="icon-btn" title="Enable sound" aria-label="Enable sound" data-icon="sound"></button><button id="help-btn" class="icon-btn" title="How to play" aria-label="How to play" data-icon="help"></button><button id="settings-btn" class="icon-btn" title="Match settings" aria-label="Match settings" data-icon="settings"></button></nav>
     </header>
-
-    <main id="game-main">
-      <nav id="mobile-nav" aria-label="Mobile sections">
-        <button type="button" class="mobile-tab is-active" data-pane="battle" aria-pressed="true">Battle</button>
-        <button type="button" class="mobile-tab" data-pane="shop" aria-pressed="false">Shop</button>
-      </nav>
-
-      <div id="round-banner" class="round-banner" hidden aria-live="assertive"></div>
-
-      <section id="board-section" class="field-panel" aria-label="Battlefield">
-        <div class="panel-ornament panel-ornament-tl" aria-hidden="true"></div>
-        <div class="panel-ornament panel-ornament-tr" aria-hidden="true"></div>
-        <div class="panel-ornament panel-ornament-bl" aria-hidden="true"></div>
-        <div class="panel-ornament panel-ornament-br" aria-hidden="true"></div>
-        <div id="board" class="battlefield">
-          <div class="field-sky" aria-hidden="true"></div>
-          <div class="field-hills" aria-hidden="true"></div>
-          <div class="field-ground" aria-hidden="true"></div>
-          <div class="field-road" aria-hidden="true"></div>
-          <div class="field-midline" aria-hidden="true"></div>
-          <div class="field-trees field-trees-n" aria-hidden="true"></div>
-          <div class="field-trees field-trees-s" aria-hidden="true"></div>
-
-          <div class="keep keep-player" id="keep-player">
-            <div class="keep-banner" aria-hidden="true"></div>
-            <div class="keep-art" aria-hidden="true"></div>
-            <div class="keep-hp"><div id="keep-player-fill" class="keep-hp-fill"></div></div>
-            <span class="keep-name">Keep</span>
-          </div>
-          <div class="keep keep-enemy" id="keep-enemy">
-            <div class="keep-banner enemy" aria-hidden="true"></div>
-            <div class="keep-art" aria-hidden="true"></div>
-            <div class="keep-hp"><div id="keep-enemy-fill" class="keep-hp-fill enemy"></div></div>
-            <span class="keep-name">Keep</span>
-          </div>
-
-          <div id="tower-layer" class="tower-layer"></div>
-          <div id="board-grid" class="spawn-grid" aria-label="Deployment zone"></div>
-          <div id="combat-layer" class="combat-layer" aria-hidden="true"></div>
+    <main class="game-layout">
+      <section class="battle-panel panel" aria-label="Battlefield">
+        <div class="battle-topline"><div class="map-title"><span class="live-dot"></span> THE KING'S CROSSING <span class="map-subtitle">Skirmish · <b id="difficulty-label">Normal</b></span></div><span id="match-clock">00:00</span></div>
+        <div id="battlefield" tabindex="0" aria-label="3D battlefield. Scroll to zoom, right-drag to pan, click a unit to inspect."></div>
+        <div class="scoreboard">
+          <div class="keep-score allied"><span class="tiny-crest" data-icon="shield"></span><div><div class="keep-title"><strong id="ally-name">DAWN ALLIANCE</strong><span id="ally-hp">2400</span></div><div class="health-track"><i id="ally-fill"></i></div></div></div>
+          <div class="wave-score"><small id="wave-label">PREPARE YOUR ARMY</small><strong id="wave-value">WAVE I</strong><span id="wave-countdown">Awaiting your command</span></div>
+          <div class="keep-score enemy"><div><div class="keep-title"><strong id="enemy-name">IRONCLAD HORDE</strong><span id="enemy-hp">2400</span></div><div class="health-track"><i id="enemy-fill"></i></div></div><span class="tiny-crest" data-icon="skull"></span></div>
         </div>
-      </section>
-
-      <section id="bench-section" class="command-panel" aria-label="Unit bench">
-        <div class="panel-ornament panel-ornament-tl" aria-hidden="true"></div>
-        <div class="panel-ornament panel-ornament-tr" aria-hidden="true"></div>
-        <div class="panel-ornament panel-ornament-bl" aria-hidden="true"></div>
-        <div class="panel-ornament panel-ornament-br" aria-hidden="true"></div>
-        <h2 class="section-label">Barracks</h2>
-        <p id="bench-hint" class="section-hint">Select a barracks unit or a placed unit, then click a tile</p>
-        <div id="bench-tray" class="bench-tray"></div>
-      </section>
-
-      <section id="shop-section" class="command-panel" aria-label="Shop">
-        <div class="panel-ornament panel-ornament-tl" aria-hidden="true"></div>
-        <div class="panel-ornament panel-ornament-tr" aria-hidden="true"></div>
-        <div class="panel-ornament panel-ornament-bl" aria-hidden="true"></div>
-        <div class="panel-ornament panel-ornament-br" aria-hidden="true"></div>
-        <h2 class="section-label">Mercenary Camp</h2>
-        <p id="shop-hint" class="section-hint">Army 0/2 · cap grows each wave</p>
-        <div class="shop-cat-tabs" role="tablist" aria-label="Shop categories">
-          <button
-            type="button"
-            class="shop-cat-tab is-active"
-            id="shop-tab-hire"
-            data-shop-tab="hire"
-            role="tab"
-            aria-selected="true"
-            aria-controls="shop-bar"
-          >
-            Hire
-          </button>
-          <button
-            type="button"
-            class="shop-cat-tab"
-            id="shop-tab-research"
-            data-shop-tab="research"
-            role="tab"
-            aria-selected="false"
-            aria-controls="shop-bar"
-          >
-            Research<span class="shop-cat-badge" hidden aria-hidden="true"></span>
-          </button>
+        <div id="wave-announcement" class="wave-announcement" hidden></div>
+        <div class="battle-bottomline">
+          <div class="shrine-control"><span data-icon="shrine"></span><div><strong id="control-label">Shrine unclaimed</strong><div class="control-track"><i id="control-fill"></i></div><small id="control-hint">Hold the crossing for bonus income</small></div></div>
+          <div class="camera-tools"><button id="formation-toggle" class="small-btn"><span data-icon="grid"></span> Formation <kbd>F</kbd></button><button id="camera-reset" class="icon-btn" title="Center camera" aria-label="Center camera" data-icon="focus"></button></div>
         </div>
-        <div id="shop-bar" class="shop-bar" role="tabpanel" aria-labelledby="shop-tab-hire"></div>
+        <div id="cast-prompt" class="cast-prompt" hidden>Choose a target on the battlefield <span>Esc to cancel</span></div>
+        <div id="paused-overlay" class="paused-overlay" hidden><span>II</span><strong>BATTLE PAUSED</strong><small>You can still plan your army.</small><button class="gold-btn" id="resume-btn">Resume battle</button></div>
+      </section>
+      <aside class="council panel" aria-label="War council">
+        <div class="panel-heading"><span data-icon="banner"></span><h2>War Council</h2><span class="ornament">◆</span></div>
+        <div class="faction-banner"><span class="faction-emblem" data-icon="shield"></span><div><small>YOUR ALLEGIANCE</small><strong id="faction-name">Dawn Alliance</strong><span id="faction-perk">Forged in honor. United in war.</span></div><button id="faction-btn" class="icon-btn" title="Choose faction" aria-label="Choose faction" data-icon="chevron"></button></div>
+        <div id="unit-detail" class="unit-detail"></div>
+        <div class="spells-section"><div class="section-caption">COMMANDER ABILITIES <span>Q · W · E</span></div><div id="spells" class="spells"></div></div>
+        <div class="battle-command"><div class="command-meta"><span id="command-hint">Your army returns every 25 seconds</span><div class="speed-switch" aria-label="Battle speed"><button data-speed="1" class="active" aria-pressed="true">1×</button><button data-speed="2" aria-pressed="false">2×</button><button data-speed="3" aria-pressed="false">3×</button></div></div><button id="play-btn" class="gold-btn play-btn"><span data-icon="swords"></span><span>Begin Battle</span><kbd>SPACE</kbd></button></div>
+      </aside>
+      <section class="command-deck panel" aria-label="Army management">
+        <aside class="tactical-map"><div class="section-caption">BATTLE OVERVIEW <span id="live-units">0 ON FIELD</span></div><canvas id="minimap" width="280" height="140" aria-label="Battlefield minimap"></canvas><div class="map-legend"><span><i class="blue-dot"></i>Your army</span><span><i class="red-dot"></i>Enemy</span></div><div class="battle-stats"><span>Defeated <b id="kills">0</b></span><span>Lost <b id="losses">0</b></span></div></aside>
+        <div class="army-workspace"><div class="army-toolbar"><div class="army-tabs" role="tablist" aria-label="Command panels"><button class="active" data-tab="army" role="tab" aria-selected="true"><span data-icon="army"></span> Recruit</button><button data-tab="research" role="tab" aria-selected="false"><span data-icon="anvil"></span> Research</button><button data-tab="formation" role="tab" aria-selected="false"><span data-icon="grid"></span> Formation</button><button data-tab="scout" role="tab" aria-selected="false"><span data-icon="eye"></span> Scout</button></div><span id="roster-count">3 in your army</span></div><div id="workspace-content" class="workspace-content" role="tabpanel"></div></div>
       </section>
     </main>
+    <footer class="statusbar"><span><i class="live-dot"></i> <span id="status-text">Build your army. Take the crossing. Break their crown.</span></span><span id="save-status">CASTLE STRIKE <b>2.0</b></span></footer>
+    <div class="mobile-command"><div><strong id="mobile-gold">280</strong><small>GOLD · <span id="mobile-wave">PREPARATION</span></small></div><button id="mobile-play-btn" class="gold-btn">Begin Battle</button></div>
   </div>
-
-  <div id="help-modal" class="modal" hidden aria-hidden="true">
-    <button type="button" class="modal-backdrop" aria-label="Close help"></button>
-    <div class="modal-panel panel" role="dialog" aria-modal="true" aria-labelledby="help-title">
-      <div class="panel-ornament panel-ornament-tl" aria-hidden="true"></div>
-      <div class="panel-ornament panel-ornament-tr" aria-hidden="true"></div>
-      <div class="panel-ornament panel-ornament-bl" aria-hidden="true"></div>
-      <div class="panel-ornament panel-ornament-br" aria-hidden="true"></div>
-      <div class="modal-header">
-        <h2 id="help-title">How to Play</h2>
-        <button type="button" id="help-close" class="btn-ghost">Close</button>
-      </div>
-      <ul class="help-list">
-        <li><strong>Campaign levels</strong>: each victory unlocks the next level with a stronger AI. Defeat keeps you on the same level so you can retry. Progress is saved in the browser.</li>
-        <li><strong>Gold</strong> trickles in all the time. Economy upgrades raise your gold per second. Buy and place the next wave while the field is still fighting.</li>
-        <li><strong>Hire</strong> recruits units and Economy; <strong>Research</strong> upgrades your army. Class tracks buff every matching unit (Forged Swords for melee, Bodkin Arrows for ranged, Arcane Focus for magic/heal). Each unit also has specialties like Vitality (HP), Plating (armor), Reach (range), Haste (speed), Blast, or Siegecraft. Towers still get +HP/+ATK/+range. Living units update immediately.</li>
-        <li><strong>Deploy</strong>: click a barracks unit, then a highlighted spawn tile. Click a placed unit to select it — empty tiles glow to move, occupied tiles swap. Click the barracks (or double-click the unit) to send it back. Esc clears the selection.</li>
-        <li>When the 30s timer hits zero, your roster deploys automatically. Combat never pauses — survivors stay and the next countdown starts immediately, until a keep falls.</li>
-        <li><strong>Mobile</strong>: <strong>Shop</strong> to hire, then tap a glowing spawn tile on <strong>Battle</strong> to choose where that unit lives. Barracks under the field holds units you have not placed yet.</li>
-        <li><strong>Inspect</strong>: hover shop, barracks, or field units for full stats and Strong/Weak counters. On a phone, press and hold — the card docks at the bottom. Research cards preview the next level in green.</li>
-        <li><strong>Shortcuts</strong>: H = help · M = mute music · Esc = clear selection.</li>
-        <li><strong>Win streak</strong>: holding more units on the field than the enemy raises your streak and bonus gold per second (shown in the top bar).</li>
-        <li><strong>Roster cap</strong> starts at 2 and grows by 1 each wave (up to 24). Early fights stay small; save gold for better units or economy instead of flooding the field.</li>
-        <li><strong>Towers</strong> guard each approach and fire at nearby enemies. Destroy them, then siege the keep.</li>
-        <li>The first keep to fall loses. Keeps are fortified (1500 HP) — chip damage is reduced; bring a real siege force (catapults help).</li>
-        <li><strong>Champions</strong> (wave 4+): one hero per match — Bulwark, Bonesinger, or Raid Captain. Pay gold to rez if they fall during the countdown.</li>
-        <li><strong>Abilities</strong>: Brace, Volley, Shield Bash, Charge, Sanctuary, Arcane splash, Guardian Aegis taunt.</li>
-        <li><strong>New roles</strong>: Militia cheap soak · Assassin dives backline · Grenadier splash · Catapult siege.</li>
-      </ul>
-    </div>
-  </div>
-
-  <div id="end-modal" class="modal" hidden aria-hidden="true">
-    <button type="button" class="modal-backdrop" aria-label="Close"></button>
-    <div class="modal-panel modal-panel-sm panel" role="dialog" aria-modal="true" aria-labelledby="end-title">
-      <div class="panel-ornament panel-ornament-tl" aria-hidden="true"></div>
-      <div class="panel-ornament panel-ornament-tr" aria-hidden="true"></div>
-      <div class="panel-ornament panel-ornament-bl" aria-hidden="true"></div>
-      <div class="panel-ornament panel-ornament-br" aria-hidden="true"></div>
-      <h2 id="end-title">Victory</h2>
-      <p id="end-level" class="end-level" aria-live="polite"></p>
-      <p id="end-body"></p>
-      <ul id="end-stats" class="help-list"></ul>
-      <div class="modal-actions">
-        <button type="button" id="end-restart" class="btn-fight">Play Level 2</button>
-        <a href="../../" class="btn-ghost">Hall</a>
-        <button type="button" id="end-reset-level" class="btn-ghost">Reset progress</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="game-tooltip" class="game-tooltip" hidden role="tooltip"></div>
-  <div id="gold-float-layer" class="gold-float-layer" aria-hidden="true"></div>
-
-  <audio id="bg-music" preload="auto" playsinline></audio>
-
-  <script src="game.js"></script>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <dialog id="help-dialog" class="game-dialog"><button class="dialog-close icon-btn" data-close aria-label="Close help">×</button><span class="eyebrow">THE ART OF WAR</span><h2>Every wave is a new chance.</h2><p>Build an army that fights for you. Your entire formation marches every 25 seconds; survivors stay on the field to join the next wave.</p><div class="guide-steps"><div><b>01</b><strong>Build a balanced army</strong><p>Recruit permanent units with gold. Put sturdy fighters in front, archers and spellcasters behind. Inspect portraits to learn their counters.</p></div><div><b>02</b><strong>Control the crossing</strong><p>Hold the central shrine to earn extra gold. Invest in mines for lasting income, or recruit now to win the next fight.</p></div><div><b>03</b><strong>Adapt. Advance. Conquer.</strong><p>Research new ages for elite troops and a unique hero. Use commander abilities at the right moment. Destroy the enemy keep to win.</p></div></div><div class="key-guide"><span><kbd>SPACE</kbd> Pause / play</span><span><kbd>F</kbd> Formation</span><span><kbd>Q W E</kbd> Abilities</span><span><kbd>ESC</kbd> Cancel</span><span>Scroll to zoom · Right-drag to pan</span></div><button class="gold-btn" data-close>My army awaits</button></dialog>
+  <dialog id="settings-dialog" class="game-dialog settings-dialog"><button class="dialog-close icon-btn" data-close aria-label="Close settings">×</button><span class="eyebrow">A NEW CHAPTER</span><h2>Choose your allegiance</h2><p>Three armies. Three ways to rule the battlefield.</p><div id="faction-options" class="faction-options"></div><div class="match-options"><label>Opponent difficulty<select id="difficulty-select"><option value="easy">Recruit — forgiving</option><option value="normal" selected>Veteran — balanced</option><option value="hard">Warlord — relentless</option></select></label><label>Visual detail<select id="quality-select"><option value="high">High — shadows & atmosphere</option><option value="low">Low — performance</option></select></label></div><p class="restart-note" id="restart-note">A new match replaces the current match. Your best record is kept.</p><button id="new-match-btn" class="gold-btn">Start new match</button></dialog>
+  <dialog id="result-dialog" class="game-dialog result-dialog"><span class="result-crest" data-icon="crown"></span><span id="result-eyebrow" class="eyebrow">THE CROSSING IS YOURS</span><h2 id="result-title">Victory</h2><p id="result-copy"></p><div id="result-stats" class="result-stats"></div><button id="play-again-btn" class="gold-btn">Another campaign</button><button id="view-field-btn" class="text-btn">View battlefield</button></dialog>
+  <noscript><div class="noscript">Castle Strike needs JavaScript to command the battlefield. Please enable JavaScript and reload.</div></noscript>
+  <script type="module" src="game.js"></script>
 </body>
 </html>
