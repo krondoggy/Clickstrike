@@ -592,8 +592,10 @@ function makeEngine(state) {
       const pending = pendingBySource.get(u.id);
       const target = pending ? context.byId.get(pending.targetId) : chooseTacticalTarget(u, candidates, context);
       targets.set(u.id, target);
-      useAbility(u, target, dt);
     }
+    // Heals must not change a victim's apparent remaining health halfway through
+    // the opposing team's choices. Every commitment sees the same pre-cast state.
+    for (const u of living) if (u.hp > 0 && u.stunTime <= EPSILON) useAbility(u, targets.get(u.id), dt);
     if (abilityHits.length) resolvePackets(abilityHits.splice(0));
     const winding = new Set(state.pendingAttacks.map(a => a.sourceId));
     const movementIntents = new Map();

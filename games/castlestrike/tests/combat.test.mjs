@@ -341,10 +341,14 @@ test('hero group healing emits bounded links to allies who actually recovered he
   }
 });
 
-test('mirrored melee armies begin contact on the same tick and remain identical through the full encounter', async () => {
+test('mirrored melee and screened support encounters remain identical through every contact and heal', async () => {
   const { loadBalanceEngine, matchedUnitArmies, runEncounter } = await import('./balance-harness.mjs');
   const runtime = await loadBalanceEngine();
-  const fixture = matchedUnitArmies(runtime.data, 'footman', 'ghoul');
+  const fixtures = [
+    { ...matchedUnitArmies(runtime.data, 'footman', 'ghoul'), seed: 100000, layout: 'compact' },
+    { left: ['spearman', 'archer', 'footman', 'mage', 'priest', 'spearman', 'ballista'], right: ['abomination', 'cryptfiend', 'ghoul', 'banshee', 'necromancer', 'skeleton', 'ghoul', 'skeleton'], seed: 999480348, layout: 'spread', mode: 'screened' },
+  ];
+  for (const fixture of fixtures) {
   const traces = [];
   const capture = {
     ...runtime,
@@ -359,7 +363,7 @@ test('mirrored melee armies begin contact on the same tick and remain identical 
       return g;
     },
   };
-  const results = [false, true].map(swap => runEncounter(capture, { ...fixture, seed: 100000, swap, layout: 'compact' }));
+  const results = [false, true].map(swap => runEncounter(capture, { ...fixture, swap }));
   const [normal, mirrored] = traces;
   assert.equal(mirrored.length, normal.length, 'Switching map sides does not change encounter duration');
   const mirrorTarget = id => id?.startsWith('player-') ? id.replace('player-', 'enemy-') : id?.startsWith('enemy-') ? id.replace('enemy-', 'player-') : id;
@@ -378,4 +382,5 @@ test('mirrored melee armies begin contact on the same tick and remain identical 
     }
   }
   for (const key of ['winner', 'time', 'leftFieldValue', 'rightFieldValue']) assert.equal(results[0][key], results[1][key]);
+  }
 });

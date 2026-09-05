@@ -39,7 +39,52 @@ const doctrineRoles = {
   air: ['flying', 'ranged', 'flying', 'frontline', 'support'],
 };
 
+// Explicit mixed threat portfolios supplement the broad role doctrines. Each
+// recipe keeps a screen and a second role, rather than relabeling a pure mass.
+export const THREAT_PROFILES = Object.freeze({
+  armor: { tiers: [1, 2, 3], label: 'Heavy armor with ranged/support backing', recipes: {
+    alliance: ['footman', 'footman', 'archer', 'footman', 'priest', 'footman'],
+    horde: ['grunt', 'ironmaw', 'headhunter', 'grunt', 'shaman', 'tauren'],
+    undead: ['skeleton', 'abomination', 'cryptfiend', 'skeleton', 'necromancer', 'abomination'],
+  } },
+  ranged: { tiers: [1, 2, 3], label: 'Ranged majority behind a melee screen', recipes: {
+    alliance: ['footman', 'archer', 'archer', 'archer', 'archer', 'priest'],
+    horde: ['grunt', 'headhunter', 'headhunter', 'headhunter', 'headhunter', 'shaman'],
+    undead: ['skeleton', 'cryptfiend', 'cryptfiend', 'cryptfiend', 'cryptfiend', 'necromancer'],
+  } },
+  cavalry: { tiers: [2, 3], label: 'Mounted pressure with mixed backing', recipes: {
+    alliance: ['knight', 'footman', 'knight', 'archer', 'knight', 'priest'],
+    horde: ['raider', 'grunt', 'raider', 'headhunter', 'raider', 'shaman'],
+    undead: ['ghoul', 'ghoul', 'deathknight', 'ghoul', 'cryptfiend', 'ghoul'],
+  }, fallbacks: { undead: 'No cavalry unit: Ghoul flankers plus Death Knight are a pressure surrogate, not a mounted-force test.' } },
+  swarm: { tiers: [1, 2, 3], label: 'Numerous inexpensive bodies with ranged/support backing', recipes: {
+    alliance: ['spearman', 'spearman', 'footman', 'spearman', 'archer', 'spearman', 'spearman', 'priest'],
+    horde: ['grunt', 'grunt', 'grunt', 'grunt', 'headhunter', 'grunt', 'grunt', 'shaman'],
+    undead: ['ghoul', 'skeleton', 'ghoul', 'ghoul', 'cryptfiend', 'ghoul', 'skeleton', 'necromancer'],
+  } },
+});
+
+export function buildThreatDoctrine(data, faction, profile, budget, tier = 3) {
+  const definition = THREAT_PROFILES[profile];
+  if (!definition || !definition.tiers.includes(tier)) throw new Error(`Unavailable threat doctrine: ${profile} tier ${tier}`);
+  const recipe = definition.recipes[faction].filter(id => data.UNIT_MAP[id].tier <= tier);
+  const result = [];
+  let spent = 0, supply = 0;
+  for (let position = 0; position < 30; position++) {
+    const legal = recipe.filter(id => {
+      const unit = data.UNIT_MAP[id];
+      return spent + unit.cost <= budget && supply + unit.supply <= 72 && (!unit.hero || !result.includes(id));
+    });
+    if (!legal.length) break;
+    const requested = recipe[position % recipe.length];
+    const selected = legal.includes(requested) ? requested : legal.sort((a, b) => data.UNIT_MAP[a].cost - data.UNIT_MAP[b].cost)[0];
+    result.push(selected); spent += data.UNIT_MAP[selected].cost; supply += data.UNIT_MAP[selected].supply;
+  }
+  return result;
+}
+
 export function buildDoctrine(data, faction, profile, budget, tier = 3) {
+  if (THREAT_PROFILES[profile]) return buildThreatDoctrine(data, faction, profile, budget, tier);
   const pattern = doctrineRoles[profile];
   if (!pattern) throw new Error(`Unknown doctrine: ${profile}`);
   const result = [], counts = new Map();

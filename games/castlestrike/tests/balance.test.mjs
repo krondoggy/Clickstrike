@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { FACTIONS, UNITS, UNIT_MAP, ABILITY_RULES, counterScore, threatMatches } from '../src/data.js';
-import { loadBalanceEngine, armyCost, armySupply, relativeBudgetGap, matchedUnitArmies, matchedDoctrines, matchedMarginalFixture, matchedMixedAnswer, SIGNATURE_FIXTURES, runEncounter, runPaired } from './balance-harness.mjs';
+import { loadBalanceEngine, armyCost, armySupply, relativeBudgetGap, matchedUnitArmies, matchedDoctrines, matchedMarginalFixture, matchedMixedAnswer, SIGNATURE_FIXTURES, THREAT_PROFILES, runEncounter, runPaired } from './balance-harness.mjs';
 
 const runtime = await loadBalanceEngine();
 
@@ -80,4 +80,28 @@ test('the production-tick balance harness is reproducible and records both sides
   assert.equal(paired.runs, 4);
   assert.ok(paired.runsDetail.some(r => r.swap) && paired.runsDetail.some(r => !r.swap));
   assert.ok(paired.runsDetail.some(r => r.layout === 'compact') && paired.runsDetail.some(r => r.layout === 'spread'));
+});
+
+test('named threat portfolios use real mixed screens, relevant tiers and explicit cavalry fallback', () => {
+  for (const [profile, definition] of Object.entries(THREAT_PROFILES)) for (const tier of definition.tiers) {
+    for (let i = 0; i < FACTIONS.length; i++) for (let j = i + 1; j < FACTIONS.length; j++) {
+      const fixture = matchedDoctrines(runtime.data, FACTIONS[i].id, FACTIONS[j].id, profile, 1200, tier);
+      assert.ok(fixture, `${profile} ${tier}`);
+      assert.ok(relativeBudgetGap(fixture.leftCost, fixture.rightCost) <= 0.05);
+      for (const army of [fixture.left, fixture.right]) {
+        const units = army.map(id => UNIT_MAP[id]);
+        assert.ok(units.every(u => u.tier <= tier));
+        assert.ok(units.some(u => u.role === 'frontline'), 'A real melee screen');
+        assert.ok(units.some(u => u.role === 'ranged'), 'A second role behind the screen');
+        assert.ok(armySupply(runtime.data, army) <= 72);
+        const heroes = units.filter(u => u.hero);
+        assert.equal(heroes.length, new Set(heroes.map(u => u.id)).size);
+        const matches = u => profile === 'armor' ? u.armorType === 'heavy' : profile === 'ranged' ? u.role === 'ranged' : profile === 'swarm' ? u.tier === 1 && u.role === 'frontline' : u.role === 'cavalry';
+        if (profile === 'cavalry' && units[0].faction === 'undead') {
+          assert.ok(definition.fallbacks.undead.includes('not a mounted-force test'));
+          assert.ok(army.includes('ghoul') && army.includes('deathknight'));
+        } else assert.ok(units.filter(matches).reduce((sum, u) => sum + u.cost, 0) / armyCost(runtime.data, army) >= 0.5, `${profile}: majority threat investment`);
+      }
+    }
+  }
 });
