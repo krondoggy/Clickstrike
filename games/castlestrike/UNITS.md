@@ -104,7 +104,6 @@ A steadfast shieldbearer who buys time for the back line. **normal damage; heavy
 
 **Counter purpose:** Shieldwall reduces incoming ranged hits. Durable shields survive fragile skirmishers.
 
-**Strong against:** Archers, Light infantry. **Vulnerable to:** Spellcasters, Siege damage.
 
 ### Silverleaf Ranger
 
@@ -116,7 +115,6 @@ Longbows punish exposed skirmishers and airborne beasts. **piercing damage; ligh
 
 **Counter purpose:** Skyhunter adds damage against flying units. Piercing arrows punish light armor.
 
-**Strong against:** Flying units, Light armor. **Vulnerable to:** Heavy armor, Cavalry.
 
 ### Kingsguard Pike
 
@@ -128,7 +126,6 @@ An inexpensive answer to charging riders and aerial raids. **normal damage; medi
 
 **Counter purpose:** A stationary, facing brace cancels charge bonuses; pikes deal bonus damage to riders. Long pikes can strike flyers that enter melee reach.
 
-**Strong against:** Cavalry, Flying units. **Vulnerable to:** Archers, Area damage.
 
 ### Sunward Cavalier
 
@@ -140,7 +137,6 @@ A fast, heavily armored rider built to smash a vulnerable flank. **normal damage
 
 **Counter purpose:** A moving charge closes the gap to vulnerable archers. Flanks unprotected healers and casters.
 
-**Strong against:** Archers, Support units. **Vulnerable to:** Pikes, Magic damage.
 
 ### Lightkeeper
 
@@ -152,7 +148,6 @@ A fragile healer who keeps expensive frontline units in the fight. **magic damag
 
 **Counter purpose:** Repeated healing keeps a protected frontline alive. Sustained healing helps valuable allies survive focused attacks.
 
-**Strong against:** Sustained combat, Heavy armor. **Vulnerable to:** Cavalry, Burst damage.
 
 ### Tempest Arcanist
 
@@ -164,7 +159,6 @@ Crackling arcane bolts unravel clustered armored formations. **magic damage; lig
 
 **Counter purpose:** Arcane bolts deal 70% extra damage against heavy armor; protect the caster from a rush. Chain lightning hits additional enemies in a close group.
 
-**Strong against:** Heavy armor, Packed formations. **Vulnerable to:** Cavalry, Light skirmishers.
 
 ### Stormbreak Ballista
 
@@ -176,7 +170,6 @@ An imposing engine with the reach to dismantle castle defenses. **siege damage; 
 
 **Counter purpose:** Siege damage has a large bonus against fortified defenses. A wide impact damages clustered ground troops.
 
-**Strong against:** Structures, Dense infantry. **Vulnerable to:** Flying units, Flanking cavalry.
 
 ### Stormwing
 
@@ -188,7 +181,6 @@ An armored storm rider who sails above the melee. **magic damage; light armor.**
 
 **Counter purpose:** Magic attacks damage heavy armor effectively. Thunderclap splashes through nearby enemies.
 
-**Strong against:** Ground melee, Heavy armor. **Vulnerable to:** Skyhunters, Webs and nets.
 
 ### Aldric, the Dawnbringer
 
@@ -200,7 +192,6 @@ A radiant commander whose presence turns a shield line into a fortress. **normal
 
 **Counter purpose:** An armor aura reduces nearby allies’ physical damage taken. Repeated area healing supports long fights.
 
-**Strong against:** Attrition, Physical armies. **Vulnerable to:** Magic focus fire, Dispersed fights.
 
 ## Ironclad Horde
 
@@ -230,7 +221,6 @@ A brutal axe fighter who becomes deadlier as the battle wears on. **normal damag
 
 **Counter purpose:** Heavy armor and Blood Fury punish fragile ground troops. A durable body trades efficiently in a close fight.
 
-**Strong against:** Light infantry, Close combat. **Vulnerable to:** Magic damage, Kiting.
 
 ### Venom Hunter
 
@@ -242,7 +232,6 @@ Thrown spears leave a lingering sting in beasts and fragile troops. **piercing d
 
 **Counter purpose:** Thrown spears and poison can reach flying units. Piercing damage and poison punish fragile troops.
 
-**Strong against:** Flying units, Light armor. **Vulnerable to:** Heavy armor, Healing.
 
 ### Warg Raider
 
@@ -254,7 +243,6 @@ Fast wolf riders drag flying prey into reach and harry back lines. **normal dama
 
 **Counter purpose:** Ensnare stops a flyer from moving while the raider closes. Fast movement and roots catch exposed support units. A flank reaches slow, unprotected siege engines.
 
-**Strong against:** Flying units, Exposed support. **Vulnerable to:** Pikes, Heavy frontline.
 
 ### Stormcaller
 
@@ -266,7 +254,6 @@ An elemental mystic who drives warriors into a killing frenzy. **magic damage; l
 
 **Counter purpose:** Attacks weaken heavy armor by 3 for 5 seconds. Bloodlust increases nearby warriors’ attack speed.
 
-**Strong against:** Large warbands, Heavy armor. **Vulnerable to:** Cavalry, Area damage.
 
 ### Ironmaw Berserker
 
@@ -278,7 +265,6 @@ A veteran wielding a great axe that cuts through crowded ranks. **normal damage;
 
 **Counter purpose:** Cleave spreads damage across adjacent ground troops. A strong frontline punishes armies that cannot clear groups.
 
-**Strong against:** Mass infantry, Summons. **Vulnerable to:** Flying units, Magic damage.
 
 ### Ember Demolisher
 
@@ -290,7 +276,6 @@ A lumbering siege cart hurling cauldrons of burning pitch. **siege damage; forti
 
 **Counter purpose:** Siege attacks break fortified defenses. Burning pitch splashes through grouped ground troops.
 
-**Strong against:** Structures, Packed formations. **Vulnerable to:** Flying units, Cavalry.
 
 ### Earthshaker
 
@@ -302,7 +287,6 @@ A towering horned guardian who breaks enemy lines underfoot. **normal damage; he
 
 **Counter purpose:** War Stomp damages and briefly stuns nearby ground enemies. A large body and ground stun interrupt exposed riders.
 
-**Strong against:** Mass infantry, Melee armies. **Vulnerable to:** Flying units, Focused magic.
 
 ### Plaguewing
 
@@ -314,7 +298,6 @@ A venomous drake that hunts archers and unguarded siege engines. **piercing dama
 
 **Counter purpose:** Piercing attacks and venom punish light armor. Flying avoids siege retaliation.
 
-**Strong against:** Ground melee, Light armor. **Vulnerable to:** Archers, Healing and nets.
 
 ### Korr, the Ashblade
 
@@ -326,7 +309,6 @@ A relentless duelist whose whirling blade carves open the enemy flank. **normal 
 
 **Counter purpose:** Fast movement reaches unprotected support units. Every third strike cleaves nearby ground enemies.
 
-**Strong against:** Support units, Grouped melee. **Vulnerable to:** Crowd control, Focused magic.
 
 ## Hollow Covenant
 
@@ -356,7 +338,6 @@ A tireless scavenger whose claws sustain it through the melee. **normal damage; 
 
 **Counter purpose:** Fast movement and lifesteal reward access to exposed archers. Punishes support units left outside a protective screen.
 
-**Strong against:** Exposed archers, Small skirmishes. **Vulnerable to:** Heavy armor, Area damage.
 
 ### Bone Sentinel
 
@@ -368,7 +349,6 @@ A rusted shield and ancient bones, sworn to serve beyond death. **normal damage;
 
 **Counter purpose:** A stationary sentinel facing a charge cancels its bonus damage and stun. Armor and reassembly absorb repeated physical attacks.
 
-**Strong against:** Physical damage, Attrition. **Vulnerable to:** Magic damage, Siege splash.
 
 ### Crypt Stalker
 
@@ -380,7 +360,6 @@ An armored arachnid that pins aerial threats beneath barbed webs. **piercing dam
 
 **Counter purpose:** Graveweb slows flyers and adds anti-air damage. Piercing attacks punish lightly armored targets.
 
-**Strong against:** Flying units, Light armor. **Vulnerable to:** Heavy armor, Siege splash.
 
 ### Graveweaver
 
@@ -392,7 +371,6 @@ A dark ritualist who swells the ranks with expendable servants. **magic damage; 
 
 **Counter purpose:** Summons occupy opponents that can attack only one body at a time. Repeated summons replace an expendable frontline.
 
-**Strong against:** Single-target armies, Attrition. **Vulnerable to:** Area damage, Cavalry.
 
 ### Veil Siren
 
@@ -404,7 +382,6 @@ A sorrowful spirit whose curse cripples powerful enemy champions. **magic damage
 
 **Counter purpose:** Magic damage is effective against heavy armor. Withering Curse reduces a powerful target’s attack damage.
 
-**Strong against:** Heroes, Heavy armor. **Vulnerable to:** Mass infantry, Light skirmishers.
 
 ### Plague Colossus
 
@@ -416,7 +393,6 @@ A shambling wall of stitched flesh, surrounded by choking decay. **normal damage
 
 **Counter purpose:** Carrion Cloud damages every nearby ground enemy. A large armored body absorbs sustained frontline pressure.
 
-**Strong against:** Mass infantry, Long melees. **Vulnerable to:** Flying units, Focused magic.
 
 ### Sepulcher Engine
 
@@ -428,7 +404,6 @@ A bone-bound engine that hurls restless souls at castle walls. **siege damage; f
 
 **Counter purpose:** Siege attacks damage fortified defenses effectively. Soulburst splashes across dense ground formations.
 
-**Strong against:** Structures, Mass infantry. **Vulnerable to:** Flying units, Cavalry.
 
 ### Frostbound Wyrm
 
@@ -440,7 +415,6 @@ An ancient skeletal dragon trailing a storm of killing frost. **magic damage; li
 
 **Counter purpose:** Magic breath is effective against heavy armor. Winter’s Breath damages and slows neighboring enemies.
 
-**Strong against:** Heavy armor, Ground armies. **Vulnerable to:** Archers, Webs and nets.
 
 ### Morvath, the Hollow King
 
@@ -452,7 +426,6 @@ An immortal king leading his cursed host toward one final conquest. **normal dam
 
 **Counter purpose:** Death’s Embrace sustains nearby allies. Death’s Embrace also strikes nearby ground enemies.
 
-**Strong against:** Attrition, Grouped melee. **Vulnerable to:** Ranged focus fire, Magic damage.
 
 ## Opening suggestions
 

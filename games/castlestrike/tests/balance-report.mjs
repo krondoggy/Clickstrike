@@ -97,7 +97,9 @@ for (const unit of runtime.data.UNITS) {
   if (!answers.length && !mixedAnswers.length) report.flags.push({ type: 'MISSING_AFFORDABLE_ANSWER', unit: unit.id });
 }
 
-for (const row of [...report.duels, ...report.mixed, ...report.mixedAnswers]) if (row.sideBias > 0.05) report.flags.push({ type: 'SIDE_BIAS_OVER_5_POINTS', left: row.left || row.leftFaction || row.candidate, right: row.right || row.rightFaction || row.opponent, mode: row.mode || 'isolated', profile: row.profile, sideBias: row.sideBias });
+const allResultSets = [...report.duels, ...report.mixed, ...report.mixedAnswers,
+  ...report.marginal.flatMap(row => ['variant', 'reference'].map(arm => ({ ...row[arm], candidate: row.candidate, opponent: row.opponent, mode: `marginal-${arm}`, profile: row.label })))];
+for (const row of allResultSets) if (row.sideBias > 0.05) report.flags.push({ type: 'SIDE_BIAS_OVER_5_POINTS', left: row.left || row.leftFaction || row.candidate, right: row.right || row.rightFaction || row.opponent, mode: row.mode || 'isolated', profile: row.profile, tier: row.tier, sideBias: row.sideBias });
 for (let i = 0; i < runtime.data.FACTIONS.length; i++) for (let j = i + 1; j < runtime.data.FACTIONS.length; j++) {
   const left = runtime.data.FACTIONS[i].id, right = runtime.data.FACTIONS[j].id;
   const rows = report.mixed.filter(r => r.leftFaction === left && r.rightFaction === right);
@@ -105,7 +107,7 @@ for (let i = 0; i < runtime.data.FACTIONS.length; i++) for (let j = i + 1; j < r
   report.factionSignals.push({ left, right, score, scenarios: rows.length });
   if (score < 0.4 || score > 0.6) report.flags.push({ type: 'FACTION_PORTFOLIO_OUTSIDE_40_60', left, right, score, detail: 'Diagnostic portfolio imbalance, not a measured full-match player win rate.' });
 }
-if ([...report.duels, ...report.mixed].some(r => !r.finite || r.peakUnits > 180)) report.flags.push({ type: 'SIMULATION_INVARIANT_FAILURE' });
+if (allResultSets.some(r => !r.finite || r.peakUnits > 180)) report.flags.push({ type: 'SIMULATION_INVARIANT_FAILURE' });
 
 const lines = [
   '# Castle Strike balance evidence', '',
