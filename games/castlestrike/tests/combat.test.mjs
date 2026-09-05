@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, counterNeed } from '../src/engine.js';
-import { UNIT_MAP, ABILITY_RULES } from '../src/data.js';
+import { UNIT_MAP, UNITS, ABILITY_RULES } from '../src/data.js';
 
 function arena(playerIds, enemyIds) {
   const g = createGame({ faction: UNIT_MAP[playerIds[0]].faction });
@@ -383,4 +383,24 @@ test('mirrored melee and screened support encounters remain identical through ev
   }
   for (const key of ['winner', 'time', 'leftFieldValue', 'rightFieldValue']) assert.equal(results[0][key], results[1][key]);
   }
+});
+
+test('all 27 advertised attack cadences and steady haste/rally combinations stay within two percent over two minutes', () => {
+  const measure = (definition, haste = false, rally = false) => {
+    const g = arena([definition.id], ['grunt']);
+    const [attacker, target] = g.state.units;
+    attacker.x = definition.range > 3 ? -5 : -1; target.x = 1;
+    attacker.damage = 1; attacker.abilityCooldown = target.abilityCooldown = 1000000;
+    target.hp = target.maxHp = 1000000000; target.cooldown = target.nextAttackAt = 1000000;
+    attacker.hasteTime = haste ? 1000 : 0; attacker.rallyTime = rally ? 1000 : 0;
+    ready(attacker);
+    g.update(5); // Exclude initial movement, windup and phase alignment.
+    const before = attacker.attacks;
+    g.update(60); g.update(60);
+    const measuredPerSecond = (attacker.attacks - before) / 120;
+    const advertisedPerSecond = (1 + (haste ? .3 : 0) + (rally ? .35 : 0)) / definition.attackSpeed;
+    assert.ok(Math.abs(measuredPerSecond / advertisedPerSecond - 1) <= .0200001, `${definition.id}, haste=${haste}, rally=${rally}: measured ${measuredPerSecond}/s vs advertised ${advertisedPerSecond}/s`);
+  };
+  for (const definition of UNITS) measure(definition);
+  for (const [haste, rally] of [[true, false], [false, true], [true, true]]) measure(UNIT_MAP.archer, haste, rally);
 });
