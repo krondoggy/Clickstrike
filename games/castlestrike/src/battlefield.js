@@ -442,6 +442,11 @@ export class Battlefield {
     }
     for (const structure of state.structures || []) {
       const p = this._fallbackProject(structure.x, structure.z), castle = structure.kind === 'castle', size = castle ? 3.4 : 1.35, bh = castle ? 5 : 3;
+      if (structure.hp <= 0) {
+        c.fillStyle='#66685c';
+        for(let i=0;i<5;i++)c.fillRect(p.x+(i-2)*size*s*.5,p.y-(i%2+.3)*s,size*s*.6,(i%2+.7)*s);
+        continue;
+      }
       c.fillStyle = '#acb199'; c.fillRect(p.x - size * s, p.y - bh * s, size * 2 * s, bh * s);
       c.fillStyle = structure.team === 'player' ? '#386b96' : '#a34c48'; c.beginPath(); c.moveTo(p.x - (size + .6) * s, p.y - bh * s); c.lineTo(p.x, p.y - (bh + size) * s); c.lineTo(p.x + (size + .6) * s, p.y - bh * s); c.closePath(); c.fill();
       c.fillStyle = '#233d33'; c.fillRect(p.x - size * .28 * s, p.y - bh * .47 * s, size * .56 * s, bh * .47 * s);

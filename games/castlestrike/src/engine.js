@@ -28,10 +28,10 @@ export function counterNeed(candidate, opponentUnits, ownedUnits) {
   const opposingInvestment = opponentUnits.reduce((total, u) => total + u.cost, 0) || 1;
   const matchupScore = (unit, target) => {
     const declared = counterScore(unit, target);
-    const priority = target.role === 'flying' ? 'air' : target.armorType === 'heavy' ? 'armorHeavy' : target.role === 'cavalry' ? 'cavalry' : null;
+    const specialistTags = [target.role === 'flying' ? 'air' : null, target.role === 'cavalry' ? 'cavalry' : null, target.armorType === 'heavy' ? 'armorHeavy' : null].filter(Boolean);
     // Broad attrition/physical strengths do not replace a declared specialist
     // when the opposing player has paid for flying or heavily armored troops.
-    return declared * (!priority || unit.counters.some(c => c.threat === priority) ? 1 : .25);
+    return declared * (!specialistTags.length || unit.counters.some(c => specialistTags.includes(c.threat)) ? 1 : .25);
   };
   const coverage = new Map(opponentUnits.map(target => {
     const invested = opponentUnits.filter(u => u.id === target.id).reduce((total, u) => total + u.cost, 0);

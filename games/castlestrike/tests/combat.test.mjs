@@ -322,6 +322,12 @@ test('counter need weights invested gold and saturates only when the army has al
   const armoredNeed = counterNeed(UNIT_MAP.mage, heavy, []);
   assert.equal(counterNeed(UNIT_MAP.mage, heavy, units(Array(8).fill('archer'))), armoredNeed);
   assert.ok(counterNeed(UNIT_MAP.mage, heavy, units(Array(4).fill('mage'))) < armoredNeed / 3);
+  const cavalier = units(['knight']), raider = units(['raider']);
+  for (const defender of [UNIT_MAP.spearman, UNIT_MAP.skeleton]) {
+    assert.ok(counterNeed(defender, cavalier, []) >= 1, `${defender.id} retains its declared anti-cavalry credit against heavy riders`);
+    assert.equal(counterNeed(defender, cavalier, []), counterNeed(defender, raider, []));
+  }
+  assert.ok(counterNeed(UNIT_MAP.mage, cavalier, []) >= 1, 'Armor-breaking remains a valid alternative against a heavy rider');
 });
 
 test('hero group healing emits bounded links to allies who actually recovered health', () => {

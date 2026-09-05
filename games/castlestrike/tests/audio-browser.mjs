@@ -325,8 +325,8 @@ try {
     await page.evaluate(() => sound.configure({ sound: false }));
   }
 
-  // Cross the real engine -> frame renderer -> audio path: spell kills can
-  // remove units before the next rendered frame, especially at battle speed 3.
+  // Cross the real engine -> frame renderer -> audio path. Starfall must finish
+  // its descent, then its casualties must reach audio at the displayed impact.
   await page.goto(`${base}/games/castlestrike/`);
   assert.deepEqual(errors, [], 'All battlefield modules load before testing death routing');
   await page.waitForFunction(() => !!window.castleStrike).catch(error => { throw new Error(`${error.message}; browser errors: ${JSON.stringify(errors)}`); });
@@ -339,18 +339,30 @@ try {
     audio.configure({ music: false });
     window.heardBattle = [];
     const play = audio.play.bind(audio);
-    audio.play = (kind, details) => { heardBattle.push({ kind, details }); return play(kind, details); };
+    audio.play = (kind, details) => { heardBattle.push({ kind, details, simulationTime: game.state.time, visualTime: castleStrike.battlefield.time }); return play(kind, details); };
     game.start(); game.setSpeed(3);
     const enemies = game.state.units.filter(unit => unit.team === 'enemy').slice(0, 2);
     game.state.units = enemies;
     enemies.forEach((unit, index) => Object.assign(unit, { x: index ? 4 : -4, z: 0, hp: 1, resurrected: true, speed: 0, cooldown: 20 }));
     game.cast('meteor', 0, 0);
+    window.starfallFlight = {
+      castAt: game.state.time,
+      impactAt: game.state.projectiles.find(projectile => projectile.kind === 'meteor').impactAt,
+      queuedDeathsAtCast: heardBattle.filter(event => event.kind === 'death').length,
+      healthAtCast: enemies.map(unit => unit.hp),
+    };
     return enemies.map(unit => unit.unitId);
   });
+  const flight = await page.evaluate(() => starfallFlight);
+  assert.ok(Math.abs(flight.impactAt - flight.castAt - 1.4) < .00001, 'The real route schedules a 1.4-second Starfall descent');
+  assert.equal(flight.queuedDeathsAtCast, 0, 'Casting cannot emit a death before impact');
+  assert.ok(flight.healthAtCast.every(hp => hp === 1), 'Casting leaves marked victims alive until landing');
   await page.waitForFunction(count => heardBattle.filter(event => event.kind === 'death').length === count, victims.length);
   const routedDeaths = await page.evaluate(() => heardBattle.filter(event => event.kind === 'death'));
   assert.deepEqual(routedDeaths.map(event => event.details.unitId).sort(), victims.sort(), 'Every lethal spell result reaches audio after simulation cleanup');
   assert.deepEqual(routedDeaths.map(event => event.details.x).sort((a, b) => a - b), [-4, 4], 'Death position survives rendering for stereo placement');
+  assert.ok(routedDeaths.every(event => event.details.time >= flight.impactAt && event.simulationTime >= flight.impactAt), 'Lethal sounds come from actual impact events');
+  assert.ok(routedDeaths.every(event => event.visualTime + .00001 >= event.details.time), 'The sound waits until the rendered battlefield reaches the casualty tick');
   await page.waitForTimeout(350);
   assert.equal(await page.evaluate(() => heardBattle.filter(event => event.kind === 'death').length), victims.length, 'Subsequent frames do not replay deaths');
   await page.evaluate(() => castleStrike.game.togglePause());
